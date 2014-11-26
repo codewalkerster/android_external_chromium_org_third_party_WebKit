@@ -391,6 +391,10 @@ private:
     Timer<EventHandler> m_activeIntervalTimer;
     double m_lastShowPressTimestamp;
     RefPtrWillBeMember<Element> m_lastDeferredTapElement;
+
+#ifdef ENABLE_CUSTOMIZATION
+    unsigned m_touchPointPlusValue;
+#endif
 };
 
 } // namespace WebCore

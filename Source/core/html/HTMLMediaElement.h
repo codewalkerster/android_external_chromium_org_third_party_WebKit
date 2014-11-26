@@ -593,6 +593,12 @@ private:
     friend class TrackDisplayUpdateScope;
 
     static URLRegistry* s_mediaStreamRegistry;
+
+#ifdef ENABLE_CUSTOMIZATION
+    double m_pending_seek;
+    bool m_loadSource : 1;
+    bool m_seekAfterEnded : 1;
+#endif
 };
 
 #ifndef NDEBUG

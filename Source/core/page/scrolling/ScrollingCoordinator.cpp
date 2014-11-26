@@ -938,9 +938,13 @@ bool ScrollingCoordinator::hasVisibleSlowRepaintViewportConstrainedObjects(Frame
         if (!viewportConstrainedObject->isBoxModelObject() || !viewportConstrainedObject->hasLayer())
             return true;
         RenderLayer* layer = toRenderBoxModelObject(viewportConstrainedObject)->layer();
+
+     // deleted by yalong.liu, because some video objects has NotComposited,but need scrolling
+    #ifndef ENABLE_CUSTOMIZATION
         // Any explicit reason that a fixed position element is not composited shouldn't cause slow scrolling.
         if (layer->compositingState() != PaintsIntoOwnBacking && layer->viewportConstrainedNotCompositedReason() == RenderLayer::NoNotCompositedReason)
             return true;
+    #endif
 
         // Composited layers that actually paint into their enclosing ancestor
         // must also force main thread scrolling.

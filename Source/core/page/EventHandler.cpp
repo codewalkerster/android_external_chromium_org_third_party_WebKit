@@ -228,6 +228,9 @@ EventHandler::EventHandler(LocalFrame* frame)
     , m_longTapShouldInvokeContextMenu(false)
     , m_activeIntervalTimer(this, &EventHandler::activeIntervalTimerFired)
     , m_lastShowPressTimestamp(0)
+#ifdef ENABLE_CUSTOMIZATION
+    , m_touchPointPlusValue(0)
+#endif
 {
 }
 
@@ -3408,6 +3411,12 @@ bool EventHandler::handleTouchEvent(const PlatformTouchEvent& event)
         const PlatformTouchPoint& point = points[i];
         if (point.state() != PlatformTouchPoint::TouchPressed)
             freshTouchEvents = false;
+    #ifdef ENABLE_CUSTOMIZATION
+        else {
+            m_touchPointPlusValue++;
+        }
+    #endif
+
         if (point.state() != PlatformTouchPoint::TouchReleased && point.state() != PlatformTouchPoint::TouchCancelled)
             allTouchReleased = false;
     }
@@ -3580,8 +3589,13 @@ bool EventHandler::handleTouchEvent(const PlatformTouchEvent& event)
         FloatPoint adjustedPagePoint = pagePoint.scaledBy(scaleFactor);
         FloatSize adjustedRadius = point.radius().scaledBy(scaleFactor);
 
+    #ifdef ENABLE_CUSTOMIZATION
+        RefPtrWillBeRawPtr<Touch> touch = Touch::create(
+            targetFrame, touchTarget.get(), m_touchPointPlusValue, point.screenPos(), adjustedPagePoint, adjustedRadius, point.rotationAngle(), point.force());
+    #else
         RefPtrWillBeRawPtr<Touch> touch = Touch::create(
             targetFrame, touchTarget.get(), point.id(), point.screenPos(), adjustedPagePoint, adjustedRadius, point.rotationAngle(), point.force());
+    #endif
 
         // Ensure this target's touch list exists, even if it ends up empty, so
         // it can always be passed to TouchEvent::Create below.

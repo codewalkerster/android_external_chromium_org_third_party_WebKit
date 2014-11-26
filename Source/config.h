@@ -158,3 +158,7 @@
 #if OS(LINUX) || OS(ANDROID) || OS(WIN)
 #define WTF_USE_HARFBUZZ 1
 #endif
+
+#if OS(ANDROID)
+#define ENABLE_CUSTOMIZATION 1
+#endif

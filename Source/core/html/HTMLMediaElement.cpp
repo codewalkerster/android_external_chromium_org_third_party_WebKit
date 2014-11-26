@@ -340,6 +340,12 @@ HTMLMediaElement::HTMLMediaElement(const QualifiedName& tagName, Document& docum
 #if ENABLE(WEB_AUDIO)
     , m_audioSourceNode(nullptr)
 #endif
+#ifdef ENABLE_CUSTOMIZATION
+    , m_pending_seek(0)
+    , m_loadSource(false)
+    , m_seekAfterEnded(false)
+#endif
+
 {
     ASSERT(RuntimeEnabledFeatures::mediaEnabled());
 
@@ -494,6 +500,9 @@ void HTMLMediaElement::parseAttribute(const QualifiedName& name, const AtomicStr
     if (name == srcAttr) {
         // Trigger a reload, as long as the 'src' attribute is present.
         if (!value.isNull()) {
+        #ifdef ENABLE_CUSTOMIZATION
+            m_pending_seek = currentTime();
+        #endif
             clearMediaPlayer(LoadMediaResource);
             scheduleDelayedAction(LoadMediaResource);
         }
@@ -902,6 +911,10 @@ void HTMLMediaElement::loadResource(const KURL& url, ContentType& contentType, c
 
     WTF_LOG(Media, "HTMLMediaElement::loadResource(%s, %s, %s)", urlForLoggingMedia(url).utf8().data(), contentType.raw().utf8().data(), keySystem.utf8().data());
 
+#ifdef ENABLE_CUSTOMIZATION
+    m_loadSource = true;
+#endif
+
     LocalFrame* frame = document().frame();
     if (!frame) {
         mediaLoadingFailed(MediaPlayer::FormatError);
@@ -969,6 +982,7 @@ void HTMLMediaElement::loadResource(const KURL& url, ContentType& contentType, c
 
     if (renderer())
         renderer()->updateFromElement();
+
 }
 
 void HTMLMediaElement::startPlayerLoad()
@@ -1886,6 +1900,12 @@ void HTMLMediaElement::seek(double time, ExceptionState& exceptionState)
 {
     WTF_LOG(Media, "HTMLMediaElement::seek(%f)", time);
 
+#ifdef ENABLE_CUSTOMIZATION
+    if (ended()) {
+        m_seekAfterEnded = true;
+    }
+#endif
+
     // 4.8.10.9 Seeking
 
     // 1 - If the media element's readyState is HAVE_NOTHING, then raise an InvalidStateError exception.
@@ -1951,6 +1971,9 @@ void HTMLMediaElement::seek(double time, ExceptionState& exceptionState)
             // is reset to false. See http://crbug.com/266631
             scheduleTimeupdateEvent(false);
             scheduleEvent(EventTypeNames::seeked);
+        #ifdef ENABLE_CUSTOMIZATION
+            scheduleEvent(EventTypeNames::canplay);
+        #endif
         }
         m_seeking = false;
         return;
@@ -1968,6 +1991,13 @@ void HTMLMediaElement::seek(double time, ExceptionState& exceptionState)
     scheduleEvent(EventTypeNames::seeking);
 
     // 9 - Set the current playback position to the given new playback position
+#ifdef ENABLE_CUSTOMIZATION
+    if (m_loadSource == true && m_pending_seek > 0) {
+        time = m_pending_seek;
+    }
+    m_loadSource = false;
+#endif
+
     m_player->seek(time);
 
     // 10-14 are handled, if necessary, when the engine signals a readystate change or otherwise
@@ -1987,6 +2017,9 @@ void HTMLMediaElement::finishSeek()
 
     // 14 - Queue a task to fire a simple event named seeked at the element.
     scheduleEvent(EventTypeNames::seeked);
+#ifdef ENABLE_CUSTOMIZATION
+    scheduleEvent(EventTypeNames::canplay);
+#endif
 
     setDisplayMode(Video);
 }
@@ -3300,6 +3333,15 @@ void HTMLMediaElement::updatePlayState()
     } else { // Should not be playing right now
         if (!playerPaused)
             m_player->pause();
+
+    #ifdef ENABLE_CUSTOMIZATION
+        if (m_seekAfterEnded) {
+            m_player->play();
+            m_player->pause();
+            m_seekAfterEnded = false;
+        }
+    #endif
+
         refreshCachedTime();
 
         m_playbackProgressTimer.stop();
