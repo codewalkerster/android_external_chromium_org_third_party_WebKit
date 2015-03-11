@@ -34,28 +34,21 @@
 #include "core/page/DragActions.h"
 #include "core/page/DragClient.h"
 
-namespace WebCore {
-class ClipBoard;
-class DragData;
-class DragImage;
-class IntPoint;
-class KURL;
-}
-
 namespace blink {
+
 class WebViewImpl;
 
-class DragClientImpl FINAL : public WebCore::DragClient {
+class DragClientImpl FINAL : public DragClient {
 public:
-    DragClientImpl(WebViewImpl* webView) : m_webView(webView) { }
+    explicit DragClientImpl(WebViewImpl* webView) : m_webView(webView) { }
 
-    virtual WebCore::DragDestinationAction actionMaskForDrag(WebCore::DragData*) OVERRIDE;
+    virtual DragDestinationAction actionMaskForDrag(DragData*) OVERRIDE;
     virtual void startDrag(
-        WebCore::DragImage*,
-        const WebCore::IntPoint& dragImageOrigin,
-        const WebCore::IntPoint& eventPos,
-        WebCore::Clipboard* clipboard,
-        WebCore::LocalFrame* frame,
+        DragImage*,
+        const IntPoint& dragImageOrigin,
+        const IntPoint& eventPos,
+        DataTransfer*,
+        LocalFrame*,
         bool isLinkDrag = false) OVERRIDE;
 
 private:

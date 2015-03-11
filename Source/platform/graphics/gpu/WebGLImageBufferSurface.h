@@ -36,10 +36,8 @@
 #include "wtf/OwnPtr.h"
 
 namespace blink {
-class WebGraphicsContext3DProvider;
-}
 
-namespace WebCore {
+class WebGraphicsContext3DProvider;
 
 // This is a GPU backed surface that has no canvas or render target.
 class PLATFORM_EXPORT WebGLImageBufferSurface : public ImageBufferSurface {
@@ -49,10 +47,11 @@ public:
     virtual ~WebGLImageBufferSurface();
 
     virtual SkCanvas* canvas() const OVERRIDE { return 0; }
-    virtual const SkBitmap& bitmap() const OVERRIDE { return m_bitmap; }
+    virtual const SkBitmap& bitmap() OVERRIDE { return m_bitmap; }
     virtual bool isValid() const OVERRIDE { return m_bitmap.pixelRef(); }
     virtual bool isAccelerated() const OVERRIDE { return true; }
     virtual Platform3DObject getBackingTexture() const OVERRIDE;
+    virtual void didModifyBackingTexture() OVERRIDE;
     virtual bool cachedBitmapEnabled() const OVERRIDE { return true; }
     virtual const SkBitmap& cachedBitmap() const OVERRIDE { return m_cachedBitmap; }
     virtual void invalidateCachedBitmap() OVERRIDE;
@@ -63,10 +62,9 @@ private:
     // This raw-pixel based SkBitmap works as a cache at CPU side to avoid heavy cost
     // on readback from GPU side to CPU side in some cases.
     SkBitmap m_cachedBitmap;
-    OwnPtr<blink::WebGraphicsContext3DProvider> m_contextProvider;
+    OwnPtr<WebGraphicsContext3DProvider> m_contextProvider;
 };
 
-
-} // namespace WebCore
+} // namespace blink
 
 #endif

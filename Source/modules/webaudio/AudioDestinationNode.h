@@ -31,17 +31,19 @@
 #include "modules/webaudio/AudioBuffer.h"
 #include "modules/webaudio/AudioNode.h"
 
-namespace WebCore {
+namespace blink {
 
 class AudioBus;
 class AudioContext;
 
 class AudioDestinationNode : public AudioNode, public AudioIOCallback {
+    DEFINE_WRAPPERTYPEINFO();
 public:
     AudioDestinationNode(AudioContext*, float sampleRate);
     virtual ~AudioDestinationNode();
 
     // AudioNode
+    virtual void dispose() OVERRIDE;
     virtual void process(size_t) OVERRIDE FINAL { } // we're pulled by hardware so this is never called
 
     // The audio hardware calls render() to get the next render quantum of audio into destinationBus.
@@ -93,6 +95,6 @@ protected:
     LocalAudioInputProvider m_localAudioInputProvider;
 };
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // AudioDestinationNode_h

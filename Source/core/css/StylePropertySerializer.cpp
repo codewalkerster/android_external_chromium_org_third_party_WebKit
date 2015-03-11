@@ -25,11 +25,11 @@
 
 #include "core/CSSValueKeywords.h"
 #include "core/StylePropertyShorthand.h"
-#include "core/css/RuntimeCSSEnabled.h"
+#include "core/css/CSSPropertyMetadata.h"
 #include "wtf/BitArray.h"
 #include "wtf/text/StringBuilder.h"
 
-namespace WebCore {
+namespace blink {
 
 static bool isInitialOrInherit(const String& value)
 {
@@ -70,7 +70,7 @@ String StylePropertySerializer::asText() const
         StylePropertySet::PropertyReference property = m_propertySet.propertyAt(n);
         CSSPropertyID propertyID = property.id();
         // Only enabled or internal properties should be part of the style.
-        ASSERT(RuntimeCSSEnabled::isCSSPropertyEnabled(propertyID) || isInternalProperty(propertyID));
+        ASSERT(CSSPropertyMetadata::isEnabledProperty(propertyID) || isInternalProperty(propertyID));
         CSSPropertyID shorthandPropertyID = CSSPropertyInvalid;
         CSSPropertyID borderFallbackShorthandProperty = CSSPropertyInvalid;
         String value;
@@ -123,6 +123,12 @@ String StylePropertySerializer::asText() const
             if (!shorthandPropertyID)
                 shorthandPropertyID = borderFallbackShorthandProperty;
             break;
+        case CSSPropertyBorderTopLeftRadius:
+        case CSSPropertyBorderTopRightRadius:
+        case CSSPropertyBorderBottomLeftRadius:
+        case CSSPropertyBorderBottomRightRadius:
+            shorthandPropertyID = CSSPropertyBorderRadius;
+            break;
         case CSSPropertyWebkitBorderHorizontalSpacing:
         case CSSPropertyWebkitBorderVerticalSpacing:
             shorthandPropertyID = CSSPropertyBorderSpacing;
@@ -130,6 +136,7 @@ String StylePropertySerializer::asText() const
         case CSSPropertyFontFamily:
         case CSSPropertyLineHeight:
         case CSSPropertyFontSize:
+        case CSSPropertyFontStretch:
         case CSSPropertyFontStyle:
         case CSSPropertyFontVariant:
         case CSSPropertyFontWeight:
@@ -228,7 +235,7 @@ String StylePropertySerializer::asText() const
         } else
             value = property.value()->cssText();
 
-        if (value == "initial" && !CSSProperty::isInheritedProperty(propertyID))
+        if (value == "initial" && !CSSPropertyMetadata::isInheritedProperty(propertyID))
             continue;
 
         result.append(getPropertyText(propertyID, value, property.isImportant(), numDecls++));
@@ -365,6 +372,7 @@ void StylePropertySerializer::appendFontLonghandValueIfExplicit(CSSPropertyID pr
     case CSSPropertyFontStyle:
         break; // No prefix.
     case CSSPropertyFontFamily:
+    case CSSPropertyFontStretch:
     case CSSPropertyFontVariant:
     case CSSPropertyFontWeight:
         prefix = ' ';
@@ -401,6 +409,7 @@ String StylePropertySerializer::fontValue() const
     appendFontLonghandValueIfExplicit(CSSPropertyFontStyle, result, commonValue);
     appendFontLonghandValueIfExplicit(CSSPropertyFontVariant, result, commonValue);
     appendFontLonghandValueIfExplicit(CSSPropertyFontWeight, result, commonValue);
+    appendFontLonghandValueIfExplicit(CSSPropertyFontStretch, result, commonValue);
     if (!result.isEmpty())
         result.append(' ');
     result.append(fontSizeProperty.value()->cssText());
@@ -502,9 +511,9 @@ String StylePropertySerializer::getLayeredShorthandValue(const StylePropertyShor
         for (unsigned j = 0; j < size; j++) {
             RefPtrWillBeRawPtr<CSSValue> value = nullptr;
             if (values[j]) {
-                if (values[j]->isBaseValueList())
-                    value = toCSSValueList(values[j].get())->item(i);
-                else {
+                if (values[j]->isBaseValueList()) {
+                    value = toCSSValueList(values[j].get())->itemWithBoundsCheck(i);
+                } else {
                     value = values[j];
 
                     // Color only belongs in the last layer.
@@ -530,7 +539,7 @@ String StylePropertySerializer::getLayeredShorthandValue(const StylePropertyShor
                     RefPtrWillBeRawPtr<CSSValue> yValue = nullptr;
                     RefPtrWillBeRawPtr<CSSValue> nextValue = values[j + 1];
                     if (nextValue->isValueList())
-                        yValue = toCSSValueList(nextValue.get())->itemWithoutBoundsCheck(i);
+                        yValue = toCSSValueList(nextValue.get())->item(i);
                     else
                         yValue = nextValue;
 
@@ -712,12 +721,12 @@ static void appendBackgroundRepeatValue(StringBuilder& builder, const CSSValue& 
     if (repeatXValueId == repeatYValueId) {
         builder.append(repeatX.cssText());
     } else if (repeatXValueId == CSSValueNoRepeat && repeatYValueId == CSSValueRepeat) {
-        builder.append("repeat-y");
+        builder.appendLiteral("repeat-y");
     } else if (repeatXValueId == CSSValueRepeat && repeatYValueId == CSSValueNoRepeat) {
-        builder.append("repeat-x");
+        builder.appendLiteral("repeat-x");
     } else {
         builder.append(repeatX.cssText());
-        builder.append(" ");
+        builder.appendLiteral(" ");
         builder.append(repeatY.cssText());
     }
 }
@@ -759,7 +768,7 @@ String StylePropertySerializer::backgroundRepeatPropertyValue() const
     StringBuilder builder;
     for (size_t i = 0; i < shorthandLength; ++i) {
         if (i)
-            builder.append(", ");
+            builder.appendLiteral(", ");
         appendBackgroundRepeatValue(builder,
             *repeatXList->item(i % repeatXList->length()),
             *repeatYList->item(i % repeatYList->length()));

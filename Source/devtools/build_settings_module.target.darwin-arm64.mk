@@ -6,7 +6,6 @@ LOCAL_MODULE_CLASS := GYP
 LOCAL_MODULE := third_party_WebKit_Source_devtools_build_settings_module_gyp
 LOCAL_MODULE_STEM := build_settings_module
 LOCAL_MODULE_SUFFIX := .stamp
-LOCAL_MODULE_TAGS := optional
 LOCAL_MODULE_TARGET_ARCH := $(TARGET_$(GYP_VAR_PREFIX)ARCH)
 gyp_intermediate_dir := $(call local-intermediates-dir,,$(GYP_VAR_PREFIX))
 gyp_shared_intermediate_dir := $(call intermediates-dir-for,GYP,shared,,,$(GYP_VAR_PREFIX))
@@ -15,19 +14,19 @@ gyp_shared_intermediate_dir := $(call intermediates-dir-for,GYP,shared,,,$(GYP_V
 GYP_TARGET_DEPENDENCIES :=
 
 ### Rules for action "build_settings_module":
-$(gyp_shared_intermediate_dir)/resources/inspector/settings/SettingsScreen.js: gyp_local_path := $(LOCAL_PATH)
-$(gyp_shared_intermediate_dir)/resources/inspector/settings/SettingsScreen.js: gyp_var_prefix := $(GYP_VAR_PREFIX)
-$(gyp_shared_intermediate_dir)/resources/inspector/settings/SettingsScreen.js: gyp_intermediate_dir := $(abspath $(gyp_intermediate_dir))
-$(gyp_shared_intermediate_dir)/resources/inspector/settings/SettingsScreen.js: gyp_shared_intermediate_dir := $(abspath $(gyp_shared_intermediate_dir))
-$(gyp_shared_intermediate_dir)/resources/inspector/settings/SettingsScreen.js: export PATH := $(subst $(ANDROID_BUILD_PATHS),,$(PATH))
-$(gyp_shared_intermediate_dir)/resources/inspector/settings/SettingsScreen.js: $(LOCAL_PATH)/third_party/WebKit/Source/devtools/scripts/inline_js_imports.py $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/settings/EditFileSystemDialog.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/settings/SettingsScreen.js $(GYP_TARGET_DEPENDENCIES)
+$(gyp_shared_intermediate_dir)/resources/inspector/settings_module.js: gyp_local_path := $(LOCAL_PATH)
+$(gyp_shared_intermediate_dir)/resources/inspector/settings_module.js: gyp_var_prefix := $(GYP_VAR_PREFIX)
+$(gyp_shared_intermediate_dir)/resources/inspector/settings_module.js: gyp_intermediate_dir := $(abspath $(gyp_intermediate_dir))
+$(gyp_shared_intermediate_dir)/resources/inspector/settings_module.js: gyp_shared_intermediate_dir := $(abspath $(gyp_shared_intermediate_dir))
+$(gyp_shared_intermediate_dir)/resources/inspector/settings_module.js: export PATH := $(subst $(ANDROID_BUILD_PATHS),,$(PATH))
+$(gyp_shared_intermediate_dir)/resources/inspector/settings_module.js: $(LOCAL_PATH)/third_party/WebKit/Source/devtools/scripts/concatenate_module_scripts.py $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/settings/module.json $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/settings/EditFileSystemDialog.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/settings/FrameworkBlackboxDialog.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/settings/SettingsScreen.js $(GYP_TARGET_DEPENDENCIES)
 	@echo "Gyp action: third_party_WebKit_Source_devtools_devtools_gyp_build_settings_module_target_build_settings_module ($@)"
-	$(hide)cd $(gyp_local_path)/third_party/WebKit/Source/devtools; mkdir -p $(gyp_shared_intermediate_dir)/resources/inspector/settings; python scripts/inline_js_imports.py front_end/settings/SettingsScreen.js "$(gyp_shared_intermediate_dir)/resources/inspector/settings/SettingsScreen.js"
+	$(hide)cd $(gyp_local_path)/third_party/WebKit/Source/devtools; mkdir -p $(gyp_shared_intermediate_dir)/resources/inspector; python scripts/concatenate_module_scripts.py front_end/settings/module.json "$(gyp_shared_intermediate_dir)/resources/inspector/settings_module.js"
 
 
 
 GYP_GENERATED_OUTPUTS := \
-	$(gyp_shared_intermediate_dir)/resources/inspector/settings/SettingsScreen.js
+	$(gyp_shared_intermediate_dir)/resources/inspector/settings_module.js
 
 # Make sure our deps and generated files are built first.
 LOCAL_ADDITIONAL_DEPENDENCIES := $(GYP_TARGET_DEPENDENCIES) $(GYP_GENERATED_OUTPUTS)

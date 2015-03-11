@@ -21,7 +21,7 @@
 #ifndef SVGMarkerElement_h
 #define SVGMarkerElement_h
 
-#include "bindings/v8/ExceptionState.h"
+#include "bindings/core/v8/ExceptionState.h"
 #include "core/svg/SVGAnimatedAngle.h"
 #include "core/svg/SVGAnimatedBoolean.h"
 #include "core/svg/SVGAnimatedEnumeration.h"
@@ -29,7 +29,7 @@
 #include "core/svg/SVGElement.h"
 #include "core/svg/SVGFitToViewBox.h"
 
-namespace WebCore {
+namespace blink {
 
 enum SVGMarkerUnitsType {
     SVGMarkerUnitsUnknown = 0,
@@ -40,6 +40,7 @@ template<> const SVGEnumerationStringEntries& getStaticStringEntries<SVGMarkerUn
 
 class SVGMarkerElement FINAL : public SVGElement,
                                public SVGFitToViewBox {
+    DEFINE_WRAPPERTYPEINFO();
 public:
     // Forward declare enumerations in the W3C naming scheme, for IDL generation.
     enum {
@@ -77,7 +78,7 @@ private:
     bool isSupportedAttribute(const QualifiedName&);
     virtual void parseAttribute(const QualifiedName&, const AtomicString&) OVERRIDE;
     virtual void svgAttributeChanged(const QualifiedName&) OVERRIDE;
-    virtual void childrenChanged(bool changedByParser = false, Node* beforeChange = 0, Node* afterChange = 0, int childCountDelta = 0) OVERRIDE;
+    virtual void childrenChanged(const ChildrenChange&) OVERRIDE;
 
     virtual RenderObject* createRenderer(RenderStyle*) OVERRIDE;
     virtual bool rendererIsNeeded(const RenderStyle&) OVERRIDE { return true; }
@@ -92,6 +93,6 @@ private:
     RefPtr<SVGAnimatedEnumeration<SVGMarkerUnitsType> > m_markerUnits;
 };
 
-}
+} // namespace blink
 
-#endif
+#endif // SVGMarkerElement_h

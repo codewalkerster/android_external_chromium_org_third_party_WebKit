@@ -10,7 +10,7 @@
 #include "wtf/text/AtomicString.h"
 #include "wtf/text/WTFString.h"
 
-namespace WebCore {
+namespace blink {
 
 struct PushEventInit : public EventInit {
     PushEventInit();
@@ -19,6 +19,7 @@ struct PushEventInit : public EventInit {
 };
 
 class PushEvent FINAL : public Event {
+    DEFINE_WRAPPERTYPEINFO();
 public:
     static PassRefPtrWillBeRawPtr<PushEvent> create()
     {
@@ -46,6 +47,6 @@ private:
     String m_data;
 };
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // PushEvent_h

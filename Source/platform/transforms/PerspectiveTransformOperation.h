@@ -28,7 +28,7 @@
 
 #include "platform/transforms/TransformOperation.h"
 
-namespace WebCore {
+namespace blink {
 
 class PLATFORM_EXPORT PerspectiveTransformOperation : public TransformOperation {
 public:
@@ -45,7 +45,6 @@ public:
     }
 
 private:
-    virtual bool isIdentity() const OVERRIDE { return !m_p; }
     virtual OperationType type() const OVERRIDE { return Perspective; }
 
     virtual bool operator==(const TransformOperation& o) const OVERRIDE
@@ -71,6 +70,6 @@ private:
     double m_p;
 };
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // PerspectiveTransformOperation_h

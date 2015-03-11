@@ -26,11 +26,12 @@
 #include "core/svg/SVGFilterPrimitiveStandardAttributes.h"
 #include "platform/graphics/filters/FEColorMatrix.h"
 
-namespace WebCore {
+namespace blink {
 
 template<> const SVGEnumerationStringEntries& getStaticStringEntries<ColorMatrixType>();
 
 class SVGFEColorMatrixElement FINAL : public SVGFilterPrimitiveStandardAttributes {
+    DEFINE_WRAPPERTYPEINFO();
 public:
     DECLARE_NODE_FACTORY(SVGFEColorMatrixElement);
 
@@ -52,6 +53,6 @@ private:
     RefPtr<SVGAnimatedEnumeration<ColorMatrixType> > m_type;
 };
 
-} // namespace WebCore
+} // namespace blink
 
-#endif
+#endif // SVGFEColorMatrixElement_h

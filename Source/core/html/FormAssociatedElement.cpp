@@ -27,12 +27,14 @@
 
 #include "core/HTMLNames.h"
 #include "core/dom/IdTargetObserver.h"
+#include "core/dom/NodeTraversal.h"
 #include "core/html/HTMLFormControlElement.h"
 #include "core/html/HTMLFormElement.h"
+#include "core/html/HTMLLabelElement.h"
 #include "core/html/HTMLObjectElement.h"
 #include "core/html/ValidityState.h"
 
-namespace WebCore {
+namespace blink {
 
 using namespace HTMLNames;
 
@@ -83,7 +85,7 @@ void FormAssociatedElement::didMoveToNewDocument(Document& oldDocument)
 
 void FormAssociatedElement::insertedInto(ContainerNode* insertionPoint)
 {
-    if (!m_formWasSetByParser || insertionPoint->highestAncestorOrSelf() != m_form->highestAncestorOrSelf())
+    if (!m_formWasSetByParser || !m_form || NodeTraversal::highestAncestorOrSelf(*insertionPoint) != NodeTraversal::highestAncestorOrSelf(*m_form.get()))
         resetFormOwner();
 
     if (!insertionPoint->inDocument())
@@ -101,7 +103,7 @@ void FormAssociatedElement::removedFrom(ContainerNode* insertionPoint)
         setFormAttributeTargetObserver(nullptr);
     // If the form and element are both in the same tree, preserve the connection to the form.
     // Otherwise, null out our form and remove ourselves from the form's list of elements.
-    if (m_form && element->highestAncestorOrSelf() != m_form->highestAncestorOrSelf())
+    if (m_form && NodeTraversal::highestAncestorOrSelf(*element) != NodeTraversal::highestAncestorOrSelf(*m_form.get()))
         resetFormOwner();
 }
 
@@ -128,7 +130,7 @@ HTMLFormElement* FormAssociatedElement::findAssociatedForm(const HTMLElement* el
 void FormAssociatedElement::formRemovedFromTree(const Node& formRoot)
 {
     ASSERT(m_form);
-    if (toHTMLElement(this)->highestAncestorOrSelf() == formRoot)
+    if (NodeTraversal::highestAncestorOrSelf(toHTMLElement(*this)) == formRoot)
         return;
     resetFormOwner();
 }
@@ -306,8 +308,10 @@ const HTMLElement& toHTMLElement(const FormAssociatedElement& associatedElement)
 {
     if (associatedElement.isFormControlElement())
         return toHTMLFormControlElement(associatedElement);
-    // Assumes the element is an HTMLObjectElement
-    return toHTMLObjectElement(associatedElement);
+    else if (associatedElement.isLabelElement())
+        return toHTMLLabelElement(associatedElement);
+    else
+        return toHTMLObjectElement(associatedElement);
 }
 
 const HTMLElement* toHTMLElement(const FormAssociatedElement* associatedElement)
@@ -348,4 +352,4 @@ void FormAttributeTargetObserver::idTargetChanged()
     m_element->formAttributeTargetChanged();
 }
 
-} // namespace Webcore
+} // namespace blink

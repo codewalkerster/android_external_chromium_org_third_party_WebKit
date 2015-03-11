@@ -30,22 +30,24 @@
 #include "wtf/RefPtr.h"
 #include "wtf/ThreadingPrimitives.h"
 
-namespace WebCore {
+namespace blink {
 
 class AudioBuffer;
 class ExceptionState;
 class Reverb;
 
 class ConvolverNode FINAL : public AudioNode {
+    DEFINE_WRAPPERTYPEINFO();
 public:
-    static PassRefPtrWillBeRawPtr<ConvolverNode> create(AudioContext* context, float sampleRate)
+    static ConvolverNode* create(AudioContext* context, float sampleRate)
     {
-        return adoptRefWillBeNoop(new ConvolverNode(context, sampleRate));
+        return adoptRefCountedGarbageCollectedWillBeNoop(new ConvolverNode(context, sampleRate));
     }
 
     virtual ~ConvolverNode();
 
     // AudioNode
+    virtual void dispose() OVERRIDE;
     virtual void process(size_t framesToProcess) OVERRIDE;
     virtual void initialize() OVERRIDE;
     virtual void uninitialize() OVERRIDE;
@@ -66,7 +68,7 @@ private:
     virtual double latencyTime() const OVERRIDE;
 
     OwnPtr<Reverb> m_reverb;
-    RefPtrWillBeMember<AudioBuffer> m_buffer;
+    Member<AudioBuffer> m_buffer;
 
     // This synchronizes dynamic changes to the convolution impulse response with process().
     mutable Mutex m_processLock;
@@ -75,6 +77,6 @@ private:
     bool m_normalize;
 };
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // ConvolverNode_h

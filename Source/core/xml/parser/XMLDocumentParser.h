@@ -29,7 +29,8 @@
 #include "core/dom/ScriptableDocumentParser.h"
 #include "core/fetch/ResourceClient.h"
 #include "core/fetch/ResourcePtr.h"
-#include "core/xml/XMLErrors.h"
+#include "core/fetch/ScriptResource.h"
+#include "core/xml/parser/XMLErrors.h"
 #include "platform/heap/Handle.h"
 #include "platform/text/SegmentedString.h"
 #include "wtf/HashMap.h"
@@ -38,10 +39,9 @@
 #include "wtf/text/StringHash.h"
 #include <libxml/tree.h>
 
-namespace WebCore {
+namespace blink {
 
 class ContainerNode;
-class ScriptResource;
 class ResourceFetcher;
 class DocumentFragment;
 class Document;
@@ -65,7 +65,7 @@ private:
     xmlParserCtxtPtr m_context;
 };
 
-class XMLDocumentParser FINAL : public ScriptableDocumentParser, public ResourceClient {
+class XMLDocumentParser FINAL : public ScriptableDocumentParser, public ScriptResourceClient {
     WTF_MAKE_FAST_ALLOCATED_WILL_BE_REMOVED;
 public:
     static PassRefPtrWillBeRawPtr<XMLDocumentParser> create(Document& document, FrameView* view)
@@ -196,6 +196,6 @@ private:
 xmlDocPtr xmlDocPtrForString(ResourceFetcher*, const String& source, const String& url);
 HashMap<String, String> parseAttributes(const String&, bool& attrsOK);
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // XMLDocumentParser_h

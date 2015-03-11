@@ -30,7 +30,7 @@
 
 #include "core/rendering/RenderTheme.h"
 
-namespace WebCore {
+namespace blink {
 
 class RenderProgress;
 
@@ -92,6 +92,7 @@ public:
     virtual void adjustSliderThumbSize(RenderStyle*, Element*) const OVERRIDE;
     virtual bool paintMediaSliderThumb(RenderObject*, const PaintInfo&, const IntRect&) OVERRIDE;
     virtual bool paintMediaToggleClosedCaptionsButton(RenderObject*, const PaintInfo&, const IntRect&) OVERRIDE;
+    virtual bool paintMediaCastButton(RenderObject*, const PaintInfo&, const IntRect&) OVERRIDE;
     virtual bool paintMediaVolumeSliderThumb(RenderObject*, const PaintInfo&, const IntRect&) OVERRIDE;
     virtual bool paintMediaPlayButton(RenderObject*, const PaintInfo&, const IntRect&) OVERRIDE;
     virtual bool paintMediaOverlayPlayButton(RenderObject*, const PaintInfo&, const IntRect&) OVERRIDE;
@@ -158,6 +159,6 @@ private:
     static const RGBA32 defaultTapHighlightColor = 0x2e000000; // 18% black.
 };
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // RenderThemeChromiumSkia_h

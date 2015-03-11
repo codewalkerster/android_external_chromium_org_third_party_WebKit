@@ -42,7 +42,7 @@
 #include "wtf/Vector.h"
 #include "wtf/text/WTFString.h"
 
-namespace WebCore {
+namespace blink {
 
 class PLATFORM_EXPORT MediaStreamSource FINAL : public RefCounted<MediaStreamSource> {
 public:
@@ -90,9 +90,9 @@ public:
     void consumeAudio(AudioBus*, size_t numberOfFrames);
 
     bool requiresAudioConsumer() const { return m_requiresConsumer; }
-    void addAudioConsumer(PassRefPtr<AudioDestinationConsumer>);
+    void addAudioConsumer(AudioDestinationConsumer*);
     bool removeAudioConsumer(AudioDestinationConsumer*);
-    const Vector<RefPtr<AudioDestinationConsumer> >& audioConsumers() { return m_audioConsumers; }
+    const HeapHashSet<Member<AudioDestinationConsumer> >& audioConsumers() { return m_audioConsumers; }
 
 private:
     MediaStreamSource(const String& id, Type, const String& name, ReadyState, bool requiresConsumer);
@@ -104,13 +104,13 @@ private:
     bool m_requiresConsumer;
     Vector<Observer*> m_observers;
     Mutex m_audioConsumersLock;
-    Vector<RefPtr<AudioDestinationConsumer> > m_audioConsumers;
+    PersistentHeapHashSet<Member<AudioDestinationConsumer> > m_audioConsumers;
     OwnPtr<ExtraData> m_extraData;
     blink::WebMediaConstraints m_constraints;
 };
 
 typedef Vector<RefPtr<MediaStreamSource> > MediaStreamSourceVector;
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // MediaStreamSource_h

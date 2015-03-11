@@ -27,7 +27,7 @@
 #include "core/svg/SVGGraphicsElement.h"
 #include "core/svg/SVGPointTearOff.h"
 
-namespace WebCore {
+namespace blink {
 
 class ExceptionState;
 
@@ -39,6 +39,7 @@ enum SVGLengthAdjustType {
 template<> const SVGEnumerationStringEntries& getStaticStringEntries<SVGLengthAdjustType>();
 
 class SVGTextContentElement : public SVGGraphicsElement {
+    DEFINE_WRAPPERTYPEINFO();
 public:
     // Forward declare enumerations in the W3C naming scheme, for IDL generation.
     enum {
@@ -82,13 +83,13 @@ private:
     RefPtr<SVGAnimatedEnumeration<SVGLengthAdjustType> > m_lengthAdjust;
 };
 
-inline bool isSVGTextContentElement(const Node& node)
+inline bool isSVGTextContentElement(const SVGElement& element)
 {
-    return node.isSVGElement() && toSVGElement(node).isTextContent();
+    return element.isTextContent();
 }
 
-DEFINE_ELEMENT_TYPE_CASTS_WITH_FUNCTION(SVGTextContentElement);
+DEFINE_SVGELEMENT_TYPE_CASTS_WITH_FUNCTION(SVGTextContentElement);
 
-} // namespace WebCore
+} // namespace blink
 
-#endif
+#endif // SVGTextContentElement_h

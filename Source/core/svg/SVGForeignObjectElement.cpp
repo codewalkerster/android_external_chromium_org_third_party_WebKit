@@ -28,7 +28,7 @@
 #include "core/svg/SVGLength.h"
 #include "wtf/Assertions.h"
 
-namespace WebCore {
+namespace blink {
 
 inline SVGForeignObjectElement::SVGForeignObjectElement(Document& document)
     : SVGGraphicsElement(SVGNames::foreignObjectTag, document)
@@ -37,8 +37,6 @@ inline SVGForeignObjectElement::SVGForeignObjectElement(Document& document)
     , m_width(SVGAnimatedLength::create(this, SVGNames::widthAttr, SVGLength::create(LengthModeWidth), ForbidNegativeLengths))
     , m_height(SVGAnimatedLength::create(this, SVGNames::heightAttr, SVGLength::create(LengthModeHeight), ForbidNegativeLengths))
 {
-    ScriptWrappable::init(this);
-
     addToPropertyMap(m_x);
     addToPropertyMap(m_y);
     addToPropertyMap(m_width);
@@ -63,22 +61,7 @@ bool SVGForeignObjectElement::isSupportedAttribute(const QualifiedName& attrName
 
 void SVGForeignObjectElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
 {
-    SVGParsingError parseError = NoError;
-
-    if (!isSupportedAttribute(name))
-        SVGGraphicsElement::parseAttribute(name, value);
-    else if (name == SVGNames::xAttr)
-        m_x->setBaseValueAsString(value, parseError);
-    else if (name == SVGNames::yAttr)
-        m_y->setBaseValueAsString(value, parseError);
-    else if (name == SVGNames::widthAttr)
-        m_width->setBaseValueAsString(value, parseError);
-    else if (name == SVGNames::heightAttr)
-        m_height->setBaseValueAsString(value, parseError);
-    else
-        ASSERT_NOT_REACHED();
-
-    reportAttributeParsingError(parseError, name, value);
+    parseAttributeNew(name, value);
 }
 
 bool SVGForeignObjectElement::isPresentationAttribute(const QualifiedName& name) const
@@ -162,4 +145,4 @@ bool SVGForeignObjectElement::selfHasRelativeLengths() const
         || m_height->currentValue()->isRelative();
 }
 
-}
+} // namespace blink

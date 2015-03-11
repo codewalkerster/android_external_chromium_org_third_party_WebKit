@@ -26,11 +26,12 @@
 #include "core/svg/SVGFilterPrimitiveStandardAttributes.h"
 #include "platform/graphics/filters/FEComposite.h"
 
-namespace WebCore {
+namespace blink {
 
 template<> const SVGEnumerationStringEntries& getStaticStringEntries<CompositeOperationType>();
 
 class SVGFECompositeElement FINAL : public SVGFilterPrimitiveStandardAttributes {
+    DEFINE_WRAPPERTYPEINFO();
 public:
     DECLARE_NODE_FACTORY(SVGFECompositeElement);
 
@@ -60,6 +61,6 @@ private:
     RefPtr<SVGAnimatedEnumeration<CompositeOperationType> > m_svgOperator;
 };
 
-} // namespace WebCore
+} // namespace blink
 
-#endif
+#endif // SVGFECompositeElement_h

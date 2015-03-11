@@ -39,7 +39,7 @@
 
 struct sqlite3;
 
-namespace WebCore {
+namespace blink {
 
 class DatabaseAuthorizer;
 class SQLiteStatement;
@@ -63,8 +63,6 @@ public:
     bool open(const String& filename, bool forWebSQLDatabase = false);
     bool isOpen() const { return m_db; }
     void close();
-    void interrupt();
-    bool isInterrupted();
 
     void updateLastChangesCount();
 
@@ -101,7 +99,6 @@ public:
 
     void setAuthorizer(DatabaseAuthorizer*);
 
-    Mutex& databaseMutex() { return m_lockingMutex; }
     bool isAutoCommitOn() const;
 
     // The SQLite AUTO_VACUUM pragma can be either NONE, FULL, or INCREMENTAL.
@@ -134,11 +131,9 @@ private:
     Mutex m_authorizerLock;
     RefPtrWillBeMember<DatabaseAuthorizer> m_authorizer;
 
-    Mutex m_lockingMutex;
     ThreadIdentifier m_openingThread;
 
     Mutex m_databaseClosingMutex;
-    bool m_interrupted;
 
     int m_openError;
     CString m_openErrorMessage;
@@ -146,6 +141,6 @@ private:
     int m_lastChangesCount;
 };
 
-} // namespace WebCore
+} // namespace blink
 
 #endif

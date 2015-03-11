@@ -6,7 +6,6 @@ LOCAL_MODULE_CLASS := GYP
 LOCAL_MODULE := third_party_WebKit_Source_devtools_build_profiler_module_gyp
 LOCAL_MODULE_STEM := build_profiler_module
 LOCAL_MODULE_SUFFIX := .stamp
-LOCAL_MODULE_TAGS := optional
 LOCAL_MODULE_TARGET_ARCH := $(TARGET_$(GYP_VAR_PREFIX)ARCH)
 gyp_intermediate_dir := $(call local-intermediates-dir,,$(GYP_VAR_PREFIX))
 gyp_shared_intermediate_dir := $(call intermediates-dir-for,GYP,shared,,,$(GYP_VAR_PREFIX))
@@ -15,19 +14,19 @@ gyp_shared_intermediate_dir := $(call intermediates-dir-for,GYP,shared,,,$(GYP_V
 GYP_TARGET_DEPENDENCIES :=
 
 ### Rules for action "build_profiler_module":
-$(gyp_shared_intermediate_dir)/resources/inspector/profiler/ProfilesPanel.js: gyp_local_path := $(LOCAL_PATH)
-$(gyp_shared_intermediate_dir)/resources/inspector/profiler/ProfilesPanel.js: gyp_var_prefix := $(GYP_VAR_PREFIX)
-$(gyp_shared_intermediate_dir)/resources/inspector/profiler/ProfilesPanel.js: gyp_intermediate_dir := $(abspath $(gyp_intermediate_dir))
-$(gyp_shared_intermediate_dir)/resources/inspector/profiler/ProfilesPanel.js: gyp_shared_intermediate_dir := $(abspath $(gyp_shared_intermediate_dir))
-$(gyp_shared_intermediate_dir)/resources/inspector/profiler/ProfilesPanel.js: export PATH := $(subst $(ANDROID_BUILD_PATHS),,$(PATH))
-$(gyp_shared_intermediate_dir)/resources/inspector/profiler/ProfilesPanel.js: $(LOCAL_PATH)/third_party/WebKit/Source/devtools/scripts/inline_js_imports.py $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/profiler/CPUProfileBottomUpDataGrid.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/profiler/CPUProfileDataGrid.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/profiler/CPUProfileFlameChart.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/profiler/CPUProfileTopDownDataGrid.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/profiler/CPUProfileView.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/profiler/HeapSnapshotCommon.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/profiler/HeapSnapshotDataGrids.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/profiler/HeapSnapshotGridNodes.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/profiler/HeapSnapshotProxy.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/profiler/HeapSnapshotView.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/profiler/ProfilesPanel.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/profiler/ProfileLauncherView.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/profiler/CanvasProfileView.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/profiler/CanvasReplayStateView.js $(GYP_TARGET_DEPENDENCIES)
+$(gyp_shared_intermediate_dir)/resources/inspector/profiler_module.js: gyp_local_path := $(LOCAL_PATH)
+$(gyp_shared_intermediate_dir)/resources/inspector/profiler_module.js: gyp_var_prefix := $(GYP_VAR_PREFIX)
+$(gyp_shared_intermediate_dir)/resources/inspector/profiler_module.js: gyp_intermediate_dir := $(abspath $(gyp_intermediate_dir))
+$(gyp_shared_intermediate_dir)/resources/inspector/profiler_module.js: gyp_shared_intermediate_dir := $(abspath $(gyp_shared_intermediate_dir))
+$(gyp_shared_intermediate_dir)/resources/inspector/profiler_module.js: export PATH := $(subst $(ANDROID_BUILD_PATHS),,$(PATH))
+$(gyp_shared_intermediate_dir)/resources/inspector/profiler_module.js: $(LOCAL_PATH)/third_party/WebKit/Source/devtools/scripts/concatenate_module_scripts.py $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/profiler/module.json $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/profiler/CanvasProfileView.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/profiler/CanvasReplayStateView.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/profiler/CPUProfileBottomUpDataGrid.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/profiler/CPUProfileDataGrid.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/profiler/CPUProfileFlameChart.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/profiler/CPUProfileTopDownDataGrid.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/profiler/CPUProfileView.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/profiler/HeapSnapshotCommon.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/profiler/HeapSnapshotDataGrids.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/profiler/HeapSnapshotGridNodes.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/profiler/HeapSnapshotProxy.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/profiler/HeapSnapshotView.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/profiler/ProfileLauncherView.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/profiler/ProfilesPanel.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/profiler/ProfileTypeRegistry.js $(GYP_TARGET_DEPENDENCIES)
 	@echo "Gyp action: third_party_WebKit_Source_devtools_devtools_gyp_build_profiler_module_target_build_profiler_module ($@)"
-	$(hide)cd $(gyp_local_path)/third_party/WebKit/Source/devtools; mkdir -p $(gyp_shared_intermediate_dir)/resources/inspector/profiler; python scripts/inline_js_imports.py front_end/profiler/ProfilesPanel.js "$(gyp_shared_intermediate_dir)/resources/inspector/profiler/ProfilesPanel.js"
+	$(hide)cd $(gyp_local_path)/third_party/WebKit/Source/devtools; mkdir -p $(gyp_shared_intermediate_dir)/resources/inspector; python scripts/concatenate_module_scripts.py front_end/profiler/module.json "$(gyp_shared_intermediate_dir)/resources/inspector/profiler_module.js"
 
 
 
 GYP_GENERATED_OUTPUTS := \
-	$(gyp_shared_intermediate_dir)/resources/inspector/profiler/ProfilesPanel.js
+	$(gyp_shared_intermediate_dir)/resources/inspector/profiler_module.js
 
 # Make sure our deps and generated files are built first.
 LOCAL_ADDITIONAL_DEPENDENCIES := $(GYP_TARGET_DEPENDENCIES) $(GYP_GENERATED_OUTPUTS)

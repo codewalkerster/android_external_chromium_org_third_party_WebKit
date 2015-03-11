@@ -22,9 +22,10 @@
 
 #include "core/svg/SVGFELightElement.h"
 
-namespace WebCore {
+namespace blink {
 
 class SVGFEPointLightElement FINAL : public SVGFELightElement {
+    DEFINE_WRAPPERTYPEINFO();
 public:
     DECLARE_NODE_FACTORY(SVGFEPointLightElement);
 
@@ -34,6 +35,6 @@ private:
     virtual PassRefPtr<LightSource> lightSource(Filter*) const OVERRIDE;
 };
 
-} // namespace WebCore
+} // namespace blink
 
-#endif
+#endif // SVGFEPointLightElement_h

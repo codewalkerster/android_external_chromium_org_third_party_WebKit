@@ -23,9 +23,10 @@
 
 #include "core/svg/SVGTextPositioningElement.h"
 
-namespace WebCore {
+namespace blink {
 
 class SVGTSpanElement FINAL : public SVGTextPositioningElement {
+    DEFINE_WRAPPERTYPEINFO();
 public:
     DECLARE_NODE_FACTORY(SVGTSpanElement);
 
@@ -36,6 +37,6 @@ private:
     virtual bool rendererIsNeeded(const RenderStyle&) OVERRIDE;
 };
 
-} // namespace WebCore
+} // namespace blink
 
-#endif
+#endif // SVGTSpanElement_h

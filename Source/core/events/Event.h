@@ -24,14 +24,14 @@
 #ifndef Event_h
 #define Event_h
 
-#include "bindings/v8/ScriptWrappable.h"
+#include "bindings/core/v8/ScriptWrappable.h"
 #include "core/dom/DOMTimeStamp.h"
 #include "core/events/EventPath.h"
 #include "platform/heap/Handle.h"
 #include "wtf/RefCounted.h"
 #include "wtf/text/AtomicString.h"
 
-namespace WebCore {
+namespace blink {
 
 class EventTarget;
 class EventDispatcher;
@@ -47,6 +47,7 @@ public:
 };
 
 class Event : public RefCountedWillBeGarbageCollectedFinalized<Event>,  public ScriptWrappable {
+    DEFINE_WRAPPERTYPEINFO();
 public:
     enum PhaseType {
         NONE                = 0,
@@ -144,6 +145,7 @@ public:
     virtual bool isTouchEvent() const;
     virtual bool isGestureEvent() const;
     virtual bool isWheelEvent() const;
+    virtual bool isRelatedEvent() const;
 
     // Drag events are a subset of mouse events.
     virtual bool isDragEvent() const;
@@ -203,7 +205,7 @@ private:
     bool m_cancelBubble;
 
     unsigned short m_eventPhase;
-    RawPtrWillBeMember<EventTarget> m_currentTarget;
+    RefPtrWillBeMember<EventTarget> m_currentTarget;
     RefPtrWillBeMember<EventTarget> m_target;
     DOMTimeStamp m_createTime;
     RefPtrWillBeMember<Event> m_underlyingEvent;
@@ -213,6 +215,6 @@ private:
 #define DEFINE_EVENT_TYPE_CASTS(typeName) \
     DEFINE_TYPE_CASTS(typeName, Event, event, event->is##typeName(), event.is##typeName())
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // Event_h

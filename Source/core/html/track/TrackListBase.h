@@ -10,10 +10,10 @@
 #include "core/html/HTMLMediaElement.h"
 #include "core/html/track/TrackEvent.h"
 
-namespace WebCore {
+namespace blink {
 
 template<class T>
-class TrackListBase : public RefCountedWillBeRefCountedGarbageCollected<TrackListBase<T> >, public EventTargetWithInlineData {
+class TrackListBase : public RefCountedWillBeGarbageCollectedFinalized<TrackListBase<T> >, public EventTargetWithInlineData {
     REFCOUNTED_EVENT_TARGET(TrackListBase);
     WILL_BE_USING_GARBAGE_COLLECTED_MIXIN(TrackListBase);
 public:
@@ -101,10 +101,7 @@ public:
 
     void scheduleChangeEvent()
     {
-        EventInit initializer;
-        initializer.bubbles = false;
-        initializer.cancelable = false;
-        RefPtrWillBeRawPtr<Event> event = Event::create(EventTypeNames::change, initializer);
+        RefPtrWillBeRawPtr<Event> event = Event::create(EventTypeNames::change);
         event->setTarget(this);
         m_mediaElement->scheduleEvent(event);
     }

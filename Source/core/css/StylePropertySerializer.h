@@ -26,9 +26,10 @@
 #include "core/css/CSSValueList.h"
 #include "core/css/StylePropertySet.h"
 
-namespace WebCore {
+namespace blink {
 
 class StylePropertySet;
+class StylePropertyShorthand;
 
 class StylePropertySerializer {
 public:
@@ -54,6 +55,6 @@ private:
     const StylePropertySet& m_propertySet;
 };
 
-} // namespace WebCore
+} // namespace blink
 
 #endif

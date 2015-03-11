@@ -31,22 +31,22 @@
 #ifndef InspectorWorkerAgent_h
 #define InspectorWorkerAgent_h
 
+#include "core/InspectorFrontend.h"
 #include "core/inspector/InspectorBaseAgent.h"
 #include "wtf/Forward.h"
 #include "wtf/HashMap.h"
 
-namespace WebCore {
-class InspectorFrontend;
+namespace blink {
 class InstrumentingAgents;
 class JSONObject;
 class KURL;
-class WorkerGlobalScopeProxy;
+class WorkerInspectorProxy;
 
 typedef String ErrorString;
 
 class InspectorWorkerAgent FINAL : public InspectorBaseAgent<InspectorWorkerAgent>, public InspectorBackendDispatcher::WorkerCommandHandler {
 public:
-    static PassOwnPtr<InspectorWorkerAgent> create();
+    static PassOwnPtrWillBeRawPtr<InspectorWorkerAgent> create();
     virtual ~InspectorWorkerAgent();
 
     virtual void init() OVERRIDE;
@@ -56,8 +56,8 @@ public:
 
     // Called from InspectorInstrumentation
     bool shouldPauseDedicatedWorkerOnStart();
-    void didStartWorkerGlobalScope(WorkerGlobalScopeProxy*, const KURL&);
-    void workerGlobalScopeTerminated(WorkerGlobalScopeProxy*);
+    void didStartWorker(WorkerInspectorProxy*, const KURL&);
+    void workerTerminated(WorkerInspectorProxy*);
 
     // Called from InspectorBackendDispatcher
     virtual void enable(ErrorString*) OVERRIDE;
@@ -68,21 +68,24 @@ public:
     virtual void sendMessageToWorker(ErrorString*, int workerId, const RefPtr<JSONObject>& message) OVERRIDE;
     virtual void setAutoconnectToWorkers(ErrorString*, bool value) OVERRIDE;
 
+    void setTracingSessionId(const String&);
+
 private:
     InspectorWorkerAgent();
     void createWorkerFrontendChannelsForExistingWorkers();
-    void createWorkerFrontendChannel(WorkerGlobalScopeProxy*, const String& url);
+    void createWorkerFrontendChannel(WorkerInspectorProxy*, const String& url);
     void destroyWorkerFrontendChannels();
 
-    InspectorFrontend* m_inspectorFrontend;
+    InspectorFrontend::Worker* m_frontend;
 
     class WorkerFrontendChannel;
     typedef HashMap<int, WorkerFrontendChannel*> WorkerChannels;
     WorkerChannels m_idToChannel;
-    typedef HashMap<WorkerGlobalScopeProxy*, String> DedicatedWorkers;
-    DedicatedWorkers m_dedicatedWorkers;
+    typedef HashMap<WorkerInspectorProxy*, String> WorkerIds;
+    WorkerIds m_workerIds;
+    String m_tracingSessionId;
 };
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // !defined(InspectorWorkerAgent_h)

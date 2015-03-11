@@ -22,18 +22,17 @@
 #define SVGCursorElement_h
 
 #include "core/SVGNames.h"
-#include "core/svg/SVGAnimatedBoolean.h"
 #include "core/svg/SVGAnimatedLength.h"
-#include "core/svg/SVGAnimatedString.h"
 #include "core/svg/SVGElement.h"
 #include "core/svg/SVGTests.h"
 #include "core/svg/SVGURIReference.h"
 
-namespace WebCore {
+namespace blink {
 
 class SVGCursorElement FINAL : public SVGElement,
                                public SVGTests,
                                public SVGURIReference {
+    DEFINE_WRAPPERTYPEINFO();
 public:
     DECLARE_NODE_FACTORY(SVGCursorElement);
 
@@ -67,6 +66,6 @@ private:
     WillBeHeapHashSet<RawPtrWillBeWeakMember<SVGElement> > m_clients;
 };
 
-} // namespace WebCore
+} // namespace blink
 
-#endif
+#endif // SVGCursorElement_h

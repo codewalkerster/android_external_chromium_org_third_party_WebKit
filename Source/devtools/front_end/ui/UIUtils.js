@@ -49,7 +49,7 @@ WebInspector.installDragHandle = function(element, elementDragStart, elementDrag
  * @param {function(!MouseEvent)} elementDrag
  * @param {?function(!MouseEvent)} elementDragEnd
  * @param {string} cursor
- * @param {?Event} event
+ * @param {!Event} event
  */
 WebInspector.elementDragStart = function(elementDragStart, elementDrag, elementDragEnd, cursor, event)
 {
@@ -157,13 +157,13 @@ WebInspector.GlassPane.prototype = {
     {
         delete WebInspector._glassPane;
         if (WebInspector.GlassPane.DefaultFocusedViewStack.length)
-            WebInspector.GlassPane.DefaultFocusedViewStack[0].focus();
+            WebInspector.GlassPane.DefaultFocusedViewStack.peekLast().focus();
         this.element.remove();
     }
 }
 
 /**
- * @type {!Array.<!WebInspector.View>}
+ * @type {!Array.<!WebInspector.View|!WebInspector.Dialog>}
  */
 WebInspector.GlassPane.DefaultFocusedViewStack = [];
 
@@ -313,11 +313,11 @@ WebInspector._modifiedFloatNumber = function(number, event)
 }
 
 /**
-  * @param {?Event} event
+  * @param {!Event} event
   * @param {!Element} element
   * @param {function(string,string)=} finishHandler
   * @param {function(string)=} suggestionHandler
-  * @param {function(number):number=} customNumberHandler
+  * @param {function(string, number, string):string=} customNumberHandler
   * @return {boolean}
  */
 WebInspector.handleElementValueModifications = function(event, element, finishHandler, suggestionHandler, customNumberHandler)
@@ -352,10 +352,7 @@ WebInspector.handleElementValueModifications = function(event, element, finishHa
         suffix = matches[3];
         number = WebInspector._modifiedHexValue(matches[2], event);
 
-        if (customNumberHandler)
-            number = customNumberHandler(number);
-
-        replacementString = prefix + number + suffix;
+        replacementString = customNumberHandler ? customNumberHandler(prefix, number, suffix) : prefix + number + suffix;
     } else {
         matches = /(.*?)(-?(?:\d+(?:\.\d+)?|\.\d+))(.*)/.exec(wordString);
         if (matches && matches.length) {
@@ -367,10 +364,7 @@ WebInspector.handleElementValueModifications = function(event, element, finishHa
             if (number === null)
                 return false;
 
-            if (customNumberHandler)
-                number = customNumberHandler(number);
-
-            replacementString = prefix + number + suffix;
+            replacementString = customNumberHandler ? customNumberHandler(prefix, number, suffix) : prefix + number + suffix;
         }
     }
 
@@ -410,6 +404,24 @@ Number.preciseMillisToString = function(ms, precision)
   return WebInspector.UIString(format, ms);
 }
 
+/** @type {!WebInspector.UIStringFormat} */
+WebInspector._subMillisFormat = new WebInspector.UIStringFormat("%.3f\u2009ms");
+
+/** @type {!WebInspector.UIStringFormat} */
+WebInspector._millisFormat = new WebInspector.UIStringFormat("%.0f\u2009ms");
+
+/** @type {!WebInspector.UIStringFormat} */
+WebInspector._secondsFormat = new WebInspector.UIStringFormat("%.2f\u2009s");
+
+/** @type {!WebInspector.UIStringFormat} */
+WebInspector._minutesFormat = new WebInspector.UIStringFormat("%.1f\u2009min");
+
+/** @type {!WebInspector.UIStringFormat} */
+WebInspector._hoursFormat = new WebInspector.UIStringFormat("%.1f\u2009hrs");
+
+/** @type {!WebInspector.UIStringFormat} */
+WebInspector._daysFormat = new WebInspector.UIStringFormat("%.1f\u2009days");
+
 /**
  * @param {number} ms
  * @param {boolean=} higherResolution
@@ -424,24 +436,24 @@ Number.millisToString = function(ms, higherResolution)
         return "0";
 
     if (higherResolution && ms < 1000)
-        return WebInspector.UIString("%.3f\u2009ms", ms);
+        return WebInspector._subMillisFormat.format(ms);
     else if (ms < 1000)
-        return WebInspector.UIString("%.0f\u2009ms", ms);
+        return WebInspector._millisFormat.format(ms);
 
     var seconds = ms / 1000;
     if (seconds < 60)
-        return WebInspector.UIString("%.2f\u2009s", seconds);
+        return WebInspector._secondsFormat.format(seconds);
 
     var minutes = seconds / 60;
     if (minutes < 60)
-        return WebInspector.UIString("%.1f\u2009min", minutes);
+        return WebInspector._minutesFormat.format(minutes);
 
     var hours = minutes / 60;
     if (hours < 24)
-        return WebInspector.UIString("%.1f\u2009hrs", hours);
+        return WebInspector._hoursFormat.format(hours);
 
     var days = hours / 24;
-    return WebInspector.UIString("%.1f\u2009days", days);
+    return WebInspector._daysFormat.format(days);
 }
 
 /**
@@ -501,11 +513,11 @@ WebInspector.useLowerCaseMenuTitles = function()
 
 /**
  * @param {string} format
- * @param {?Array.<string>} substitutions
+ * @param {?ArrayLike} substitutions
  * @param {!Object.<string, function(string, ...):*>} formatters
  * @param {string} initialValue
  * @param {function(string, string): ?} append
- * @return {!{formattedResult: string, unusedSubstitutions: ?Array.<string>}};
+ * @return {!{formattedResult: string, unusedSubstitutions: ?ArrayLike}};
  */
 WebInspector.formatLocalized = function(format, substitutions, formatters, initialValue, append)
 {
@@ -526,6 +538,33 @@ WebInspector.openLinkExternallyLabel = function()
 WebInspector.copyLinkAddressLabel = function()
 {
     return WebInspector.UIString(WebInspector.useLowerCaseMenuTitles() ? "Copy link address" : "Copy Link Address");
+}
+
+/**
+ * @return {string}
+ */
+WebInspector.anotherProfilerActiveLabel = function()
+{
+    return WebInspector.UIString("Another profiler is already active");
+}
+
+/**
+ * @param {string|undefined} description
+ * @return {string}
+ */
+WebInspector.asyncStackTraceLabel = function(description)
+{
+    if (description)
+        return description + " " + WebInspector.UIString("(async)");
+    return WebInspector.UIString("Async Call");
+}
+
+/**
+ * @return {string}
+ */
+WebInspector.manageBlackboxingButtonLabel = function()
+{
+    return WebInspector.UIString("Manage framework blackboxing...");
 }
 
 WebInspector.installPortStyles = function()
@@ -637,17 +676,17 @@ WebInspector.setToolbarColors = function(backgroundColor, color)
     var prefix = WebInspector.isMac() ? "body:not(.undocked)" : "";
     WebInspector._themeStyleElement.textContent =
         String.sprintf(
-            "%s .toolbar-background {\
+            "%s .toolbar-colors {\
                  background-image: none !important;\
                  background-color: %s !important;\
                  color: %s !important;\
              }", prefix, backgroundColor, color) +
         String.sprintf(
-             "%s .toolbar-background button.status-bar-item .glyph, %s .toolbar-background button.status-bar-item .long-click-glyph {\
+             "%s .toolbar-colors button.status-bar-item .glyph, %s .toolbar-colors button.status-bar-item .long-click-glyph {\
                  background-color: %s;\
              }", prefix, prefix, color) +
         String.sprintf(
-             "%s .toolbar-background button.status-bar-item .glyph.shadow, %s .toolbar-background button.status-bar-item .long-click-glyph.shadow {\
+             "%s .toolbar-colors button.status-bar-item .glyph.shadow, %s .toolbar-colors button.status-bar-item .long-click-glyph.shadow {\
                  background-color: %s;\
              }", prefix, prefix, shadowColor);
 }
@@ -842,7 +881,7 @@ WebInspector.InvokeOnceHandlers.prototype = {
         var methods = this._handlers.get(object);
         if (!methods) {
             methods = new Set();
-            this._handlers.put(object, methods);
+            this._handlers.set(object, methods);
         }
         methods.add(method);
     },
@@ -893,6 +932,143 @@ WebInspector.invokeOnceAfterBatchUpdate = function(object, method)
     if (!WebInspector._postUpdateHandlers)
         WebInspector._postUpdateHandlers = new WebInspector.InvokeOnceHandlers(true);
     WebInspector._postUpdateHandlers.add(object, method);
+}
+
+/**
+ * @param {!Function} func
+ * @param {!Array.<{from:number, to:number}>} params
+ * @param {number} frames
+ * @param {function()=} animationComplete
+ * @return {function()}
+ */
+WebInspector.animateFunction = function(func, params, frames, animationComplete)
+{
+    var values = new Array(params.length);
+    var deltas = new Array(params.length);
+    for (var i = 0; i < params.length; ++i) {
+        values[i] = params[i].from;
+        deltas[i] = (params[i].to - params[i].from) / frames;
+    }
+
+    var raf = requestAnimationFrame(animationStep);
+
+    var framesLeft = frames;
+
+    function animationStep()
+    {
+        if (--framesLeft < 0) {
+            if (animationComplete)
+                animationComplete();
+            return;
+        }
+        for (var i = 0; i < params.length; ++i) {
+            if (params[i].to > params[i].from)
+                values[i] = Number.constrain(values[i] + deltas[i], params[i].from, params[i].to);
+            else
+                values[i] = Number.constrain(values[i] + deltas[i], params[i].to, params[i].from);
+        }
+        func.apply(null, values);
+        raf = window.requestAnimationFrame(animationStep);
+    }
+
+    function cancelAnimation()
+    {
+        window.cancelAnimationFrame(raf);
+    }
+
+    return cancelAnimation;
+}
+
+/**
+ * @constructor
+ * @extends {WebInspector.Object}
+ * @param {!Element} element
+ */
+WebInspector.LongClickController = function(element)
+{
+    this._element = element;
+}
+
+/**
+ * @enum {string}
+ */
+WebInspector.LongClickController.Events = {
+    LongClick: "LongClick",
+    LongPress: "LongPress"
+};
+
+WebInspector.LongClickController.prototype = {
+    reset: function()
+    {
+        if (this._longClickInterval) {
+            clearInterval(this._longClickInterval);
+            delete this._longClickInterval;
+        }
+    },
+
+    enable: function()
+    {
+        if (this._longClickData)
+            return;
+        var boundMouseDown = mouseDown.bind(this);
+        var boundMouseUp = mouseUp.bind(this);
+        var boundReset = this.reset.bind(this);
+
+        this._element.addEventListener("mousedown", boundMouseDown, false);
+        this._element.addEventListener("mouseout", boundReset, false);
+        this._element.addEventListener("mouseup", boundMouseUp, false);
+        this._element.addEventListener("click", boundReset, true);
+
+        var longClicks = 0;
+
+        this._longClickData = { mouseUp: boundMouseUp, mouseDown: boundMouseDown, reset: boundReset };
+
+        /**
+         * @param {!Event} e
+         * @this {WebInspector.LongClickController}
+         */
+        function mouseDown(e)
+        {
+            if (e.which !== 1)
+                return;
+            longClicks = 0;
+            this._longClickInterval = setInterval(longClicked.bind(this, e), 200);
+        }
+
+        /**
+         * @param {!Event} e
+         * @this {WebInspector.LongClickController}
+         */
+        function mouseUp(e)
+        {
+            if (e.which !== 1)
+                return;
+            this.reset();
+        }
+
+        /**
+         * @param {!Event} e
+         * @this {WebInspector.LongClickController}
+         */
+        function longClicked(e)
+        {
+            ++longClicks;
+            this.dispatchEventToListeners(longClicks === 1 ? WebInspector.LongClickController.Events.LongClick : WebInspector.LongClickController.Events.LongPress, e);
+        }
+    },
+
+    disable: function()
+    {
+        if (!this._longClickData)
+            return;
+        this._element.removeEventListener("mousedown", this._longClickData.mouseDown, false);
+        this._element.removeEventListener("mouseout", this._longClickData.reset, false);
+        this._element.removeEventListener("mouseup", this._longClickData.mouseUp, false);
+        this._element.addEventListener("click", this._longClickData.reset, true);
+        delete this._longClickData;
+    },
+
+    __proto__: WebInspector.Object.prototype
 }
 
 ;(function() {

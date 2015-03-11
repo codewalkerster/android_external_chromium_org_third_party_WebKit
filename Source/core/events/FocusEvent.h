@@ -29,7 +29,7 @@
 #include "core/events/EventTarget.h"
 #include "core/events/UIEvent.h"
 
-namespace WebCore {
+namespace blink {
 
 class Node;
 
@@ -40,6 +40,7 @@ struct FocusEventInit : public UIEventInit {
 };
 
 class FocusEvent FINAL : public UIEvent {
+    DEFINE_WRAPPERTYPEINFO();
 public:
     static PassRefPtrWillBeRawPtr<FocusEvent> create()
     {
@@ -57,7 +58,6 @@ public:
     }
 
     EventTarget* relatedTarget() const { return m_relatedTarget.get(); }
-    EventTarget* relatedTarget(bool& isNull) const { isNull = !m_relatedTarget; return m_relatedTarget.get(); }
     void setRelatedTarget(EventTarget* relatedTarget) { m_relatedTarget = relatedTarget; }
 
     virtual const AtomicString& interfaceName() const OVERRIDE;
@@ -111,6 +111,6 @@ private:
     virtual bool dispatchEvent(EventDispatcher*) const OVERRIDE;
 };
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // FocusEvent_h

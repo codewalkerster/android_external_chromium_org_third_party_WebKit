@@ -24,9 +24,10 @@
 #include "core/svg/SVGFilterPrimitiveStandardAttributes.h"
 #include "platform/graphics/filters/FETile.h"
 
-namespace WebCore {
+namespace blink {
 
 class SVGFETileElement FINAL : public SVGFilterPrimitiveStandardAttributes {
+    DEFINE_WRAPPERTYPEINFO();
 public:
     DECLARE_NODE_FACTORY(SVGFETileElement);
     SVGAnimatedString* in1() { return m_in1.get(); }
@@ -42,6 +43,6 @@ private:
     RefPtr<SVGAnimatedString> m_in1;
 };
 
-} // namespace WebCore
+} // namespace blink
 
-#endif
+#endif // SVGFETileElement_h

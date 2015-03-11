@@ -36,7 +36,7 @@
 #include "core/dom/Document.h"
 #include "core/inspector/ScriptCallStack.h"
 #include "core/loader/CookieJar.h"
-#include "modules/websockets/WebSocket.h"
+#include "modules/websockets/DOMWebSocket.h"
 #include "platform/Cookie.h"
 #include "platform/Crypto.h"
 #include "platform/Logging.h"
@@ -53,7 +53,7 @@
 #include "wtf/text/StringBuilder.h"
 #include "wtf/unicode/CharacterNames.h"
 
-namespace WebCore {
+namespace blink {
 
 String formatHandshakeFailureReason(const String& detail)
 {
@@ -133,7 +133,7 @@ WebSocketHandshake::WebSocketHandshake(const KURL& url, const String& protocol, 
 
 WebSocketHandshake::~WebSocketHandshake()
 {
-    blink::Platform::current()->histogramEnumeration("WebCore.WebSocket.HandshakeResult", m_mode, WebSocketHandshake::ModeMax);
+    Platform::current()->histogramEnumeration("WebCore.WebSocket.HandshakeResult", m_mode, WebSocketHandshake::ModeMax);
 }
 
 const KURL& WebSocketHandshake::url() const
@@ -174,8 +174,11 @@ String WebSocketHandshake::clientOrigin() const
 String WebSocketHandshake::clientLocation() const
 {
     StringBuilder builder;
-    builder.append(m_secure ? "wss" : "ws");
-    builder.append("://");
+    if (m_secure)
+        builder.appendLiteral("wss");
+    else
+        builder.appendLiteral("ws");
+    builder.appendLiteral("://");
     builder.append(hostName(m_url, m_secure));
     builder.append(resourceName(m_url));
     return builder.toString();
@@ -188,9 +191,9 @@ CString WebSocketHandshake::clientHandshakeMessage() const
     // Keep the following consistent with clientHandshakeRequest().
     StringBuilder builder;
 
-    builder.append("GET ");
+    builder.appendLiteral("GET ");
     builder.append(resourceName(m_url));
-    builder.append(" HTTP/1.1\r\n");
+    builder.appendLiteral(" HTTP/1.1\r\n");
 
     Vector<String> fields;
     fields.append("Upgrade: websocket");
@@ -221,10 +224,10 @@ CString WebSocketHandshake::clientHandshakeMessage() const
 
     for (size_t i = 0; i < fields.size(); i++) {
         builder.append(fields[i]);
-        builder.append("\r\n");
+        builder.appendLiteral("\r\n");
     }
 
-    builder.append("\r\n");
+    builder.appendLiteral("\r\n");
 
     return builder.toString().utf8();
 }
@@ -273,7 +276,7 @@ void WebSocketHandshake::reset()
 
 void WebSocketHandshake::clearDocument()
 {
-    m_document = 0;
+    m_document = nullptr;
 }
 
 int WebSocketHandshake::readServerHandshake(const char* header, size_t len)
@@ -533,7 +536,7 @@ bool WebSocketHandshake::checkResponseHeaders()
             return false;
         }
         Vector<String> result;
-        m_clientProtocol.split(String(WebSocket::subprotocolSeperator()), result);
+        m_clientProtocol.split(String(DOMWebSocket::subprotocolSeperator()), result);
         if (!result.contains(serverWebSocketProtocol)) {
             m_failureReason = formatHandshakeFailureReason("'Sec-WebSocket-Protocol' header value '" + serverWebSocketProtocol + "' in response does not match any of sent values");
             return false;
@@ -545,4 +548,9 @@ bool WebSocketHandshake::checkResponseHeaders()
     return true;
 }
 
-} // namespace WebCore
+void WebSocketHandshake::trace(Visitor* visitor)
+{
+    visitor->trace(m_document);
+}
+
+} // namespace blink

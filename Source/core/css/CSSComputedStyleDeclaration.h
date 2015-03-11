@@ -23,13 +23,14 @@
 
 #include "core/css/CSSStyleDeclaration.h"
 #include "core/rendering/style/RenderStyleConstants.h"
+#include "platform/fonts/FixedPitchFontType.h"
 #include "wtf/HashMap.h"
 #include "wtf/RefPtr.h"
 #include "wtf/text/AtomicString.h"
 #include "wtf/text/AtomicStringHash.h"
 #include "wtf/text/WTFString.h"
 
-namespace WebCore {
+namespace blink {
 
 class CSSPrimitiveValue;
 class CSSValueList;
@@ -38,11 +39,9 @@ class MutableStylePropertySet;
 class Node;
 class RenderObject;
 class RenderStyle;
-class SVGPaint;
 class ShadowData;
 class ShadowList;
 class StyleColor;
-class StylePropertySet;
 class StylePropertyShorthand;
 
 enum EUpdateLayout { DoNotUpdateLayout = false, UpdateLayout = true };
@@ -67,7 +66,7 @@ public:
 
     PassRefPtrWillBeRawPtr<CSSValue> getPropertyCSSValue(CSSPropertyID, EUpdateLayout = UpdateLayout) const;
     PassRefPtrWillBeRawPtr<CSSValue> getFontSizeCSSValuePreferringKeyword() const;
-    bool useFixedFontDefaultSize() const;
+    FixedPitchFontType fixedPitchFontType() const;
     PassRefPtrWillBeRawPtr<CSSValue> getSVGPropertyCSSValue(CSSPropertyID, EUpdateLayout) const;
 
     PassRefPtrWillBeRawPtr<MutableStylePropertySet> copyPropertiesInSet(const Vector<CSSPropertyID>&) const;
@@ -88,7 +87,7 @@ private:
     virtual CSSRule* parentRule() const OVERRIDE;
     virtual unsigned length() const OVERRIDE;
     virtual String item(unsigned index) const OVERRIDE;
-    PassRefPtr<RenderStyle> computeRenderStyle(CSSPropertyID) const;
+    PassRefPtr<RenderStyle> computeRenderStyle() const;
     virtual PassRefPtrWillBeRawPtr<CSSValue> getPropertyCSSValue(const String& propertyName) OVERRIDE;
     virtual String getPropertyValue(const String& propertyName) OVERRIDE;
     virtual String getPropertyPriority(const String& propertyName) OVERRIDE;
@@ -107,7 +106,6 @@ private:
     PassRefPtrWillBeRawPtr<CSSValue> valueForShadowData(const ShadowData&, const RenderStyle&, bool useSpread) const;
     PassRefPtrWillBeRawPtr<CSSValue> valueForShadowList(const ShadowList*, const RenderStyle&, bool useSpread) const;
     PassRefPtrWillBeRawPtr<CSSPrimitiveValue> currentColorOrValidColor(const RenderStyle&, const StyleColor&) const;
-    PassRefPtrWillBeRawPtr<SVGPaint> adjustSVGPaintForCurrentColor(PassRefPtrWillBeRawPtr<SVGPaint>, RenderStyle&) const;
 
     PassRefPtrWillBeRawPtr<CSSValue> valueForFilter(const RenderObject*, const RenderStyle&) const;
 
@@ -124,6 +122,6 @@ private:
 #endif
 };
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // CSSComputedStyleDeclaration_h

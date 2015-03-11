@@ -27,12 +27,13 @@
 
 #include "core/css/CSSFontSelector.h"
 #include "core/css/FontSize.h"
+#include "core/dom/StyleEngine.h"
 #include "core/editing/VisiblePosition.h"
 #include "core/rendering/svg/RenderSVGText.h"
 #include "core/rendering/svg/SVGInlineTextBox.h"
 #include "core/rendering/svg/SVGRenderingContext.h"
 
-namespace WebCore {
+namespace blink {
 
 static PassRefPtr<StringImpl> applySVGWhitespaceRules(PassRefPtr<StringImpl> string, bool preserveWhiteSpace)
 {
@@ -219,7 +220,7 @@ void RenderSVGInlineText::computeNewScaledFontForStyle(RenderObject* renderer, c
 
     // Alter font-size to the right on-screen value to avoid scaling the glyphs themselves, except when GeometricPrecision is specified.
     scalingFactor = SVGRenderingContext::calculateScreenFontSizeScalingFactor(renderer);
-    if (scalingFactor == 1 || !scalingFactor) {
+    if (style->effectiveZoom() == 1 && (scalingFactor == 1 || !scalingFactor)) {
         scalingFactor = 1;
         scaledFont = style->font();
         return;

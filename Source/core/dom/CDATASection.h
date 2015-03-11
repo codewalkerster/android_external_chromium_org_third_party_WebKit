@@ -25,9 +25,10 @@
 
 #include "core/dom/Text.h"
 
-namespace WebCore {
+namespace blink {
 
 class CDATASection FINAL : public Text {
+    DEFINE_WRAPPERTYPEINFO();
 public:
     static PassRefPtrWillBeRawPtr<CDATASection> create(Document&, const String&);
 
@@ -41,6 +42,6 @@ private:
 
 DEFINE_NODE_TYPE_CASTS(CDATASection, nodeType() == Node::CDATA_SECTION_NODE);
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // CDATASection_h

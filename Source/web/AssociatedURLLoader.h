@@ -37,17 +37,16 @@
 #include "wtf/OwnPtr.h"
 #include "wtf/RefPtr.h"
 
-namespace WebCore { class DocumentThreadableLoader; }
-
 namespace blink {
 
+class DocumentThreadableLoader;
 class WebLocalFrameImpl;
 
 // This class is used to implement WebFrame::createAssociatedURLLoader.
 class AssociatedURLLoader FINAL : public WebURLLoader {
     WTF_MAKE_NONCOPYABLE(AssociatedURLLoader);
 public:
-    AssociatedURLLoader(PassRefPtr<WebLocalFrameImpl>, const WebURLLoaderOptions&);
+    AssociatedURLLoader(PassRefPtrWillBeRawPtr<WebLocalFrameImpl>, const WebURLLoaderOptions&);
     ~AssociatedURLLoader();
 
     // WebURLLoader methods:
@@ -60,11 +59,11 @@ private:
 
     class ClientAdapter;
 
-    RefPtr<WebLocalFrameImpl> m_frameImpl;
+    RefPtrWillBePersistent<WebLocalFrameImpl> m_frameImpl;
     WebURLLoaderOptions m_options;
     WebURLLoaderClient* m_client;
     OwnPtr<ClientAdapter> m_clientAdapter;
-    RefPtr<WebCore::DocumentThreadableLoader> m_loader;
+    RefPtr<DocumentThreadableLoader> m_loader;
 };
 
 } // namespace blink

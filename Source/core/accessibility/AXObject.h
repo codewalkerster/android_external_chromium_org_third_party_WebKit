@@ -37,7 +37,7 @@
 #include "wtf/RefPtr.h"
 #include "wtf/Vector.h"
 
-namespace WebCore {
+namespace blink {
 
 class AXObject;
 class AXObjectCache;
@@ -49,6 +49,7 @@ class HTMLAreaElement;
 class IntPoint;
 class IntSize;
 class Node;
+class Range;
 class RenderObject;
 class RenderListItem;
 class ScrollableArea;
@@ -79,6 +80,7 @@ enum AccessibilityRole {
     DefinitionRole,
     DescriptionListDetailRole,
     DescriptionListTermRole,
+    DetailsRole,
     DialogRole,
     DirectoryRole,
     DisclosureTriangleRole,
@@ -87,6 +89,8 @@ enum AccessibilityRole {
     DrawerRole,
     EditableTextRole,
     EmbeddedObjectRole,
+    FigcaptionRole,
+    FigureRole,
     FooterRole,
     FormRole,
     GridRole,
@@ -123,6 +127,7 @@ enum AccessibilityRole {
     MenuListPopupRole,
     MenuRole,
     NavigationRole,
+    NoneRole,
     NoteRole,
     OutlineRole,
     ParagraphRole,
@@ -577,6 +582,6 @@ protected:
 #define DEFINE_AX_OBJECT_TYPE_CASTS(thisType, predicate) \
     DEFINE_TYPE_CASTS(thisType, AXObject, object, object->predicate, object.predicate)
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // AXObject_h

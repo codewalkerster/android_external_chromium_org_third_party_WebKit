@@ -34,21 +34,23 @@
 #include "wtf/PassRefPtr.h"
 #include "wtf/ThreadingPrimitives.h"
 
-namespace WebCore {
+namespace blink {
 
 class AudioContext;
 class HTMLMediaElement;
 
 class MediaElementAudioSourceNode FINAL : public AudioSourceNode, public AudioSourceProviderClient {
-    WILL_BE_USING_GARBAGE_COLLECTED_MIXIN(MediaElementAudioSourceNode);
+    DEFINE_WRAPPERTYPEINFO();
+    USING_GARBAGE_COLLECTED_MIXIN(MediaElementAudioSourceNode);
 public:
-    static PassRefPtrWillBeRawPtr<MediaElementAudioSourceNode> create(AudioContext*, HTMLMediaElement*);
+    static MediaElementAudioSourceNode* create(AudioContext*, HTMLMediaElement*);
 
     virtual ~MediaElementAudioSourceNode();
 
     HTMLMediaElement* mediaElement() { return m_mediaElement.get(); }
 
     // AudioNode
+    virtual void dispose() OVERRIDE;
     virtual void process(size_t framesToProcess) OVERRIDE;
 
     // AudioSourceProviderClient
@@ -74,7 +76,7 @@ private:
     OwnPtr<MultiChannelResampler> m_multiChannelResampler;
 };
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // ENABLE(WEB_AUDIO)
 

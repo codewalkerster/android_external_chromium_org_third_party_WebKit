@@ -30,19 +30,13 @@
 
 OBJC_CLASS WebCoreRenderThemeNotificationObserver;
 
-namespace WebCore {
+namespace blink {
 
 class RenderThemeChromiumMac FINAL : public RenderTheme {
 public:
     static PassRefPtr<RenderTheme> create();
 
-    // A method asking if the control changes its tint when the window has focus or not.
-    virtual bool controlSupportsTints(const RenderObject*) const OVERRIDE;
-
-    // A general method asking if any control tinting is supported at all.
-    virtual bool supportsControlTints() const OVERRIDE { return true; }
-
-    virtual void adjustRepaintRect(const RenderObject*, IntRect&) OVERRIDE;
+    virtual void adjustPaintInvalidationRect(const RenderObject*, IntRect&) OVERRIDE;
 
     virtual bool isControlStyled(const RenderStyle*, const CachedUAStyle*) const OVERRIDE;
 
@@ -55,7 +49,7 @@ public:
     virtual Color platformInactiveListBoxSelectionForegroundColor() const OVERRIDE;
     virtual Color platformFocusRingColor() const OVERRIDE;
 
-    virtual ScrollbarControlSize scrollbarControlSizeForPart(ControlPart) OVERRIDE { return SmallScrollbar; }
+    virtual ScrollbarControlSize scrollbarControlSizeForPart(ControlPart part) OVERRIDE { return part == ListboxPart ? SmallScrollbar : RegularScrollbar; }
 
     virtual void platformColorsDidChange() OVERRIDE;
 
@@ -77,6 +71,7 @@ public:
     virtual bool paintCapsLockIndicator(RenderObject*, const PaintInfo&, const IntRect&) OVERRIDE;
 
     virtual bool popsMenuByArrowKeys() const OVERRIDE { return true; }
+    virtual bool popsMenuBySpaceKey() const OVERRIDE FINAL { return true; }
 
     virtual IntSize meterSizeForBounds(const RenderMeter*, const IntRect&) const OVERRIDE;
     virtual bool paintMeter(RenderObject*, const PaintInfo&, const IntRect&) OVERRIDE;
@@ -90,6 +85,8 @@ public:
     virtual Color systemColor(CSSValueID) const OVERRIDE;
 
     virtual bool supportsSelectionForegroundColors() const OVERRIDE { return false; }
+
+    virtual bool isModalColorChooser() const { return false; }
 
 protected:
     RenderThemeChromiumMac();
@@ -126,8 +123,6 @@ protected:
 private:
     virtual String fileListNameForWidth(Locale&, const FileList*, const Font&, int width) const OVERRIDE;
 
-    IntRect inflateRect(const IntRect&, const IntSize&, const int* margins, float zoomLevel = 1.0f) const;
-
     FloatRect convertToPaintingRect(const RenderObject* inputRenderer, const RenderObject* partRenderer, const FloatRect& inputRect, const IntRect&) const;
 
     // Get the control size based off the font. Used by some of the controls (like buttons).
@@ -160,7 +155,6 @@ private:
 
     NSPopUpButtonCell* popupButton() const;
     NSSearchFieldCell* search() const;
-    NSMenu* searchMenuTemplate() const;
     NSTextFieldCell* textField() const;
 
     NSLevelIndicatorStyle levelIndicatorStyleFor(ControlPart) const;
@@ -210,6 +204,6 @@ private:
     RetainPtr<WebCoreRenderThemeNotificationObserver> m_notificationObserver;
 };
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // RenderThemeChromiumMac_h

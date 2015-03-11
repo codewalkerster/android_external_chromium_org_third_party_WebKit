@@ -26,7 +26,6 @@
 #ifndef SpeechSynthesis_h
 #define SpeechSynthesis_h
 
-#include "bindings/v8/ScriptWrappable.h"
 #include "core/dom/ContextLifecycleObserver.h"
 #include "modules/EventTargetModules.h"
 #include "modules/speech/SpeechSynthesisUtterance.h"
@@ -35,13 +34,14 @@
 #include "platform/speech/PlatformSpeechSynthesisUtterance.h"
 #include "platform/speech/PlatformSpeechSynthesizer.h"
 
-namespace WebCore {
+namespace blink {
 
 class ExceptionState;
 class PlatformSpeechSynthesizerClient;
 
-class SpeechSynthesis FINAL : public RefCountedGarbageCollectedWillBeGarbageCollectedFinalized<SpeechSynthesis>, public PlatformSpeechSynthesizerClient, public ScriptWrappable, public ContextLifecycleObserver, public EventTargetWithInlineData {
+class SpeechSynthesis FINAL : public RefCountedGarbageCollectedWillBeGarbageCollectedFinalized<SpeechSynthesis>, public PlatformSpeechSynthesizerClient, public ContextLifecycleObserver, public EventTargetWithInlineData {
     DEFINE_EVENT_TARGET_REFCOUNTING_WILL_BE_REMOVED(RefCountedGarbageCollected<SpeechSynthesis>);
+    DEFINE_WRAPPERTYPEINFO();
     USING_GARBAGE_COLLECTED_MIXIN(SpeechSynthesis);
 public:
     static SpeechSynthesis* create(ExecutionContext*);
@@ -94,6 +94,6 @@ private:
     virtual const AtomicString& interfaceName() const OVERRIDE;
 };
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // SpeechSynthesisEvent_h

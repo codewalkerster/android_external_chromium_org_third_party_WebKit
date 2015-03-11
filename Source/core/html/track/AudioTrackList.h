@@ -5,13 +5,13 @@
 #ifndef AudioTrackList_h
 #define AudioTrackList_h
 
-#include "bindings/v8/ScriptWrappable.h"
 #include "core/html/track/AudioTrack.h"
 #include "core/html/track/TrackListBase.h"
 
-namespace WebCore {
+namespace blink {
 
-class AudioTrackList FINAL : public TrackListBase<AudioTrack>, public ScriptWrappable {
+class AudioTrackList FINAL : public TrackListBase<AudioTrack> {
+    DEFINE_WRAPPERTYPEINFO();
 public:
     static PassRefPtrWillBeRawPtr<AudioTrackList> create(HTMLMediaElement&);
 
@@ -26,6 +26,6 @@ private:
     explicit AudioTrackList(HTMLMediaElement&);
 };
 
-}
+} // namespace blink
 
-#endif
+#endif // AudioTrackList_h

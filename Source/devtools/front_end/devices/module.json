@@ -9,5 +9,9 @@
             "className": "WebInspector.DevicesView"
         }
     ],
-    "scripts": [ "DevicesView.js" ]
+    "dependencies": [
+        "sdk",
+        "ui"
+    ],
+    "scripts": ["DevicesView.js"]
 }

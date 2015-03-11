@@ -22,15 +22,15 @@
 #include "config.h"
 #include "core/svg/SVGAngle.h"
 
-#include "bindings/v8/ExceptionState.h"
-#include "bindings/v8/ExceptionStatePlaceholder.h"
+#include "bindings/core/v8/ExceptionState.h"
+#include "bindings/core/v8/ExceptionStatePlaceholder.h"
 #include "core/dom/ExceptionCode.h"
 #include "core/svg/SVGAnimationElement.h"
 #include "core/svg/SVGParserUtilities.h"
 #include "wtf/MathExtras.h"
 #include "wtf/text/WTFString.h"
 
-namespace WebCore {
+namespace blink {
 
 template<> const SVGEnumerationStringEntries& getStaticStringEntries<SVGMarkerOrientType>()
 {
@@ -38,8 +38,14 @@ template<> const SVGEnumerationStringEntries& getStaticStringEntries<SVGMarkerOr
     if (entries.isEmpty()) {
         entries.append(std::make_pair(SVGMarkerOrientAuto, "auto"));
         entries.append(std::make_pair(SVGMarkerOrientAngle, "angle"));
+        entries.append(std::make_pair(SVGMarkerOrientAutoStartReverse, "auto-start-reverse"));
     }
     return entries;
+}
+
+template<> unsigned short getMaxExposedEnumValue<SVGMarkerOrientType>()
+{
+    return SVGMarkerOrientAngle;
 }
 
 SVGMarkerOrientEnumeration::SVGMarkerOrientEnumeration(SVGAngle* angle)
@@ -78,16 +84,14 @@ float SVGMarkerOrientEnumeration::calculateDistance(PassRefPtr<SVGPropertyBase> 
 }
 
 SVGAngle::SVGAngle()
-    : SVGPropertyBase(classType())
-    , m_unitType(SVG_ANGLETYPE_UNSPECIFIED)
+    : m_unitType(SVG_ANGLETYPE_UNSPECIFIED)
     , m_valueInSpecifiedUnits(0)
     , m_orientType(SVGMarkerOrientEnumeration::create(this))
 {
 }
 
 SVGAngle::SVGAngle(SVGAngleType unitType, float valueInSpecifiedUnits, SVGMarkerOrientType orientType)
-    : SVGPropertyBase(classType())
-    , m_unitType(unitType)
+    : m_unitType(unitType)
     , m_valueInSpecifiedUnits(valueInSpecifiedUnits)
     , m_orientType(SVGMarkerOrientEnumeration::create(this))
 {
@@ -101,13 +105,6 @@ SVGAngle::~SVGAngle()
 PassRefPtr<SVGAngle> SVGAngle::clone() const
 {
     return adoptRef(new SVGAngle(m_unitType, m_valueInSpecifiedUnits, m_orientType->enumValue()));
-}
-
-PassRefPtr<SVGPropertyBase> SVGAngle::cloneForAnimation(const String& value) const
-{
-    RefPtr<SVGAngle> point = create();
-    point->setValueAsString(value, IGNORE_EXCEPTION);
-    return point.release();
 }
 
 float SVGAngle::value() const
@@ -238,6 +235,11 @@ void SVGAngle::setValueAsString(const String& value, ExceptionState& exceptionSt
     if (value == "auto") {
         newValueSpecifiedUnits(SVG_ANGLETYPE_UNSPECIFIED, 0);
         m_orientType->setEnumValue(SVGMarkerOrientAuto);
+        return;
+    }
+    if (value == "auto-start-reverse") {
+        newValueSpecifiedUnits(SVG_ANGLETYPE_UNSPECIFIED, 0);
+        m_orientType->setEnumValue(SVGMarkerOrientAutoStartReverse);
         return;
     }
 
@@ -382,27 +384,34 @@ void SVGAngle::calculateAnimatedValue(SVGAnimationElement* animationElement, flo
     SVGMarkerOrientType toOrientType = toAngle->orientType()->enumValue();
 
     if (fromOrientType != toOrientType) {
-        // Animating from eg. auto to 90deg, or auto to 90deg.
+        // Animating from eg. 90deg to auto.
         if (fromOrientType == SVGMarkerOrientAngle) {
             // Animating from an angle value to eg. 'auto' - this disabled additive as 'auto' is a keyword..
-            if (toOrientType == SVGMarkerOrientAuto) {
+            if (toOrientType == SVGMarkerOrientAuto || toOrientType == SVGMarkerOrientAutoStartReverse) {
                 if (percentage < 0.5f) {
                     newValueSpecifiedUnits(fromAngle->unitType(), fromAngle->valueInSpecifiedUnits());
                     return;
                 }
-                orientType()->setEnumValue(SVGMarkerOrientAuto);
+                orientType()->setEnumValue(toOrientType);
                 return;
             }
             m_valueInSpecifiedUnits = 0;
             orientType()->setEnumValue(SVGMarkerOrientUnknown);
             return;
+        } else if (toOrientType == SVGMarkerOrientAuto || toOrientType == SVGMarkerOrientAutoStartReverse) {
+            // Animating from e.g 'auto' to 'auto-start-reverse'
+            if (percentage >= 0.5f) {
+                m_valueInSpecifiedUnits = 0;
+                orientType()->setEnumValue(toOrientType);
+                return;
+            }
         }
     }
 
-    // From 'auto' to 'auto'.
-    if (fromOrientType == SVGMarkerOrientAuto) {
+    // From 'auto' to 'auto', or 'auto-start-reverse' to 'auto-start-reverse'
+    if (fromOrientType == SVGMarkerOrientAuto || fromOrientType == SVGMarkerOrientAutoStartReverse) {
         m_valueInSpecifiedUnits = 0;
-        orientType()->setEnumValue(SVGMarkerOrientAuto);
+        orientType()->setEnumValue(fromOrientType);
         return;
     }
 
@@ -427,7 +436,7 @@ float SVGAngle::calculateDistance(PassRefPtr<SVGPropertyBase> other, SVGElement*
 
 void SVGAngle::orientTypeChanged()
 {
-    if (orientType()->enumValue() == SVGMarkerOrientAuto) {
+    if (orientType()->enumValue() == SVGMarkerOrientAuto || orientType()->enumValue() == SVGMarkerOrientAutoStartReverse) {
         m_unitType = SVG_ANGLETYPE_UNSPECIFIED;
         m_valueInSpecifiedUnits = 0;
     }

@@ -36,7 +36,7 @@
 #include "wtf/Forward.h"
 #include "wtf/PassOwnPtr.h"
 
-namespace WebCore {
+namespace blink {
 
     class KURL;
     class Worker;
@@ -55,17 +55,8 @@ namespace WebCore {
         virtual bool hasPendingActivity() const = 0;
 
         virtual void workerObjectDestroyed() = 0;
-
-        class PageInspector {
-        public:
-            virtual ~PageInspector() { }
-            virtual void dispatchMessageFromWorker(const String&) = 0;
-        };
-        virtual void connectToInspector(PageInspector*) { }
-        virtual void disconnectFromInspector() { }
-        virtual void sendMessageToInspector(const String&) { }
     };
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // WorkerGlobalScopeProxy_h

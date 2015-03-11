@@ -35,9 +35,7 @@
 #include "platform/geometry/FloatSize.h"
 #include "platform/geometry/IntSize.h"
 
-namespace WebCore {
-
-class LayoutPoint;
+namespace blink {
 
 enum AspectRatioFit {
     AspectRatioFitShrink,
@@ -189,6 +187,6 @@ inline LayoutSize roundedLayoutSize(const FloatSize& s)
     return LayoutSize(s);
 }
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // LayoutSize_h

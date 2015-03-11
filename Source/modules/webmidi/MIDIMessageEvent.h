@@ -34,19 +34,18 @@
 #include "modules/EventModules.h"
 #include "wtf/Uint8Array.h"
 
-namespace WebCore {
+namespace blink {
 
 struct MIDIMessageEventInit : public EventInit {
     MIDIMessageEventInit()
-        : receivedTime(0.0)
-    {
-    };
+        : receivedTime(0.0) { }
 
     double receivedTime;
     RefPtr<Uint8Array> data;
 };
 
 class MIDIMessageEvent FINAL : public Event {
+    DEFINE_WRAPPERTYPEINFO();
 public:
     static PassRefPtrWillBeRawPtr<MIDIMessageEvent> create()
     {
@@ -72,31 +71,22 @@ public:
 
 private:
     MIDIMessageEvent()
-        : m_receivedTime(0)
-    {
-        ScriptWrappable::init(this);
-    }
+        : m_receivedTime(0) { }
 
     MIDIMessageEvent(double receivedTime, PassRefPtr<Uint8Array> data)
         : Event(EventTypeNames::midimessage, true, false)
         , m_receivedTime(receivedTime)
-        , m_data(data)
-    {
-        ScriptWrappable::init(this);
-    }
+        , m_data(data) { }
 
     MIDIMessageEvent(const AtomicString& type, const MIDIMessageEventInit& initializer)
         : Event(type, initializer)
         , m_receivedTime(initializer.receivedTime)
-        , m_data(initializer.data)
-    {
-        ScriptWrappable::init(this);
-    }
+        , m_data(initializer.data) { }
 
     double m_receivedTime;
     RefPtr<Uint8Array> m_data;
 };
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // MIDIMessageEvent_h

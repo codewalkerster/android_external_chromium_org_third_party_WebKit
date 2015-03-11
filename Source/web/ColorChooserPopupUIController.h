@@ -30,44 +30,44 @@
 #include "web/ColorChooserUIController.h"
 #include "wtf/OwnPtr.h"
 
-namespace WebCore {
-class ColorChooserClient;
-class PagePopup;
-}
-
 namespace blink {
 
 class ChromeClientImpl;
+class ColorChooserClient;
+class PagePopup;
 
-class ColorChooserPopupUIController FINAL : public ColorChooserUIController, public WebCore::PagePopupClient  {
+class ColorChooserPopupUIController FINAL : public ColorChooserUIController, public PagePopupClient  {
 
 public:
-    ColorChooserPopupUIController(WebCore::LocalFrame*, ChromeClientImpl*, WebCore::ColorChooserClient*);
+    ColorChooserPopupUIController(LocalFrame*, ChromeClientImpl*, ColorChooserClient*);
     virtual ~ColorChooserPopupUIController();
 
     // ColorChooserUIController functions:
     virtual void openUI() OVERRIDE;
 
     // ColorChooser functions
-    void endChooser() OVERRIDE;
+    virtual void endChooser() OVERRIDE;
+    virtual AXObject* rootAXObject() OVERRIDE;
 
     // PagePopupClient functions:
-    virtual WebCore::IntSize contentSize() OVERRIDE;
-    virtual void writeDocument(WebCore::SharedBuffer*) OVERRIDE;
-    virtual WebCore::Locale& locale() OVERRIDE;
+    virtual IntSize contentSize() OVERRIDE;
+    virtual void writeDocument(SharedBuffer*) OVERRIDE;
+    virtual Locale& locale() OVERRIDE;
     virtual void setValueAndClosePopup(int, const String&) OVERRIDE;
     virtual void setValue(const String&) OVERRIDE;
     virtual void closePopup() OVERRIDE;
+    virtual Element& ownerElement() OVERRIDE;
     virtual void didClosePopup() OVERRIDE;
 
 private:
     void openPopup();
 
     ChromeClientImpl* m_chromeClient;
-    WebCore::ColorChooserClient* m_client;
-    WebCore::PagePopup* m_popup;
-    WebCore::Locale& m_locale;
+    ColorChooserClient* m_client;
+    PagePopup* m_popup;
+    Locale& m_locale;
 };
+
 }
 
 #endif // ColorChooserPopupUIController_h

@@ -27,7 +27,7 @@
 
 #include "platform/transforms/TransformOperation.h"
 
-namespace WebCore {
+namespace blink {
 
 class PLATFORM_EXPORT RotateTransformOperation : public TransformOperation {
 public:
@@ -53,8 +53,6 @@ public:
     virtual OperationType type() const OVERRIDE { return m_type; }
 
 private:
-    virtual bool isIdentity() const OVERRIDE { return !m_angle; }
-
     virtual bool operator==(const TransformOperation& o) const OVERRIDE
     {
         if (!isSameType(o))
@@ -87,6 +85,6 @@ private:
     OperationType m_type;
 };
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // RotateTransformOperation_h

@@ -43,7 +43,7 @@
 #include "public/platform/WebThemeEngine.h"
 #endif
 
-namespace WebCore {
+namespace blink {
 
 bool ScrollbarTheme::gMockScrollbarsEnabled = false;
 
@@ -210,8 +210,6 @@ void ScrollbarTheme::paintScrollCorner(GraphicsContext* context, const IntRect& 
 #if OS(MACOSX)
     context->fillRect(cornerRect, Color::white);
 #else
-    if (context->paintingDisabled())
-        return;
     blink::Platform::current()->themeEngine()->paint(context->canvas(), blink::WebThemeEngine::PartScrollbarCorner, blink::WebThemeEngine::StateNormal, blink::WebRect(cornerRect), 0);
 #endif
 }
@@ -270,7 +268,11 @@ int ScrollbarTheme::thumbLength(ScrollbarThemeClient* scrollbar)
         overhang = -scrollbar->currentPos();
     else if (scrollbar->visibleSize() + scrollbar->currentPos() > scrollbar->totalSize())
         overhang = scrollbar->currentPos() + scrollbar->visibleSize() - scrollbar->totalSize();
-    float proportion = (scrollbar->visibleSize() - overhang) / usedTotalSize(scrollbar);
+    float proportion = 0.0f;
+    float totalSize = usedTotalSize(scrollbar);
+    if (totalSize > 0.0f) {
+        proportion = (scrollbar->visibleSize() - overhang) / totalSize;
+    }
     int trackLen = trackLength(scrollbar);
     int length = round(proportion * trackLen);
     length = std::max(length, minimumThumbLength(scrollbar));

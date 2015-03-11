@@ -27,7 +27,9 @@
 #ifndef Settings_h
 #define Settings_h
 
+#include "bindings/core/v8/V8CacheOptions.h"
 #include "core/SettingsMacros.h"
+#include "core/css/PointerProperties.h"
 #include "core/editing/EditingBehaviorTypes.h"
 #include "core/frame/SettingsDelegate.h"
 #include "platform/Timer.h"
@@ -37,7 +39,7 @@
 #include "wtf/HashSet.h"
 #include "wtf/RefCounted.h"
 
-namespace WebCore {
+namespace blink {
 
 class Settings {
     WTF_MAKE_NONCOPYABLE(Settings); WTF_MAKE_FAST_ALLOCATED;
@@ -82,6 +84,6 @@ private:
     SETTINGS_MEMBER_VARIABLES
 };
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // Settings_h

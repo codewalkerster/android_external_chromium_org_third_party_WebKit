@@ -5,36 +5,226 @@
 #include "config.h"
 #include "modules/encryptedmedia/HTMLMediaElementEncryptedMedia.h"
 
-#include "bindings/v8/ExceptionState.h"
+#include "bindings/core/v8/ExceptionState.h"
+#include "bindings/core/v8/ScriptPromise.h"
+#include "bindings/core/v8/ScriptPromiseResolver.h"
+#include "bindings/core/v8/ScriptState.h"
+#include "core/dom/DOMException.h"
 #include "core/dom/ExceptionCode.h"
 #include "core/html/HTMLMediaElement.h"
 #include "core/html/MediaKeyError.h"
 #include "core/html/MediaKeyEvent.h"
 #include "modules/encryptedmedia/MediaKeyNeededEvent.h"
 #include "modules/encryptedmedia/MediaKeys.h"
+#include "modules/encryptedmedia/SimpleContentDecryptionModuleResult.h"
+#include "platform/ContentDecryptionModuleResult.h"
 #include "platform/Logging.h"
 #include "platform/RuntimeEnabledFeatures.h"
+#include "wtf/Functional.h"
+#include "wtf/Uint8Array.h"
 
-namespace WebCore {
+namespace blink {
 
-static void throwExceptionIfMediaKeyExceptionOccurred(const String& keySystem, const String& sessionId, blink::WebMediaPlayer::MediaKeyException exception, ExceptionState& exceptionState)
+static void throwExceptionIfMediaKeyExceptionOccurred(const String& keySystem, const String& sessionId, WebMediaPlayer::MediaKeyException exception, ExceptionState& exceptionState)
 {
     switch (exception) {
-    case blink::WebMediaPlayer::MediaKeyExceptionNoError:
+    case WebMediaPlayer::MediaKeyExceptionNoError:
         return;
-    case blink::WebMediaPlayer::MediaKeyExceptionInvalidPlayerState:
+    case WebMediaPlayer::MediaKeyExceptionInvalidPlayerState:
         exceptionState.throwDOMException(InvalidStateError, "The player is in an invalid state.");
         return;
-    case blink::WebMediaPlayer::MediaKeyExceptionKeySystemNotSupported:
+    case WebMediaPlayer::MediaKeyExceptionKeySystemNotSupported:
         exceptionState.throwDOMException(NotSupportedError, "The key system provided ('" + keySystem +"') is not supported.");
         return;
-    case blink::WebMediaPlayer::MediaKeyExceptionInvalidAccess:
+    case WebMediaPlayer::MediaKeyExceptionInvalidAccess:
         exceptionState.throwDOMException(InvalidAccessError, "The session ID provided ('" + sessionId + "') is invalid.");
         return;
     }
 
     ASSERT_NOT_REACHED();
     return;
+}
+
+// This class allows MediaKeys to be set asynchronously.
+class SetMediaKeysHandler : public ScriptPromiseResolver {
+    WTF_MAKE_NONCOPYABLE(SetMediaKeysHandler);
+
+public:
+    static ScriptPromise create(ScriptState*, HTMLMediaElement&, MediaKeys*);
+    virtual ~SetMediaKeysHandler();
+
+private:
+    SetMediaKeysHandler(ScriptState*, HTMLMediaElement&, MediaKeys*);
+    void timerFired(Timer<SetMediaKeysHandler>*);
+
+    void clearExistingMediaKeys();
+    void setNewMediaKeys();
+    void finish();
+
+    void reportSetFailed(ExceptionCode, const String& errorMessage);
+
+    // Keep media element alive until promise is fulfilled
+    RefPtrWillBePersistent<HTMLMediaElement> m_element;
+    Persistent<MediaKeys> m_newMediaKeys;
+    Timer<SetMediaKeysHandler> m_timer;
+};
+
+typedef Function<void()> SuccessCallback;
+typedef Function<void(ExceptionCode, const String&)> FailureCallback;
+
+// Represents the result used when setContentDecryptionModule() is called.
+// Calls |success| if result is resolved, |failure| is result is rejected.
+class SetContentDecryptionModuleResult FINAL : public ContentDecryptionModuleResult {
+public:
+    SetContentDecryptionModuleResult(SuccessCallback success, FailureCallback failure)
+        : m_successCallback(success)
+        , m_failureCallback(failure)
+    {
+    }
+
+    // ContentDecryptionModuleResult implementation.
+    virtual void complete() OVERRIDE
+    {
+        m_successCallback();
+    }
+
+    virtual void completeWithSession(blink::WebContentDecryptionModuleResult::SessionStatus status) OVERRIDE
+    {
+        ASSERT_NOT_REACHED();
+        m_failureCallback(InvalidStateError, "Unexpected completion.");
+    }
+
+    virtual void completeWithError(blink::WebContentDecryptionModuleException code, unsigned long systemCode, const blink::WebString& message) OVERRIDE
+    {
+        m_failureCallback(WebCdmExceptionToExceptionCode(code), message);
+    }
+
+private:
+    SuccessCallback m_successCallback;
+    FailureCallback m_failureCallback;
+};
+
+ScriptPromise SetMediaKeysHandler::create(ScriptState* scriptState, HTMLMediaElement& element, MediaKeys* mediaKeys)
+{
+    RefPtr<SetMediaKeysHandler> handler = adoptRef(new SetMediaKeysHandler(scriptState, element, mediaKeys));
+    handler->suspendIfNeeded();
+    handler->keepAliveWhilePending();
+    return handler->promise();
+}
+
+SetMediaKeysHandler::SetMediaKeysHandler(ScriptState* scriptState, HTMLMediaElement& element, MediaKeys* mediaKeys)
+    : ScriptPromiseResolver(scriptState)
+    , m_element(element)
+    , m_newMediaKeys(mediaKeys)
+    , m_timer(this, &SetMediaKeysHandler::timerFired)
+{
+    WTF_LOG(Media, "SetMediaKeysHandler::SetMediaKeysHandler");
+
+    // 3. Run the remaining steps asynchronously.
+    m_timer.startOneShot(0, FROM_HERE);
+}
+
+SetMediaKeysHandler::~SetMediaKeysHandler()
+{
+}
+
+void SetMediaKeysHandler::timerFired(Timer<SetMediaKeysHandler>*)
+{
+    clearExistingMediaKeys();
+}
+
+void SetMediaKeysHandler::clearExistingMediaKeys()
+{
+    WTF_LOG(Media, "SetMediaKeysHandler::clearExistingMediaKeys");
+    HTMLMediaElementEncryptedMedia& thisElement = HTMLMediaElementEncryptedMedia::from(*m_element);
+
+    // 3.1 If mediaKeys is not null, it is already in use by another media
+    //     element, and the user agent is unable to use it with this element,
+    //     reject promise with a new DOMException whose name is
+    //     "QuotaExceededError".
+    // FIXME: Need to check whether mediaKeys is already in use by another
+    //        media element.
+    // 3.2 If the mediaKeys attribute is not null, run the following steps:
+    if (thisElement.m_mediaKeys) {
+        // 3.2.1 If the user agent or CDM do not support removing the
+        //       association, return a promise rejected with a new DOMException
+        //       whose name is "NotSupportedError".
+        //       (supported by blink).
+        // 3.2.2 If the association cannot currently be removed (i.e. during
+        //       playback), return a promise rejected with a new DOMException
+        //       whose name is "InvalidStateError".
+        if (m_element->webMediaPlayer()) {
+            reject(DOMException::create(InvalidStateError, "The existing MediaKeys object cannot be removed while a media resource is loaded."));
+            return;
+        }
+
+        // (next 2 steps not required as there is no player connected).
+        // 3.2.3 Stop using the CDM instance represented by the mediaKeys
+        //       attribute to decrypt media data and remove the association
+        //       with the media element.
+        // 3.2.4 If the preceding step failed, reject promise with a new
+        //       DOMException whose name is the appropriate error name and
+        //       that has an appropriate message.
+    }
+
+    // MediaKeys not currently set or no player connected, so continue on.
+    setNewMediaKeys();
+}
+
+void SetMediaKeysHandler::setNewMediaKeys()
+{
+    WTF_LOG(Media, "SetMediaKeysHandler::setNewMediaKeys");
+
+    // 3.3 If mediaKeys is not null, run the following steps:
+    if (m_newMediaKeys) {
+        // 3.3.1 Associate the CDM instance represented by mediaKeys with the
+        //       media element for decrypting media data.
+        // 3.3.2 If the preceding step failed, run the following steps:
+        //       (done in reportSetFailed()).
+        // 3.3.3 Run the Attempt to Resume Playback If Necessary algorithm on
+        //       the media element. The user agent may choose to skip this
+        //       step if it knows resuming will fail (i.e. mediaKeys has no
+        //       sessions).
+        //       (Handled in Chromium).
+        if (m_element->webMediaPlayer()) {
+            SuccessCallback successCallback = bind(&SetMediaKeysHandler::finish, this);
+            FailureCallback failureCallback = bind<ExceptionCode, const String&>(&SetMediaKeysHandler::reportSetFailed, this);
+            ContentDecryptionModuleResult* result = new SetContentDecryptionModuleResult(successCallback, failureCallback);
+            m_element->webMediaPlayer()->setContentDecryptionModule(m_newMediaKeys->contentDecryptionModule(), result->result());
+
+            // Don't do anything more until |result| is resolved (or rejected).
+            return;
+        }
+    }
+
+    // MediaKeys doesn't need to be set on the player, so continue on.
+    finish();
+}
+
+void SetMediaKeysHandler::finish()
+{
+    WTF_LOG(Media, "SetMediaKeysHandler::finish");
+    HTMLMediaElementEncryptedMedia& thisElement = HTMLMediaElementEncryptedMedia::from(*m_element);
+
+    // 3.4 Set the mediaKeys attribute to mediaKeys.
+    thisElement.m_mediaKeys = m_newMediaKeys;
+
+    // 3.5 Resolve promise with undefined.
+    resolve();
+}
+
+void SetMediaKeysHandler::reportSetFailed(ExceptionCode code, const String& errorMessage)
+{
+    WTF_LOG(Media, "SetMediaKeysHandler::reportSetFailed");
+    HTMLMediaElementEncryptedMedia& thisElement = HTMLMediaElementEncryptedMedia::from(*m_element);
+
+    // 3.3.2 If the preceding step failed, run the following steps:
+    // 3.3.2.1 Set the mediaKeys attribute to null.
+    thisElement.m_mediaKeys.clear();
+
+    // 3.3.2.2 Reject promise with a new DOMException whose name is the
+    //         appropriate error name and that has an appropriate message.
+    reject(DOMException::create(code, errorMessage));
 }
 
 HTMLMediaElementEncryptedMedia::HTMLMediaElementEncryptedMedia()
@@ -59,17 +249,16 @@ HTMLMediaElementEncryptedMedia& HTMLMediaElementEncryptedMedia::from(HTMLMediaEl
     return *supplement;
 }
 
-bool HTMLMediaElementEncryptedMedia::setEmeMode(EmeMode emeMode, ExceptionState& exceptionState)
+bool HTMLMediaElementEncryptedMedia::setEmeMode(EmeMode emeMode)
 {
-    if (m_emeMode != EmeModeNotSelected && m_emeMode != emeMode) {
-        exceptionState.throwDOMException(InvalidStateError, "Mixed use of EME prefixed and unprefixed API not allowed.");
+    if (m_emeMode != EmeModeNotSelected && m_emeMode != emeMode)
         return false;
-    }
+
     m_emeMode = emeMode;
     return true;
 }
 
-blink::WebContentDecryptionModule* HTMLMediaElementEncryptedMedia::contentDecryptionModule()
+WebContentDecryptionModule* HTMLMediaElementEncryptedMedia::contentDecryptionModule()
 {
     return m_mediaKeys ? m_mediaKeys->contentDecryptionModule() : 0;
 }
@@ -80,28 +269,21 @@ MediaKeys* HTMLMediaElementEncryptedMedia::mediaKeys(HTMLMediaElement& element)
     return thisElement.m_mediaKeys.get();
 }
 
-void HTMLMediaElementEncryptedMedia::setMediaKeysInternal(HTMLMediaElement& element, MediaKeys* mediaKeys)
+ScriptPromise HTMLMediaElementEncryptedMedia::setMediaKeys(ScriptState* scriptState, HTMLMediaElement& element, MediaKeys* mediaKeys)
 {
-    if (m_mediaKeys == mediaKeys)
-        return;
-
-    ASSERT(m_emeMode == EmeModeUnprefixed);
-    m_mediaKeys = mediaKeys;
-
-    // If a player is connected, tell it that the CDM has changed.
-    if (element.webMediaPlayer())
-        element.webMediaPlayer()->setContentDecryptionModule(contentDecryptionModule());
-}
-
-void HTMLMediaElementEncryptedMedia::setMediaKeys(HTMLMediaElement& element, MediaKeys* mediaKeys, ExceptionState& exceptionState)
-{
-    WTF_LOG(Media, "HTMLMediaElementEncryptedMedia::setMediaKeys");
     HTMLMediaElementEncryptedMedia& thisElement = HTMLMediaElementEncryptedMedia::from(element);
+    WTF_LOG(Media, "HTMLMediaElementEncryptedMedia::setMediaKeys current(%p), new(%p)", thisElement.m_mediaKeys.get(), mediaKeys);
 
-    if (!thisElement.setEmeMode(EmeModeUnprefixed, exceptionState))
-        return;
+    if (!thisElement.setEmeMode(EmeModeUnprefixed))
+        return ScriptPromise::rejectWithDOMException(scriptState, DOMException::create(InvalidStateError, "Mixed use of EME prefixed and unprefixed API not allowed."));
 
-    thisElement.setMediaKeysInternal(element, mediaKeys);
+    // 1. If mediaKeys and the mediaKeys attribute are the same object, return
+    //    a promise resolved with undefined.
+    if (thisElement.m_mediaKeys == mediaKeys)
+        return ScriptPromise::cast(scriptState, V8ValueTraits<V8UndefinedType>::toV8Value(V8UndefinedType(), scriptState->context()->Global(), scriptState->isolate()));
+
+    // 2. Let promise be a new promise. Remaining steps done in handler.
+    return SetMediaKeysHandler::create(scriptState, element, mediaKeys);
 }
 
 // Create a MediaKeyNeededEvent for WD EME.
@@ -134,12 +316,14 @@ void HTMLMediaElementEncryptedMedia::webkitGenerateKeyRequest(HTMLMediaElement& 
     HTMLMediaElementEncryptedMedia::from(element).generateKeyRequest(element.webMediaPlayer(), keySystem, initData, exceptionState);
 }
 
-void HTMLMediaElementEncryptedMedia::generateKeyRequest(blink::WebMediaPlayer* webMediaPlayer, const String& keySystem, PassRefPtr<Uint8Array> initData, ExceptionState& exceptionState)
+void HTMLMediaElementEncryptedMedia::generateKeyRequest(WebMediaPlayer* webMediaPlayer, const String& keySystem, PassRefPtr<Uint8Array> initData, ExceptionState& exceptionState)
 {
     WTF_LOG(Media, "HTMLMediaElementEncryptedMedia::webkitGenerateKeyRequest");
 
-    if (!setEmeMode(EmeModePrefixed, exceptionState))
+    if (!setEmeMode(EmeModePrefixed)) {
+        exceptionState.throwDOMException(InvalidStateError, "Mixed use of EME prefixed and unprefixed API not allowed.");
         return;
+    }
 
     if (keySystem.isEmpty()) {
         exceptionState.throwDOMException(SyntaxError, "The key system provided is empty.");
@@ -158,7 +342,7 @@ void HTMLMediaElementEncryptedMedia::generateKeyRequest(blink::WebMediaPlayer* w
         initDataLength = initData->length();
     }
 
-    blink::WebMediaPlayer::MediaKeyException result = webMediaPlayer->generateKeyRequest(keySystem, initDataPointer, initDataLength);
+    WebMediaPlayer::MediaKeyException result = webMediaPlayer->generateKeyRequest(keySystem, initDataPointer, initDataLength);
     throwExceptionIfMediaKeyExceptionOccurred(keySystem, String(), result, exceptionState);
 }
 
@@ -172,12 +356,14 @@ void HTMLMediaElementEncryptedMedia::webkitAddKey(HTMLMediaElement& element, con
     HTMLMediaElementEncryptedMedia::from(element).addKey(element.webMediaPlayer(), keySystem, key, initData, sessionId, exceptionState);
 }
 
-void HTMLMediaElementEncryptedMedia::addKey(blink::WebMediaPlayer* webMediaPlayer, const String& keySystem, PassRefPtr<Uint8Array> key, PassRefPtr<Uint8Array> initData, const String& sessionId, ExceptionState& exceptionState)
+void HTMLMediaElementEncryptedMedia::addKey(WebMediaPlayer* webMediaPlayer, const String& keySystem, PassRefPtr<Uint8Array> key, PassRefPtr<Uint8Array> initData, const String& sessionId, ExceptionState& exceptionState)
 {
     WTF_LOG(Media, "HTMLMediaElementEncryptedMedia::webkitAddKey");
 
-    if (!setEmeMode(EmeModePrefixed, exceptionState))
+    if (!setEmeMode(EmeModePrefixed)) {
+        exceptionState.throwDOMException(InvalidStateError, "Mixed use of EME prefixed and unprefixed API not allowed.");
         return;
+    }
 
     if (keySystem.isEmpty()) {
         exceptionState.throwDOMException(SyntaxError, "The key system provided is empty.");
@@ -206,7 +392,7 @@ void HTMLMediaElementEncryptedMedia::addKey(blink::WebMediaPlayer* webMediaPlaye
         initDataLength = initData->length();
     }
 
-    blink::WebMediaPlayer::MediaKeyException result = webMediaPlayer->addKey(keySystem, key->data(), key->length(), initDataPointer, initDataLength, sessionId);
+    WebMediaPlayer::MediaKeyException result = webMediaPlayer->addKey(keySystem, key->data(), key->length(), initDataPointer, initDataLength, sessionId);
     throwExceptionIfMediaKeyExceptionOccurred(keySystem, sessionId, result, exceptionState);
 }
 
@@ -220,12 +406,14 @@ void HTMLMediaElementEncryptedMedia::webkitCancelKeyRequest(HTMLMediaElement& el
     HTMLMediaElementEncryptedMedia::from(element).cancelKeyRequest(element.webMediaPlayer(), keySystem, sessionId, exceptionState);
 }
 
-void HTMLMediaElementEncryptedMedia::cancelKeyRequest(blink::WebMediaPlayer* webMediaPlayer, const String& keySystem, const String& sessionId, ExceptionState& exceptionState)
+void HTMLMediaElementEncryptedMedia::cancelKeyRequest(WebMediaPlayer* webMediaPlayer, const String& keySystem, const String& sessionId, ExceptionState& exceptionState)
 {
     WTF_LOG(Media, "HTMLMediaElementEncryptedMedia::webkitCancelKeyRequest");
 
-    if (!setEmeMode(EmeModePrefixed, exceptionState))
+    if (!setEmeMode(EmeModePrefixed)) {
+        exceptionState.throwDOMException(InvalidStateError, "Mixed use of EME prefixed and unprefixed API not allowed.");
         return;
+    }
 
     if (keySystem.isEmpty()) {
         exceptionState.throwDOMException(SyntaxError, "The key system provided is empty.");
@@ -237,7 +425,7 @@ void HTMLMediaElementEncryptedMedia::cancelKeyRequest(blink::WebMediaPlayer* web
         return;
     }
 
-    blink::WebMediaPlayer::MediaKeyException result = webMediaPlayer->cancelKeyRequest(keySystem, sessionId);
+    WebMediaPlayer::MediaKeyException result = webMediaPlayer->cancelKeyRequest(keySystem, sessionId);
     throwExceptionIfMediaKeyExceptionOccurred(keySystem, sessionId, result, exceptionState);
 }
 
@@ -256,28 +444,28 @@ void HTMLMediaElementEncryptedMedia::keyAdded(HTMLMediaElement& element, const S
     element.scheduleEvent(event.release());
 }
 
-void HTMLMediaElementEncryptedMedia::keyError(HTMLMediaElement& element, const String& keySystem, const String& sessionId, blink::WebMediaPlayerClient::MediaKeyErrorCode errorCode, unsigned short systemCode)
+void HTMLMediaElementEncryptedMedia::keyError(HTMLMediaElement& element, const String& keySystem, const String& sessionId, WebMediaPlayerClient::MediaKeyErrorCode errorCode, unsigned short systemCode)
 {
     WTF_LOG(Media, "HTMLMediaElementEncryptedMedia::mediaPlayerKeyError: sessionID=%s, errorCode=%d, systemCode=%d", sessionId.utf8().data(), errorCode, systemCode);
 
     MediaKeyError::Code mediaKeyErrorCode = MediaKeyError::MEDIA_KEYERR_UNKNOWN;
     switch (errorCode) {
-    case blink::WebMediaPlayerClient::MediaKeyErrorCodeUnknown:
+    case WebMediaPlayerClient::MediaKeyErrorCodeUnknown:
         mediaKeyErrorCode = MediaKeyError::MEDIA_KEYERR_UNKNOWN;
         break;
-    case blink::WebMediaPlayerClient::MediaKeyErrorCodeClient:
+    case WebMediaPlayerClient::MediaKeyErrorCodeClient:
         mediaKeyErrorCode = MediaKeyError::MEDIA_KEYERR_CLIENT;
         break;
-    case blink::WebMediaPlayerClient::MediaKeyErrorCodeService:
+    case WebMediaPlayerClient::MediaKeyErrorCodeService:
         mediaKeyErrorCode = MediaKeyError::MEDIA_KEYERR_SERVICE;
         break;
-    case blink::WebMediaPlayerClient::MediaKeyErrorCodeOutput:
+    case WebMediaPlayerClient::MediaKeyErrorCodeOutput:
         mediaKeyErrorCode = MediaKeyError::MEDIA_KEYERR_OUTPUT;
         break;
-    case blink::WebMediaPlayerClient::MediaKeyErrorCodeHardwareChange:
+    case WebMediaPlayerClient::MediaKeyErrorCodeHardwareChange:
         mediaKeyErrorCode = MediaKeyError::MEDIA_KEYERR_HARDWARECHANGE;
         break;
-    case blink::WebMediaPlayerClient::MediaKeyErrorCodeDomain:
+    case WebMediaPlayerClient::MediaKeyErrorCodeDomain:
         mediaKeyErrorCode = MediaKeyError::MEDIA_KEYERR_DOMAIN;
         break;
     }
@@ -295,7 +483,7 @@ void HTMLMediaElementEncryptedMedia::keyError(HTMLMediaElement& element, const S
     element.scheduleEvent(event.release());
 }
 
-void HTMLMediaElementEncryptedMedia::keyMessage(HTMLMediaElement& element, const String& keySystem, const String& sessionId, const unsigned char* message, unsigned messageLength, const blink::WebURL& defaultURL)
+void HTMLMediaElementEncryptedMedia::keyMessage(HTMLMediaElement& element, const String& keySystem, const String& sessionId, const unsigned char* message, unsigned messageLength, const WebURL& defaultURL)
 {
     WTF_LOG(Media, "HTMLMediaElementEncryptedMedia::mediaPlayerKeyMessage: sessionID=%s", sessionId.utf8().data());
 
@@ -340,10 +528,14 @@ void HTMLMediaElementEncryptedMedia::playerDestroyed(HTMLMediaElement& element)
 #endif
 
     HTMLMediaElementEncryptedMedia& thisElement = HTMLMediaElementEncryptedMedia::from(element);
-    thisElement.setMediaKeysInternal(element, 0);
+    if (!thisElement.m_mediaKeys)
+        return;
+
+    ASSERT(thisElement.m_emeMode == EmeModeUnprefixed);
+    thisElement.m_mediaKeys.clear();
 }
 
-blink::WebContentDecryptionModule* HTMLMediaElementEncryptedMedia::contentDecryptionModule(HTMLMediaElement& element)
+WebContentDecryptionModule* HTMLMediaElementEncryptedMedia::contentDecryptionModule(HTMLMediaElement& element)
 {
     HTMLMediaElementEncryptedMedia& thisElement = HTMLMediaElementEncryptedMedia::from(element);
     return thisElement.contentDecryptionModule();
@@ -355,4 +547,4 @@ void HTMLMediaElementEncryptedMedia::trace(Visitor* visitor)
     WillBeHeapSupplement<HTMLMediaElement>::trace(visitor);
 }
 
-} // namespace WebCore
+} // namespace blink

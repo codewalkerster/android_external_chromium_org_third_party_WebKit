@@ -26,6 +26,7 @@
 #ifndef PendingScript_h
 #define PendingScript_h
 
+#include "core/dom/Element.h"
 #include "core/fetch/ResourceClient.h"
 #include "core/fetch/ResourceOwner.h"
 #include "core/fetch/ScriptResource.h"
@@ -34,10 +35,10 @@
 #include "wtf/RefPtr.h"
 #include "wtf/text/TextPosition.h"
 
-namespace WebCore {
+namespace blink {
 
-class Element;
-class ScriptResource;
+class ScriptSourceCode;
+class ScriptStreamer;
 
 // A container for an external script which may be loaded and executed.
 //
@@ -47,6 +48,12 @@ class ScriptResource;
 class PendingScript FINAL : public ResourceOwner<ScriptResource> {
     ALLOW_ONLY_INLINE_ALLOCATION();
 public:
+    enum Type {
+        ParsingBlocking,
+        Deferred,
+        Async
+    };
+
     PendingScript()
         : m_watchingForLoad(false)
         , m_startingPosition(TextPosition::belowRangePosition())
@@ -65,6 +72,7 @@ public:
         , m_watchingForLoad(other.m_watchingForLoad)
         , m_element(other.m_element)
         , m_startingPosition(other.m_startingPosition)
+        , m_streamer(other.m_streamer)
     {
         setScriptResource(other.resource());
     }
@@ -79,16 +87,16 @@ public:
         m_watchingForLoad = other.m_watchingForLoad;
         m_element = other.m_element;
         m_startingPosition = other.m_startingPosition;
-        this->ResourceOwner<ScriptResource, ResourceClient>::operator=(other);
-
+        m_streamer = other.m_streamer;
+        this->ResourceOwner<ScriptResource, ScriptResourceClient>::operator=(other);
         return *this;
     }
 
     TextPosition startingPosition() const { return m_startingPosition; }
     void setStartingPosition(const TextPosition& position) { m_startingPosition = position; }
 
-    bool watchingForLoad() const { return m_watchingForLoad; }
-    void setWatchingForLoad(bool b) { m_watchingForLoad = b; }
+    void watchForLoad(ScriptResourceClient*);
+    void stopWatchingForLoad(ScriptResourceClient*);
 
     Element* element() const { return m_element.get(); }
     void setElement(Element* element) { m_element = element; }
@@ -97,13 +105,27 @@ public:
     void setScriptResource(ScriptResource*);
 
     virtual void notifyFinished(Resource*);
+    virtual void notifyAppendData(ScriptResource*);
 
     void trace(Visitor*);
+
+    ScriptSourceCode getSource(const KURL& documentURL, bool& errorOccurred) const;
+
+    void setStreamer(PassRefPtr<ScriptStreamer> streamer)
+    {
+        ASSERT(!m_streamer);
+        ASSERT(!m_watchingForLoad);
+        m_streamer = streamer;
+    }
+
+    bool isReady() const;
 
 private:
     bool m_watchingForLoad;
     RefPtrWillBeMember<Element> m_element;
     TextPosition m_startingPosition; // Only used for inline script tags.
+
+    RefPtr<ScriptStreamer> m_streamer;
 };
 
 }

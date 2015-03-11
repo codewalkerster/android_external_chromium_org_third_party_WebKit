@@ -52,7 +52,7 @@
 #include "platform/text/TextBreakIterator.h"
 #include <limits>
 
-namespace WebCore {
+namespace blink {
 
 using namespace HTMLNames;
 
@@ -73,8 +73,10 @@ static bool hasImpliedEndTag(const HTMLStackItem* item)
         || item->hasTagName(optionTag)
         || item->hasTagName(optgroupTag)
         || item->hasTagName(pTag)
+        || item->hasTagName(rbTag)
         || item->hasTagName(rpTag)
-        || item->hasTagName(rtTag);
+        || item->hasTagName(rtTag)
+        || item->hasTagName(rtcTag);
 }
 
 static bool shouldUseLengthLimit(const ContainerNode& node)
@@ -229,9 +231,13 @@ static String atomizeIfAllWhitespace(const String& string, WhitespaceMode whites
     return string;
 }
 
-void HTMLConstructionSite::flushPendingText()
+void HTMLConstructionSite::flushPendingText(FlushMode mode)
 {
     if (m_pendingText.isEmpty())
+        return;
+
+    if (mode == FlushIfAtTextLimit
+        && !shouldUseLengthLimit(*m_pendingText.parent))
         return;
 
     PendingText pendingText;
@@ -267,7 +273,7 @@ void HTMLConstructionSite::flushPendingText()
 
 void HTMLConstructionSite::queueTask(const HTMLConstructionSiteTask& task)
 {
-    flushPendingText();
+    flushPendingText(FlushAlways);
     ASSERT(m_pendingText.isEmpty());
     m_taskQueue.append(task);
 }
@@ -407,7 +413,7 @@ void HTMLConstructionSite::mergeAttributesFromTokenIntoElement(AtomicHTMLToken* 
 
     for (unsigned i = 0; i < token->attributes().size(); ++i) {
         const Attribute& tokenAttribute = token->attributes().at(i);
-        if (!element->elementData() || !element->findAttributeByName(tokenAttribute.name()))
+        if (element->attributesWithoutUpdate().findIndex(tokenAttribute.name()) == kNotFound)
             element->setAttribute(tokenAttribute.name(), tokenAttribute.value());
     }
 }
@@ -531,7 +537,7 @@ void HTMLConstructionSite::setCompatibilityModeFromDoctype(const String& name, c
 void HTMLConstructionSite::processEndOfFile()
 {
     ASSERT(currentNode());
-    flush();
+    flush(FlushAlways);
     openElements()->popAll();
 }
 
@@ -539,7 +545,7 @@ void HTMLConstructionSite::finishedParsing()
 {
     // We shouldn't have any queued tasks but we might have pending text which we need to promote to tasks and execute.
     ASSERT(m_taskQueue.isEmpty());
-    flush();
+    flush(FlushAlways);
     m_document->finishedParsing();
 }
 
@@ -599,7 +605,7 @@ void HTMLConstructionSite::insertHTMLHeadElement(AtomicHTMLToken* token)
 void HTMLConstructionSite::insertHTMLBodyElement(AtomicHTMLToken* token)
 {
     ASSERT(!shouldFosterParent());
-    RefPtrWillBeRawPtr<Element> body = createHTMLElement(token);
+    RefPtrWillBeRawPtr<HTMLElement> body = createHTMLElement(token);
     attachLater(currentNode(), body);
     m_openElements.pushHTMLBodyElement(HTMLStackItem::create(body.release(), token));
     if (LocalFrame* frame = m_document->frame())
@@ -608,7 +614,7 @@ void HTMLConstructionSite::insertHTMLBodyElement(AtomicHTMLToken* token)
 
 void HTMLConstructionSite::insertHTMLFormElement(AtomicHTMLToken* token, bool isDemoted)
 {
-    RefPtrWillBeRawPtr<Element> element = createHTMLElement(token);
+    RefPtrWillBeRawPtr<HTMLElement> element = createHTMLElement(token);
     ASSERT(isHTMLFormElement(element));
     m_form = static_pointer_cast<HTMLFormElement>(element.release());
     m_form->setDemoted(isDemoted);
@@ -618,7 +624,7 @@ void HTMLConstructionSite::insertHTMLFormElement(AtomicHTMLToken* token, bool is
 
 void HTMLConstructionSite::insertHTMLElement(AtomicHTMLToken* token)
 {
-    RefPtrWillBeRawPtr<Element> element = createHTMLElement(token);
+    RefPtrWillBeRawPtr<HTMLElement> element = createHTMLElement(token);
     attachLater(currentNode(), element);
     m_openElements.push(HTMLStackItem::create(element.release(), token));
 }
@@ -687,7 +693,7 @@ void HTMLConstructionSite::insertTextNode(const String& string, WhitespaceMode w
     // The nextChild != dummy.nextChild case occurs whenever foster parenting happened and we hit a new text node "<table>a</table>b"
     // In either case we have to flush the pending text into the task queue before making more.
     if (!m_pendingText.isEmpty() && (m_pendingText.parent != dummyTask.parent ||  m_pendingText.nextChild != dummyTask.nextChild))
-        flushPendingText();
+        flushPendingText(FlushAlways);
     m_pendingText.append(dummyTask.parent, dummyTask.nextChild, string, whitespaceMode);
 }
 
@@ -743,7 +749,7 @@ inline Document& HTMLConstructionSite::ownerDocumentForCurrentNode()
     return currentNode()->document();
 }
 
-PassRefPtrWillBeRawPtr<Element> HTMLConstructionSite::createHTMLElement(AtomicHTMLToken* token)
+PassRefPtrWillBeRawPtr<HTMLElement> HTMLConstructionSite::createHTMLElement(AtomicHTMLToken* token)
 {
     Document& document = ownerDocumentForCurrentNode();
     // Only associate the element with the current form if we're creating the new element
@@ -752,9 +758,8 @@ PassRefPtrWillBeRawPtr<Element> HTMLConstructionSite::createHTMLElement(AtomicHT
     // FIXME: This can't use HTMLConstructionSite::createElement because we
     // have to pass the current form element.  We should rework form association
     // to occur after construction to allow better code sharing here.
-    RefPtrWillBeRawPtr<Element> element = HTMLElementFactory::createHTMLElement(token->name(), document, form, true);
+    RefPtrWillBeRawPtr<HTMLElement> element = HTMLElementFactory::createHTMLElement(token->name(), document, form, true);
     setAttributes(element.get(), token, m_parserContentPolicy);
-    ASSERT(element->isHTMLElement());
     return element.release();
 }
 

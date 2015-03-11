@@ -29,7 +29,7 @@
 #include "core/dom/DocumentParser.h"
 #include "wtf/OwnPtr.h"
 
-namespace WebCore {
+namespace blink {
 class TextResourceDecoder;
 
 class DecodedDataDocumentParser : public DocumentParser {
@@ -52,7 +52,7 @@ protected:
     virtual ~DecodedDataDocumentParser();
 
 private:
-    // append is used by DocumentWriter::replaceDocument.
+    // append is used by DocumentWriter::replaceDocumentWhileExecutingJavaScriptURL.
     virtual void append(PassRefPtr<StringImpl>) = 0;
 
     void updateDocument(String& decodedData);

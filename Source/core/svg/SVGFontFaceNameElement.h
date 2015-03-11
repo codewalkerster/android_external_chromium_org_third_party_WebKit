@@ -24,11 +24,12 @@
 #include "core/SVGNames.h"
 #include "core/svg/SVGElement.h"
 
-namespace WebCore {
+namespace blink {
 
 class CSSFontFaceSrcValue;
 
 class SVGFontFaceNameElement FINAL : public SVGElement {
+    DEFINE_WRAPPERTYPEINFO();
 public:
     DECLARE_NODE_FACTORY(SVGFontFaceNameElement);
 
@@ -40,9 +41,7 @@ private:
     virtual bool rendererIsNeeded(const RenderStyle&) OVERRIDE { return false; }
 };
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // ENABLE(SVG_FONTS)
-#endif
-
-// vim:ts=4:noet
+#endif // SVGFontFaceNameElement_h

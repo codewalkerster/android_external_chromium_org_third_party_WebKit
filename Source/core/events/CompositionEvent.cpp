@@ -27,7 +27,7 @@
 #include "config.h"
 #include "core/events/CompositionEvent.h"
 
-namespace WebCore {
+namespace blink {
 
 CompositionEventInit::CompositionEventInit()
 {
@@ -37,7 +37,6 @@ CompositionEvent::CompositionEvent()
     : m_activeSegmentStart(0)
     , m_activeSegmentEnd(0)
 {
-    ScriptWrappable::init(this);
     initializeSegments();
 }
 
@@ -47,7 +46,6 @@ CompositionEvent::CompositionEvent(const AtomicString& type, PassRefPtrWillBeRaw
     , m_activeSegmentStart(0)
     , m_activeSegmentEnd(0)
 {
-    ScriptWrappable::init(this);
     initializeSegments(&underlines);
 }
 
@@ -57,7 +55,6 @@ CompositionEvent::CompositionEvent(const AtomicString& type, const CompositionEv
     , m_activeSegmentStart(0)
     , m_activeSegmentEnd(0)
 {
-    ScriptWrappable::init(this);
     initializeSegments();
 }
 
@@ -108,4 +105,4 @@ void CompositionEvent::trace(Visitor* visitor)
     UIEvent::trace(visitor);
 }
 
-} // namespace WebCore
+} // namespace blink

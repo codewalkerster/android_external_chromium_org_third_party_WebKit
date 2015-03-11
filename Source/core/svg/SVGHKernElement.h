@@ -26,9 +26,10 @@
 #include "core/SVGNames.h"
 #include "core/svg/SVGFontElement.h"
 
-namespace WebCore {
+namespace blink {
 
 class SVGHKernElement FINAL : public SVGElement {
+    DEFINE_WRAPPERTYPEINFO();
 public:
     DECLARE_NODE_FACTORY(SVGHKernElement);
 
@@ -43,7 +44,7 @@ private:
     virtual bool rendererIsNeeded(const RenderStyle&) OVERRIDE { return false; }
 };
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // ENABLE(SVG_FONTS)
-#endif
+#endif // SVGHKernElement_h

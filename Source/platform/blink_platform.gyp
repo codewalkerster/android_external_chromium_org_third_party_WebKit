@@ -161,7 +161,7 @@
                 'class_whitelist_regex':
                     'ChromiumWebCoreObjC|TCMVisibleView|RTCMFlippedView|ScrollerStyleObserver',
                 'category_whitelist_regex':
-                    'TCMInterposing|ScrollAnimatorChromiumMacExt|WebCoreTheme',
+                    'WebCoreFocusRingDrawing|WebCoreTheme',
               },
               'action': [
                 '../build/scripts/check_objc_rename.sh',
@@ -220,8 +220,7 @@
     'xcode_settings': {
       # Some Mac-specific parts of WebKit won't compile without having this
       # prefix header injected.
-      # FIXME: make this a first-class setting.
-      'GCC_PREFIX_HEADER': '../core/WebCorePrefixMac.h',
+      'GCC_PREFIX_HEADER': '<(DEPTH)/third_party/WebKit/Source/build/mac/Prefix.h',
     },
     'sources': [
       '<@(platform_files)',
@@ -253,7 +252,6 @@
         'sources/': [
           # Cherry-pick files excluded by the broader regular expressions above.
           ['include', 'fonts/harfbuzz/FontHarfBuzz\\.cpp$'],
-          ['include', 'fonts/harfbuzz/FontPlatformDataHarfBuzz\\.cpp$'],
           ['include', 'fonts/harfbuzz/HarfBuzzFace\\.(cpp|h)$'],
           ['include', 'fonts/harfbuzz/HarfBuzzFaceSkia\\.cpp$'],
           ['include', 'fonts/harfbuzz/HarfBuzzShaper\\.(cpp|h)$'],
@@ -271,11 +269,11 @@
       }],
       ['OS=="linux" or OS=="android"', {
         'sources/': [
-          ['include', 'fonts/linux/FontPlatformDataLinuxHarfBuzz\\.cpp$'],
+          ['include', 'fonts/linux/FontPlatformDataLinux\\.cpp$'],
         ]
       }, { # OS!="linux" and OS!="android"
         'sources/': [
-          ['exclude', 'fonts/linux/FontPlatformDataLinuxHarfBuzz\\.cpp$'],
+          ['exclude', 'fonts/linux/FontPlatformDataLinux\\.cpp$'],
         ]
       }],
       ['OS=="mac"', {
@@ -319,6 +317,8 @@
           ['include', 'mac/ScrollElasticityController\\.mm$'],
           ['include', 'mac/ThemeMac\\.h$'],
           ['include', 'mac/ThemeMac\\.mm$'],
+          ['include', 'mac/WebCoreNSCellExtras\\.h$'],
+          ['include', 'mac/WebCoreNSCellExtras\\.mm$'],
  
           # Mac uses only ScrollAnimatorMac.
           ['exclude', 'scroll/ScrollbarThemeNonMacCommon\\.(cpp|h)$'],
@@ -360,9 +360,6 @@
           ['exclude', 'geometry/cg/'],
           ['exclude', 'scroll/ScrollbarThemeMac'],
 
-          # FIXME: We will eventually compile this too, but for now it's
-          # only used on mac.
-          ['exclude', 'fonts/FontPlatformData\\.cpp$'],
           ['exclude', 'fonts/harfbuzz/HarfBuzzFaceCoreText\\.cpp$'],
         ],
       }],
@@ -451,7 +448,7 @@
       ['OS=="android"', {
         'sources/': [
             ['include', 'exported/linux/WebFontRenderStyle\\.cpp$'],
-            ['include', 'fonts/linux/FontPlatformDataLinuxHarfBuzz\\.cpp$'],
+            ['include', 'fonts/linux/FontPlatformDataLinux\\.cpp$'],
         ],
       }],
     ],

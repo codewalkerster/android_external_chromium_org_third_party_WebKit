@@ -30,11 +30,12 @@
 #include "core/svg/SVGFilterPrimitiveStandardAttributes.h"
 #include "platform/graphics/filters/FEConvolveMatrix.h"
 
-namespace WebCore {
+namespace blink {
 
 template<> const SVGEnumerationStringEntries& getStaticStringEntries<EdgeModeType>();
 
 class SVGFEConvolveMatrixElement FINAL : public SVGFilterPrimitiveStandardAttributes {
+    DEFINE_WRAPPERTYPEINFO();
 public:
     DECLARE_NODE_FACTORY(SVGFEConvolveMatrixElement);
 
@@ -72,6 +73,6 @@ private:
     RefPtr<SVGAnimatedInteger> m_targetY;
 };
 
-} // namespace WebCore
+} // namespace blink
 
-#endif
+#endif // SVGFEConvolveMatrixElement_h

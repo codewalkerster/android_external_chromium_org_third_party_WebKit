@@ -30,12 +30,12 @@
 
 /**
  * @constructor
- * @extends {WebInspector.TargetAwareObject}
+ * @extends {WebInspector.SDKModel}
  * @param {!WebInspector.Target} target
  */
 WebInspector.NetworkManager = function(target)
 {
-    WebInspector.TargetAwareObject.call(this, target);
+    WebInspector.SDKModel.call(this, WebInspector.NetworkManager, target);
     this._dispatcher = new WebInspector.NetworkDispatcher(this);
     this._target = target;
     this._networkAgent = target.networkAgent();
@@ -81,6 +81,7 @@ WebInspector.NetworkManager._MIMETypes = {
     "font/opentype":               {"font": true},
     "application/octet-stream":    {"font": true, "image": true},
     "application/font-woff":       {"font": true},
+    "application/font-woff2":      {"font": true},
     "application/x-font-woff":     {"font": true},
     "application/x-font-type1":    {"font": true},
     "application/x-font-ttf":      {"font": true},
@@ -130,7 +131,12 @@ WebInspector.NetworkManager.prototype = {
         this._networkAgent.setCacheDisabled(enabled);
     },
 
-    __proto__: WebInspector.TargetAwareObject.prototype
+    dispose: function()
+    {
+        WebInspector.settings.cacheDisabled.removeChangeListener(this._cacheDisabledSettingChanged, this)
+    },
+
+    __proto__: WebInspector.SDKModel.prototype
 }
 
 /**
@@ -193,9 +199,12 @@ WebInspector.NetworkDispatcher.prototype = {
         }
 
         networkRequest.connectionReused = response.connectionReused;
-        networkRequest.connectionId = response.connectionId;
+        networkRequest.connectionId = String(response.connectionId);
         if (response.remoteIPAddress)
             networkRequest.setRemoteAddress(response.remoteIPAddress, response.remotePort || -1);
+
+        if (response.fromServiceWorker)
+            networkRequest.fetchedViaServiceWorker = true;
 
         if (response.fromDiskCache)
             networkRequest.cached = true;
@@ -376,7 +385,8 @@ WebInspector.NetworkDispatcher.prototype = {
      */
     webSocketCreated: function(requestId, requestURL)
     {
-        var networkRequest = new WebInspector.NetworkRequest(this._manager._target, requestId, requestURL, "", "", "");
+        // FIXME: WebSocket MUST have initiator info.
+        var networkRequest = new WebInspector.NetworkRequest(this._manager._target, requestId, requestURL, "", "", "", null);
         networkRequest.type = WebInspector.resourceTypes.WebSocket;
         this._startNetworkRequest(networkRequest);
     },
@@ -496,13 +506,13 @@ WebInspector.NetworkDispatcher.prototype = {
     {
         var originalNetworkRequest = this._inflightRequestsById[requestId];
         var previousRedirects = originalNetworkRequest.redirects || [];
-        originalNetworkRequest.requestId = "redirected:" + requestId + "." + previousRedirects.length;
+        originalNetworkRequest.requestId = requestId + ":redirected." + previousRedirects.length;
         delete originalNetworkRequest.redirects;
         if (previousRedirects.length > 0)
             originalNetworkRequest.redirectSource = previousRedirects[previousRedirects.length - 1];
         this._finishNetworkRequest(originalNetworkRequest, time, -1);
         var newNetworkRequest = this._createNetworkRequest(requestId, originalNetworkRequest.frameId, originalNetworkRequest.loaderId,
-             redirectURL, originalNetworkRequest.documentURL, originalNetworkRequest.initiator);
+             redirectURL, originalNetworkRequest.documentURL, originalNetworkRequest.initiator());
         newNetworkRequest.redirects = previousRedirects.concat(originalNetworkRequest);
         return newNetworkRequest;
     },
@@ -556,17 +566,10 @@ WebInspector.NetworkDispatcher.prototype = {
      * @param {!NetworkAgent.LoaderId} loaderId
      * @param {string} url
      * @param {string} documentURL
-     * @param {!NetworkAgent.Initiator} initiator
+     * @param {?NetworkAgent.Initiator} initiator
      */
     _createNetworkRequest: function(requestId, frameId, loaderId, url, documentURL, initiator)
     {
-        var networkRequest = new WebInspector.NetworkRequest(this._manager._target, requestId, url, documentURL, frameId, loaderId);
-        networkRequest.initiator = initiator;
-        return networkRequest;
+        return new WebInspector.NetworkRequest(this._manager._target, requestId, url, documentURL, frameId, loaderId, initiator);
     }
 }
-
-/**
- * @type {!WebInspector.NetworkManager}
- */
-WebInspector.networkManager;

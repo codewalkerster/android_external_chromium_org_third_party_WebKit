@@ -33,8 +33,10 @@
 
 #include "core/dom/Position.h"
 #include "core/editing/VisiblePosition.h"
+#include "core/rendering/RenderLayer.h"
+#include "core/rendering/compositing/CompositedSelectionBound.h"
 
-namespace WebCore {
+namespace blink {
 
 static inline RenderObject* rendererFromPosition(const Position& position)
 {
@@ -229,6 +231,21 @@ IntRect RenderedPosition::absoluteRect(LayoutUnit* extraWidthToEndOfLine) const
 
     IntRect localRect = pixelSnappedIntRect(m_renderer->localCaretRect(m_inlineBox, m_offset, extraWidthToEndOfLine));
     return localRect == IntRect() ? IntRect() : m_renderer->localToAbsoluteQuad(FloatRect(localRect)).enclosingBoundingBox();
+}
+
+void RenderedPosition::positionInGraphicsLayerBacking(CompositedSelectionBound& bound) const
+{
+    bound.layer = nullptr;
+    bound.edgeTopInLayer = bound.edgeBottomInLayer = FloatPoint();
+
+    if (isNull())
+        return;
+
+    LayoutRect rect = m_renderer->localCaretRect(m_inlineBox, m_offset);
+    RenderLayer* layer = nullptr;
+    bound.edgeTopInLayer = m_renderer->localToInvalidationBackingPoint(rect.minXMinYCorner(), &layer);
+    bound.edgeBottomInLayer = m_renderer->localToInvalidationBackingPoint(rect.minXMaxYCorner(), nullptr);
+    bound.layer = layer->graphicsLayerBacking();
 }
 
 bool renderObjectContainsPosition(RenderObject* target, const Position& position)

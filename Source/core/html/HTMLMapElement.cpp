@@ -25,19 +25,21 @@
 #include "core/HTMLNames.h"
 #include "core/dom/Document.h"
 #include "core/dom/ElementTraversal.h"
+#include "core/dom/NodeListsNodeData.h"
+#include "core/frame/UseCounter.h"
 #include "core/html/HTMLAreaElement.h"
 #include "core/html/HTMLCollection.h"
 #include "core/html/HTMLImageElement.h"
 #include "core/rendering/HitTestResult.h"
 
-namespace WebCore {
+namespace blink {
 
 using namespace HTMLNames;
 
 inline HTMLMapElement::HTMLMapElement(Document& document)
     : HTMLElement(mapTag, document)
 {
-    ScriptWrappable::init(this);
+    UseCounter::count(document, UseCounter::MapElement);
 }
 
 DEFINE_NODE_FACTORY(HTMLMapElement)
@@ -111,7 +113,7 @@ void HTMLMapElement::parseAttribute(const QualifiedName& name, const AtomicStrin
 
 PassRefPtrWillBeRawPtr<HTMLCollection> HTMLMapElement::areas()
 {
-    return ensureCachedHTMLCollection(MapAreas);
+    return ensureCachedCollection<HTMLCollection>(MapAreas);
 }
 
 Node::InsertionNotificationRequest HTMLMapElement::insertedInto(ContainerNode* insertionPoint)

@@ -20,9 +20,11 @@
 #include "config.h"
 #include "core/rendering/InlineBox.h"
 
+#include "core/paint/BlockPainter.h"
 #include "core/rendering/InlineFlowBox.h"
 #include "core/rendering/PaintInfo.h"
 #include "core/rendering/RenderBlockFlow.h"
+#include "core/rendering/RenderObjectInlines.h"
 #include "core/rendering/RootInlineBox.h"
 #include "platform/Partitions.h"
 #include "platform/fonts/FontMetrics.h"
@@ -31,9 +33,7 @@
 #include <stdio.h>
 #endif
 
-using namespace std;
-
-namespace WebCore {
+namespace blink {
 
 struct SameSizeAsInlineBox {
     virtual ~SameSizeAsInlineBox() { }
@@ -41,14 +41,14 @@ struct SameSizeAsInlineBox {
     FloatPoint b;
     float c;
     uint32_t d : 32;
-#ifndef NDEBUG
+#if ENABLE(ASSERT)
     bool f;
 #endif
 };
 
 COMPILE_ASSERT(sizeof(InlineBox) == sizeof(SameSizeAsInlineBox), InlineBox_size_guard);
 
-#ifndef NDEBUG
+#if ENABLE(ASSERT)
 
 InlineBox::~InlineBox()
 {
@@ -194,14 +194,7 @@ void InlineBox::adjustPosition(float dx, float dy)
 
 void InlineBox::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffset, LayoutUnit /* lineTop */, LayoutUnit /*lineBottom*/)
 {
-    if (!paintInfo.shouldPaintWithinRoot(&renderer()) || (paintInfo.phase != PaintPhaseForeground && paintInfo.phase != PaintPhaseSelection))
-        return;
-
-    LayoutPoint childPoint = paintOffset;
-    if (parent()->renderer().style()->isFlippedBlocksWritingMode()) // Faster than calling containingBlock().
-        childPoint = renderer().containingBlock()->flipForWritingModeForChild(&toRenderBox(renderer()), childPoint);
-
-    RenderBlock::paintAsInlineBlock(&renderer(), paintInfo, childPoint);
+    BlockPainter::paintInlineBox(*this, paintInfo, paintOffset);
 }
 
 bool InlineBox::nodeAtPoint(const HitTestRequest& request, HitTestResult& result, const HitTestLocation& locationInContainer, const LayoutPoint& accumulatedOffset, LayoutUnit /* lineTop */, LayoutUnit /*lineBottom*/)
@@ -283,7 +276,7 @@ InlineBox* InlineBox::prevLeafChildIgnoringLineBreak() const
     return leaf;
 }
 
-RenderObject::SelectionState InlineBox::selectionState()
+RenderObject::SelectionState InlineBox::selectionState() const
 {
     return renderer().selectionState();
 }
@@ -352,17 +345,17 @@ LayoutPoint InlineBox::flipForWritingMode(const LayoutPoint& point)
     return root().block().flipForWritingMode(point);
 }
 
-} // namespace WebCore
+} // namespace blink
 
 #ifndef NDEBUG
 
-void showTree(const WebCore::InlineBox* b)
+void showTree(const blink::InlineBox* b)
 {
     if (b)
         b->showTreeForThis();
 }
 
-void showLineTree(const WebCore::InlineBox* b)
+void showLineTree(const blink::InlineBox* b)
 {
     if (b)
         b->showLineTreeForThis();

@@ -26,7 +26,6 @@
 #ifndef XMLHttpRequestUpload_h
 #define XMLHttpRequestUpload_h
 
-#include "bindings/v8/ScriptWrappable.h"
 #include "core/events/EventListener.h"
 #include "core/xml/XMLHttpRequest.h"
 #include "core/xml/XMLHttpRequestEventTarget.h"
@@ -35,20 +34,20 @@
 #include "wtf/PassOwnPtr.h"
 #include "wtf/RefCounted.h"
 #include "wtf/RefPtr.h"
-#include "wtf/Vector.h"
 #include "wtf/text/AtomicStringHash.h"
 
-namespace WebCore {
+namespace blink {
 
 class ExecutionContext;
 class XMLHttpRequest;
 
-class XMLHttpRequestUpload FINAL : public NoBaseWillBeRefCountedGarbageCollected<XMLHttpRequestUpload>, public ScriptWrappable, public XMLHttpRequestEventTarget {
+class XMLHttpRequestUpload FINAL : public NoBaseWillBeGarbageCollectedFinalized<XMLHttpRequestUpload>, public XMLHttpRequestEventTarget {
+    DEFINE_WRAPPERTYPEINFO();
     WILL_BE_USING_GARBAGE_COLLECTED_MIXIN(XMLHttpRequestUpload);
 public:
     static PassOwnPtrWillBeRawPtr<XMLHttpRequestUpload> create(XMLHttpRequest* xmlHttpRequest)
     {
-        return adoptPtrWillBeRefCountedGarbageCollected(new XMLHttpRequestUpload(xmlHttpRequest));
+        return adoptPtrWillBeNoop(new XMLHttpRequestUpload(xmlHttpRequest));
     }
 
 #if !ENABLE(OILPAN)
@@ -85,6 +84,6 @@ private:
     unsigned long long m_lastTotalBytesToBeSent;
 };
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // XMLHttpRequestUpload_h

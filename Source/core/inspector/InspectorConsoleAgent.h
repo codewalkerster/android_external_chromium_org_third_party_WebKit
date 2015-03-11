@@ -25,8 +25,8 @@
 #ifndef InspectorConsoleAgent_h
 #define InspectorConsoleAgent_h
 
-#include "bindings/v8/ScriptState.h"
-#include "bindings/v8/ScriptString.h"
+#include "bindings/core/v8/ScriptState.h"
+#include "bindings/core/v8/ScriptString.h"
 #include "core/InspectorFrontend.h"
 #include "core/inspector/ConsoleAPITypes.h"
 #include "core/inspector/InspectorBaseAgent.h"
@@ -38,12 +38,14 @@
 #include "wtf/Vector.h"
 #include "wtf/text/StringHash.h"
 
-namespace WebCore {
+namespace blink {
 
 class ConsoleMessage;
+class ConsoleMessageStorage;
 class DocumentLoader;
 class LocalDOMWindow;
 class LocalFrame;
+class InspectorConsoleMessage;
 class InspectorFrontend;
 class InjectedScriptManager;
 class InspectorTimelineAgent;
@@ -55,6 +57,7 @@ class ScriptArguments;
 class ScriptCallStack;
 class ScriptProfile;
 class ThreadableLoaderClient;
+class WorkerGlobalScopeProxy;
 class XMLHttpRequest;
 
 typedef String ErrorString;
@@ -64,38 +67,29 @@ class InspectorConsoleAgent : public InspectorBaseAgent<InspectorConsoleAgent>, 
 public:
     InspectorConsoleAgent(InspectorTimelineAgent*, InjectedScriptManager*);
     virtual ~InspectorConsoleAgent();
+    virtual void trace(Visitor*) OVERRIDE;
 
     virtual void init() OVERRIDE;
     virtual void enable(ErrorString*) OVERRIDE FINAL;
     virtual void disable(ErrorString*) OVERRIDE FINAL;
     virtual void clearMessages(ErrorString*) OVERRIDE;
     bool enabled() { return m_enabled; }
-    void reset();
 
     virtual void setFrontend(InspectorFrontend*) OVERRIDE FINAL;
     virtual void clearFrontend() OVERRIDE FINAL;
     virtual void restore() OVERRIDE FINAL;
 
-    void addMessageToConsole(MessageSource, MessageType, MessageLevel, const String& message, ScriptState*, PassRefPtrWillBeRawPtr<ScriptArguments>, unsigned long requestIdentifier = 0);
-    void addMessageToConsole(MessageSource, MessageType, MessageLevel, const String& message, const String& scriptId, unsigned lineNumber, unsigned columnNumber = 0, ScriptState* = 0, unsigned long requestIdentifier = 0);
+    void addMessageToConsole(ConsoleMessage*);
+    void consoleMessagesCleared();
 
-    // FIXME: Remove once we no longer generate stacks outside of Inspector.
-    void addMessageToConsole(MessageSource, MessageType, MessageLevel, const String& message, PassRefPtrWillBeRawPtr<ScriptCallStack>, unsigned long requestIdentifier = 0);
-
-    Vector<unsigned> consoleMessageArgumentCounts();
-
-    void consoleTime(ExecutionContext*, const String& title);
-    void consoleTimeEnd(ExecutionContext*, const String& title, ScriptState*);
+    void setTracingBasedTimeline(ErrorString*, bool enabled);
     void consoleTimeline(ExecutionContext*, const String& title, ScriptState*);
     void consoleTimelineEnd(ExecutionContext*, const String& title, ScriptState*);
-
-    void consoleCount(ScriptState*, PassRefPtrWillBeRawPtr<ScriptArguments>);
 
     void frameWindowDiscarded(LocalDOMWindow*);
     void didCommitLoad(LocalFrame*, DocumentLoader*);
 
     void didFinishXHRLoading(XMLHttpRequest*, ThreadableLoaderClient*, unsigned long requestIdentifier, ScriptString, const AtomicString& method, const String& url, const String& sendURL, unsigned sendLineNumber);
-    void didReceiveResourceResponse(LocalFrame*, unsigned long requestIdentifier, DocumentLoader*, const ResourceResponse&, ResourceLoader*);
     void didFailLoading(unsigned long requestIdentifier, const ResourceError&);
     void addProfileFinishedMessageToConsole(PassRefPtrWillBeRawPtr<ScriptProfile>, unsigned lineNumber, const String& sourceURL);
     void addStartProfilingMessageToConsole(const String& title, unsigned lineNumber, const String& sourceURL);
@@ -106,21 +100,18 @@ public:
     virtual bool isWorkerAgent() = 0;
 
 protected:
-    void addConsoleMessage(PassOwnPtr<ConsoleMessage>);
+    void sendConsoleMessageToFrontend(ConsoleMessage*, bool generatePreview);
+    virtual ConsoleMessageStorage* messageStorage() = 0;
 
-    InspectorTimelineAgent* m_timelineAgent;
-    InjectedScriptManager* m_injectedScriptManager;
+    RawPtrWillBeMember<InspectorTimelineAgent> m_timelineAgent;
+    RawPtrWillBeMember<InjectedScriptManager> m_injectedScriptManager;
     InspectorFrontend::Console* m_frontend;
-    Vector<OwnPtr<ConsoleMessage> > m_consoleMessages;
-    int m_expiredConsoleMessageCount;
-    HashCountedSet<String> m_counts;
-    HashMap<String, double> m_times;
     bool m_enabled;
 private:
     static int s_enabledAgentCount;
 };
 
-} // namespace WebCore
+} // namespace blink
 
 
 #endif // !defined(InspectorConsoleAgent_h)

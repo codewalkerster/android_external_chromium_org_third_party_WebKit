@@ -25,6 +25,7 @@
 #ifndef FrameView_h
 #define FrameView_h
 
+#include "core/frame/FrameViewAutoSizeInfo.h"
 #include "core/rendering/PaintPhase.h"
 #include "platform/RuntimeEnabledFeatures.h"
 #include "platform/geometry/LayoutRect.h"
@@ -34,7 +35,7 @@
 #include "wtf/OwnPtr.h"
 #include "wtf/text/WTFString.h"
 
-namespace WebCore {
+namespace blink {
 
 class AXObjectCache;
 class DocumentLifecycle;
@@ -50,12 +51,13 @@ class RenderBox;
 class RenderEmbeddedObject;
 class RenderObject;
 class RenderScrollbarPart;
-class RenderStyle;
 class RenderView;
 class RenderWidget;
+struct CompositedSelectionBound;
 
 typedef unsigned long long DOMTimeStamp;
 
+// FIXME: Oilpan: move Widget (and thereby FrameView) to the heap.
 class FrameView FINAL : public ScrollView {
 public:
     friend class RenderView;
@@ -71,9 +73,12 @@ public:
     virtual void invalidateRect(const IntRect&) OVERRIDE;
     virtual void setFrameRect(const IntRect&) OVERRIDE;
 
-    virtual bool scheduleAnimation() OVERRIDE;
+    LocalFrame& frame() const
+    {
+        ASSERT(m_frame);
+        return *m_frame;
+    }
 
-    LocalFrame& frame() const { return *m_frame; }
     Page* page() const;
 
     RenderView* renderView() const;
@@ -102,6 +107,8 @@ public:
     bool needsLayout() const;
     void setNeedsLayout();
 
+    void setNeedsUpdateWidgetPositions() { m_needsUpdateWidgetPositions = true; }
+
     // Methods for getting/setting the size Blink should use to layout the contents.
     IntSize layoutSize(IncludeScrollbarsInRect = ExcludeScrollbars) const;
     void setLayoutSize(const IntSize&);
@@ -112,12 +119,12 @@ public:
     bool layoutSizeFixedToFrameSize() { return m_layoutSizeFixedToFrameSize; }
 
     bool needsFullPaintInvalidation() const { return m_doFullPaintInvalidation; }
+    void setNeedsFullPaintInvalidation() { m_doFullPaintInvalidation = true; }
 
     void updateAcceleratedCompositingSettings();
 
     void recalcOverflowAfterStyleChange();
 
-    bool hasCompositedContent() const;
     bool isEnclosedInCompositingLayer() const;
 
     void resetScrollbars();
@@ -151,7 +158,7 @@ public:
     virtual IntSize inputEventsOffsetForEmulation() const OVERRIDE;
     void setInputEventsTransformForEmulation(const IntSize&, float);
 
-    virtual void setScrollPosition(const IntPoint&) OVERRIDE;
+    virtual void setScrollPosition(const IntPoint&, ScrollBehavior = ScrollBehaviorInstant) OVERRIDE;
     virtual bool isRubberBandInProgress() const OVERRIDE;
     void setScrollPositionNonProgrammatically(const IntPoint&);
 
@@ -164,16 +171,11 @@ public:
     void setMediaType(const AtomicString&);
     void adjustMediaTypeForPrinting(bool printing);
 
-    void setCannotBlitToWindow();
-    void setIsOverlapped(bool);
-    bool isOverlapped() const { return m_isOverlapped; }
-    void setContentIsOpaque(bool);
-
     void addSlowRepaintObject();
     void removeSlowRepaintObject();
     bool hasSlowRepaintObjects() const { return m_slowRepaintObjectCount; }
 
-    // Includes fixed- and sticky-position objects.
+    // Fixed-position objects.
     typedef HashSet<RenderObject*> ViewportConstrainedObjectSet;
     void addViewportConstrainedObject(RenderObject*);
     void removeViewportConstrainedObject(RenderObject*);
@@ -183,7 +185,6 @@ public:
     void handleLoadCompleted();
 
     void updateAnnotatedRegions();
-    void updateControlTints();
 
     void restoreScrollbar();
 
@@ -219,10 +220,13 @@ public:
     void updateLayoutAndStyleForPainting();
     void updateLayoutAndStyleIfNeededRecursive();
 
+    void invalidateTreeIfNeededRecursive();
+
     void incrementVisuallyNonEmptyCharacterCount(unsigned);
     void incrementVisuallyNonEmptyPixelCount(const IntSize&);
     void setIsVisuallyNonEmpty() { m_isVisuallyNonEmpty = true; }
-    void enableAutoSizeMode(bool enable, const IntSize& minSize, const IntSize& maxSize);
+    void enableAutoSizeMode(const IntSize& minSize, const IntSize& maxSize);
+    void disableAutoSizeMode() { m_autoSizeInfo.clear(); }
 
     void forceLayout(bool allowSubtree = false);
     void forceLayoutForPagination(const FloatSize& pageSize, const FloatSize& originalPageSize, float maximumShrinkFactor);
@@ -241,6 +245,14 @@ public:
 
     bool isFrameViewScrollCorner(RenderScrollbarPart* scrollCorner) const { return m_scrollCorner == scrollCorner; }
 
+    enum ScrollingReasons {
+        Scrollable,
+        NotScrollableNoOverflow,
+        NotScrollableNotVisible,
+        NotScrollableExplicitlyDisabled
+    };
+
+    ScrollingReasons scrollingReasons();
     bool isScrollable();
 
     enum ScrollbarModesCalculationStrategy { RulesFromWebContentOnly, AnyRule };
@@ -264,6 +276,7 @@ public:
     void setTracksPaintInvalidations(bool);
     bool isTrackingPaintInvalidations() const { return m_isTrackingPaintInvalidations; }
     void resetTrackedPaintInvalidations();
+
     String trackedPaintInvalidationRectsAsText() const;
 
     typedef HashSet<ScrollableArea*> ScrollableAreaSet;
@@ -279,6 +292,7 @@ public:
     void removeResizerArea(RenderBox&);
     const ResizerAreaSet* resizerAreas() const { return m_resizerAreas.get(); }
 
+    virtual void setParent(Widget*) OVERRIDE;
     virtual void removeChild(Widget*) OVERRIDE;
 
     // This function exists for ports that need to handle wheel events manually.
@@ -289,9 +303,6 @@ public:
     bool inProgrammaticScroll() const { return m_inProgrammaticScroll; }
     void setInProgrammaticScroll(bool programmaticScroll) { m_inProgrammaticScroll = programmaticScroll; }
 
-    void setHasSoftwareFilters(bool hasSoftwareFilters) { m_hasSoftwareFilters = hasSoftwareFilters; }
-    bool hasSoftwareFilters() const { return m_hasSoftwareFilters; }
-
     virtual bool isActive() const OVERRIDE;
 
     // DEPRECATED: Use viewportConstrainedVisibleContentRect() instead.
@@ -301,7 +312,6 @@ public:
     virtual void didAddScrollbar(Scrollbar*, ScrollbarOrientation) OVERRIDE;
     virtual void willRemoveScrollbar(Scrollbar*, ScrollbarOrientation) OVERRIDE;
 
-    virtual bool shouldAttemptToScrollUsingFastPath() const OVERRIDE;
     // FIXME: This should probably be renamed as the 'inSubtreeLayout' parameter
     // passed around the FrameView layout methods can be true while this returns
     // false.
@@ -311,6 +321,13 @@ public:
     // which is to display the tickmarks corresponding to find results.
     // If |m_tickmarks| is empty, the default behavior is restored.
     void setTickmarks(const Vector<IntRect>& tickmarks) { m_tickmarks = tickmarks; }
+
+    // Since the compositor can resize the viewport due to top controls and
+    // commit scroll offsets before a WebView::resize occurs, we need to adjust
+    // our scroll extents to prevent clamping the scroll offsets.
+    void setTopControlsViewportAdjustment(float);
+
+    virtual IntPoint maximumScrollPosition() const OVERRIDE;
 
     // ScrollableArea interface
     virtual void invalidateScrollbarRect(Scrollbar*, const IntRect&) OVERRIDE;
@@ -326,11 +343,15 @@ public:
 
 protected:
     virtual void scrollContentsIfNeeded();
-    virtual bool scrollContentsFastPath(const IntSize& scrollDelta, const IntRect& rectToScroll, const IntRect& clipRect) OVERRIDE;
+    virtual bool scrollContentsFastPath(const IntSize& scrollDelta) OVERRIDE;
     virtual void scrollContentsSlowPath(const IntRect& updateRect) OVERRIDE;
 
     virtual bool isVerticalDocument() const OVERRIDE;
     virtual bool isFlippedDocument() const OVERRIDE;
+
+    // Prevents creation of scrollbars. Used to prevent drawing two sets of
+    // overlay scrollbars in the case of the pinch viewport.
+    virtual bool scrollbarsDisabled() const OVERRIDE;
 
 private:
     explicit FrameView(LocalFrame*);
@@ -342,8 +363,6 @@ private:
     virtual bool isFrameView() const OVERRIDE { return true; }
 
     friend class RenderWidget;
-    bool useSlowRepaints(bool considerOverlap = true) const;
-    bool useSlowRepaintsIfNotOverlapped() const;
 
     bool contentsInCompositedLayer() const;
 
@@ -351,14 +370,13 @@ private:
     void updateOverflowStatus(bool horizontalOverflow, bool verticalOverflow);
 
     void updateCounters();
-    void autoSizeIfEnabled();
     void forceLayoutParentViewIfNeeded();
     void performPreLayoutTasks();
     void performLayout(RenderObject* rootForThisLayout, bool inSubtreeLayout);
     void scheduleOrPerformPostLayoutTasks();
     void performPostLayoutTasks();
 
-    void invalidateTree(RenderObject* root);
+    void invalidateTreeIfNeeded();
 
     void gatherDebugLayoutRects(RenderObject* layoutRoot);
 
@@ -375,6 +393,9 @@ private:
     virtual IntPoint convertToContainingView(const IntPoint&) const OVERRIDE;
     virtual IntPoint convertFromContainingView(const IntPoint&) const OVERRIDE;
 
+    void updateWidgetPositionsIfNeeded();
+
+    bool wasViewportResized();
     void sendResizeEventIfNeeded();
 
     void updateScrollableAreaSet();
@@ -390,7 +411,10 @@ private:
     void didScrollTimerFired(Timer<FrameView>*);
 
     void updateLayersAndCompositingAfterScrollIfNeeded();
+
+    static bool computeCompositedSelectionBounds(LocalFrame&, CompositedSelectionBound& start, CompositedSelectionBound& end);
     void updateFixedElementPaintInvalidationRectsAfterScroll();
+    void updateCompositedSelectionBoundsIfNeeded();
 
     bool hasCustomScrollbars() const;
     bool shouldUseCustomScrollbars(Element*& customScrollbarElement, LocalFrame*& customScrollbarFrame);
@@ -406,9 +430,6 @@ private:
 
     bool paintInvalidationIsAllowed() const
     {
-        if (!RuntimeEnabledFeatures::repaintAfterLayoutEnabled())
-            return true;
-
         return !isInPerformLayout() || canInvalidatePaintDuringPerformLayout();
     }
 
@@ -417,20 +438,23 @@ private:
 
     LayoutSize m_size;
 
-    typedef HashSet<RefPtr<RenderEmbeddedObject> > EmbeddedObjectSet;
-    EmbeddedObjectSet m_widgetUpdateSet;
+    typedef WillBeHeapHashSet<RefPtrWillBeMember<RenderEmbeddedObject> > EmbeddedObjectSet;
+    WillBePersistentHeapHashSet<RefPtrWillBeMember<RenderEmbeddedObject> > m_widgetUpdateSet;
 
     // FIXME: These are just "children" of the FrameView and should be RefPtr<Widget> instead.
-    HashSet<RefPtr<RenderWidget> > m_widgets;
+    WillBePersistentHeapHashSet<RefPtrWillBeMember<RenderWidget> > m_widgets;
 
-    RefPtr<LocalFrame> m_frame;
+    // Oilpan: the use of a persistent back reference 'emulates' the
+    // RefPtr-cycle that is kept between the two objects non-Oilpan.
+    //
+    // That cycle is broken when a LocalFrame is detached by
+    // FrameLoader::detachFromParent(), it then clears its
+    // FrameView's m_frame reference by calling setView(nullptr).
+    RefPtrWillBePersistent<LocalFrame> m_frame;
 
     bool m_doFullPaintInvalidation;
 
     bool m_canHaveScrollbars;
-    bool m_cannotBlitToWindow;
-    bool m_isOverlapped;
-    bool m_contentIsOpaque;
     unsigned m_slowRepaintObjectCount;
 
     bool m_hasPendingLayout;
@@ -481,23 +505,12 @@ private:
     RefPtrWillBePersistent<Node> m_maintainScrollPositionAnchor;
 
     // Renderer to hold our custom scroll corner.
-    RenderScrollbarPart* m_scrollCorner;
-
-    // If true, automatically resize the frame view around its content.
-    bool m_shouldAutoSize;
-    bool m_inAutoSize;
-    // True if autosize has been run since m_shouldAutoSize was set.
-    bool m_didRunAutosize;
-    // The lower bound on the size when autosizing.
-    IntSize m_minAutoSize;
-    // The upper bound on the size when autosizing.
-    IntSize m_maxAutoSize;
+    RawPtrWillBePersistent<RenderScrollbarPart> m_scrollCorner;
 
     OwnPtr<ScrollableAreaSet> m_scrollableAreas;
     OwnPtr<ResizerAreaSet> m_resizerAreas;
     OwnPtr<ViewportConstrainedObjectSet> m_viewportConstrainedObjects;
-
-    bool m_hasSoftwareFilters;
+    OwnPtr<FrameViewAutoSizeInfo> m_autoSizeInfo;
 
     float m_visibleContentScaleFactor;
     IntSize m_inputEventsOffsetForEmulation;
@@ -509,6 +522,9 @@ private:
     Timer<FrameView> m_didScrollTimer;
 
     Vector<IntRect> m_tickmarks;
+
+    bool m_needsUpdateWidgetPositions;
+    float m_topControlsViewportAdjustment;
 };
 
 inline void FrameView::incrementVisuallyNonEmptyCharacterCount(unsigned count)
@@ -560,6 +576,6 @@ private:
     bool m_originalValue;
 };
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // FrameView_h

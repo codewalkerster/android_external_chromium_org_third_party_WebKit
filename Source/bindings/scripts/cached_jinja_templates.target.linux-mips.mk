@@ -6,7 +6,6 @@ LOCAL_MODULE_CLASS := GYP
 LOCAL_MODULE := third_party_WebKit_Source_bindings_scripts_cached_jinja_templates_gyp
 LOCAL_MODULE_STEM := cached_jinja_templates
 LOCAL_MODULE_SUFFIX := .stamp
-LOCAL_MODULE_TAGS := optional
 LOCAL_MODULE_TARGET_ARCH := $(TARGET_$(GYP_VAR_PREFIX)ARCH)
 gyp_intermediate_dir := $(call local-intermediates-dir,,$(GYP_VAR_PREFIX))
 gyp_shared_intermediate_dir := $(call intermediates-dir-for,GYP,shared,,,$(GYP_VAR_PREFIX))
@@ -20,7 +19,7 @@ $(gyp_shared_intermediate_dir)/blink/bindings/scripts/cached_jinja_templates.sta
 $(gyp_shared_intermediate_dir)/blink/bindings/scripts/cached_jinja_templates.stamp: gyp_intermediate_dir := $(abspath $(gyp_intermediate_dir))
 $(gyp_shared_intermediate_dir)/blink/bindings/scripts/cached_jinja_templates.stamp: gyp_shared_intermediate_dir := $(abspath $(gyp_shared_intermediate_dir))
 $(gyp_shared_intermediate_dir)/blink/bindings/scripts/cached_jinja_templates.stamp: export PATH := $(subst $(ANDROID_BUILD_PATHS),,$(PATH))
-$(gyp_shared_intermediate_dir)/blink/bindings/scripts/cached_jinja_templates.stamp: $(LOCAL_PATH)/third_party/jinja2/__init__.py $(LOCAL_PATH)/third_party/markupsafe/__init__.py $(LOCAL_PATH)/third_party/WebKit/Source/bindings/scripts/code_generator_v8.py $(LOCAL_PATH)/third_party/WebKit/Source/bindings/templates/attributes.cpp $(LOCAL_PATH)/third_party/WebKit/Source/bindings/templates/callback_interface.cpp $(LOCAL_PATH)/third_party/WebKit/Source/bindings/templates/callback_interface.h $(LOCAL_PATH)/third_party/WebKit/Source/bindings/templates/interface_base.cpp $(LOCAL_PATH)/third_party/WebKit/Source/bindings/templates/interface.cpp $(LOCAL_PATH)/third_party/WebKit/Source/bindings/templates/interface.h $(LOCAL_PATH)/third_party/WebKit/Source/bindings/templates/methods.cpp $(GYP_TARGET_DEPENDENCIES)
+$(gyp_shared_intermediate_dir)/blink/bindings/scripts/cached_jinja_templates.stamp: $(LOCAL_PATH)/third_party/jinja2/__init__.py $(LOCAL_PATH)/third_party/markupsafe/__init__.py $(LOCAL_PATH)/third_party/WebKit/Source/bindings/scripts/code_generator_v8.py $(LOCAL_PATH)/third_party/WebKit/Source/bindings/templates/attributes.cpp $(LOCAL_PATH)/third_party/WebKit/Source/bindings/templates/callback_interface.cpp $(LOCAL_PATH)/third_party/WebKit/Source/bindings/templates/callback_interface.h $(LOCAL_PATH)/third_party/WebKit/Source/bindings/templates/constants.cpp $(LOCAL_PATH)/third_party/WebKit/Source/bindings/templates/dictionary_impl.cpp $(LOCAL_PATH)/third_party/WebKit/Source/bindings/templates/dictionary_impl.h $(LOCAL_PATH)/third_party/WebKit/Source/bindings/templates/dictionary_v8.cpp $(LOCAL_PATH)/third_party/WebKit/Source/bindings/templates/dictionary_v8.h $(LOCAL_PATH)/third_party/WebKit/Source/bindings/templates/interface_base.cpp $(LOCAL_PATH)/third_party/WebKit/Source/bindings/templates/interface.cpp $(LOCAL_PATH)/third_party/WebKit/Source/bindings/templates/interface.h $(LOCAL_PATH)/third_party/WebKit/Source/bindings/templates/methods.cpp $(GYP_TARGET_DEPENDENCIES)
 	@echo "Gyp action: Caching bytecode of Jinja templates ($@)"
 	$(hide)cd $(gyp_local_path)/third_party/WebKit/Source/bindings/scripts; mkdir -p $(gyp_shared_intermediate_dir)/blink/bindings/scripts; python code_generator_v8.py "$(gyp_shared_intermediate_dir)/blink/bindings/scripts" "$(gyp_shared_intermediate_dir)/blink/bindings/scripts/cached_jinja_templates.stamp"
 

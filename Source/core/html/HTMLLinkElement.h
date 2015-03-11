@@ -36,7 +36,7 @@
 #include "core/loader/LinkLoader.h"
 #include "core/loader/LinkLoaderClient.h"
 
-namespace WebCore {
+namespace blink {
 
 class DocumentFragment;
 class HTMLLinkElement;
@@ -115,6 +115,7 @@ private:
 
 
 class HTMLLinkElement FINAL : public HTMLElement, public LinkLoaderClient {
+    DEFINE_WRAPPERTYPEINFO();
 public:
     static PassRefPtrWillBeRawPtr<HTMLLinkElement> create(Document&, bool createdByParser);
     virtual ~HTMLLinkElement();
@@ -167,6 +168,7 @@ public:
     virtual void trace(Visitor*) OVERRIDE;
 
 private:
+    virtual void attributeWillChange(const QualifiedName&, const AtomicString& oldValue, const AtomicString& newValue) OVERRIDE;
     virtual void parseAttribute(const QualifiedName&, const AtomicString&) OVERRIDE;
 
     LinkStyle* linkStyle() const;
@@ -211,6 +213,6 @@ private:
     bool m_isInShadowTree;
 };
 
-} //namespace
+} // namespace blink
 
-#endif
+#endif // HTMLLinkElement_h

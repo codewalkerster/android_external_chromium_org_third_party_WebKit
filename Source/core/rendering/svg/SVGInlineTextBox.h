@@ -26,9 +26,7 @@
 #include "core/rendering/svg/RenderSVGResource.h"
 #include "core/rendering/svg/SVGTextLayoutEngine.h"
 
-namespace WebCore {
-
-class RenderSVGResource;
+namespace blink {
 
 class SVGInlineTextBox FINAL : public InlineTextBox {
 public:
@@ -65,14 +63,6 @@ public:
 private:
     TextRun constructTextRun(RenderStyle*, const SVGTextFragment&) const;
 
-    bool acquirePaintingResource(GraphicsContext*&, float scalingFactor, RenderObject*,
-        RenderStyle*, RenderSVGResourceModeFlags);
-    void releasePaintingResource(GraphicsContext*&, const Path*, RenderSVGResourceModeFlags);
-
-    bool prepareGraphicsContextForTextPainting(GraphicsContext*&, float scalingFactor, TextRun&,
-        RenderStyle*, RenderSVGResourceModeFlags);
-    void restoreGraphicsContextAfterTextPainting(GraphicsContext*&, TextRun&, RenderSVGResourceModeFlags);
-
     void paintDecoration(GraphicsContext*, TextDecoration, const SVGTextFragment&);
     void paintDecorationWithStyle(GraphicsContext*, TextDecoration, const SVGTextFragment&,
         RenderObject* decorationRenderer, RenderSVGResourceModeFlags);
@@ -89,12 +79,11 @@ private:
 private:
     float m_logicalHeight;
     bool m_startsNewTextChunk : 1;
-    RenderSVGResource* m_paintingResource;
     Vector<SVGTextFragment> m_textFragments;
 };
 
 DEFINE_INLINE_BOX_TYPE_CASTS(SVGInlineTextBox);
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // SVGInlineTextBox_h

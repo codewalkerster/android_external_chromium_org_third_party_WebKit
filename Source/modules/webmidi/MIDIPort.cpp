@@ -33,7 +33,7 @@
 
 #include "modules/webmidi/MIDIAccess.h"
 
-namespace WebCore {
+namespace blink {
 
 MIDIPort::MIDIPort(MIDIAccess* access, const String& id, const String& manufacturer, const String& name, MIDIPortTypeCode type, const String& version)
     : m_id(id)
@@ -45,7 +45,6 @@ MIDIPort::MIDIPort(MIDIAccess* access, const String& id, const String& manufactu
 {
     ASSERT(access);
     ASSERT(type == MIDIPortTypeInput || type == MIDIPortTypeOutput);
-    ScriptWrappable::init(this);
 }
 
 String MIDIPort::type() const
@@ -72,4 +71,4 @@ void MIDIPort::trace(Visitor* visitor)
     EventTargetWithInlineData::trace(visitor);
 }
 
-} // namespace WebCore
+} // namespace blink

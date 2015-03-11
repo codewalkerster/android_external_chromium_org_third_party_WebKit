@@ -27,13 +27,14 @@
 #include "core/fetch/ResourceClient.h"
 #include "wtf/HashCountedSet.h"
 
-namespace WebCore {
+namespace blink {
 
 class FrameView;
 class HTMLBodyElement;
 class HTMLElement;
 
 class HTMLDocument : public Document, public ResourceClient {
+    DEFINE_WRAPPERTYPEINFO();
 public:
     static PassRefPtrWillBeRawPtr<HTMLDocument> create(const DocumentInit& initializer = DocumentInit())
     {
@@ -102,6 +103,6 @@ inline bool HTMLDocument::hasExtraNamedItem(const AtomicString& name)
 
 DEFINE_DOCUMENT_TYPE_CASTS(HTMLDocument);
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // HTMLDocument_h

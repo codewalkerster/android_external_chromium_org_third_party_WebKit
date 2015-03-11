@@ -51,8 +51,10 @@ WebInspector.ConsoleViewMessage = function(consoleMessage, linkifier, nestingLev
     /** @type {!Object.<string, function(!WebInspector.RemoteObject, !Element, boolean=)>} */
     this._customFormatters = {
         "object": this._formatParameterAsObject,
-        "array":  this._formatParameterAsArray,
-        "node":   this._formatParameterAsNode,
+        "array": this._formatParameterAsArray,
+        "node": this._formatParameterAsNode,
+        "map": this._formatParameterAsObject,
+        "set": this._formatParameterAsObject,
         "string": this._formatParameterAsString
     };
 }
@@ -93,7 +95,7 @@ WebInspector.ConsoleViewMessage.prototype = {
     {
         for (var i = 0; this._dataGrids && i < this._dataGrids.length; ++i) {
             var dataGrid = this._dataGrids[i];
-            this._dataGridParents.put(dataGrid, dataGrid.element.parentElement);
+            this._dataGridParents.set(dataGrid, dataGrid.element.parentElement);
             dataGrid.detach();
         }
     },
@@ -171,12 +173,12 @@ WebInspector.ConsoleViewMessage.prototype = {
                 if (consoleMessage.request) {
                     this._messageElement = document.createElement("span");
                     if (consoleMessage.level === WebInspector.ConsoleMessage.MessageLevel.Error) {
-                        this._messageElement.appendChild(document.createTextNode(consoleMessage.request.requestMethod + " "));
+                        this._messageElement.createTextChildren(consoleMessage.request.requestMethod, " ");
                         this._messageElement.appendChild(WebInspector.Linkifier.linkifyUsingRevealer(consoleMessage.request, consoleMessage.request.url, consoleMessage.request.url));
                         if (consoleMessage.request.failed)
-                            this._messageElement.appendChild(document.createTextNode(" " + consoleMessage.request.localizedFailDescription));
+                            this._messageElement.createTextChildren(" ", consoleMessage.request.localizedFailDescription);
                         else
-                            this._messageElement.appendChild(document.createTextNode(" " + consoleMessage.request.statusCode + " (" + consoleMessage.request.statusText + ")"));
+                            this._messageElement.createTextChildren(" ", String(consoleMessage.request.statusCode), " (", consoleMessage.request.statusText, ")");
                     } else {
                         var fragment = WebInspector.linkifyStringAsFragmentWithCustomLinkifier(consoleMessage.messageText, linkifyRequest.bind(consoleMessage));
                         this._messageElement.appendChild(fragment);
@@ -196,17 +198,22 @@ WebInspector.ConsoleViewMessage.prototype = {
         }
 
         if (consoleMessage.source !== WebInspector.ConsoleMessage.MessageSource.Network || consoleMessage.request) {
-            var callFrame = this._callFrameAnchorFromStackTrace(consoleMessage.stackTrace);
-            if (callFrame)
-                this._anchorElement = this._linkifyCallFrame(callFrame);
-            else if (consoleMessage.url && consoleMessage.url !== "undefined")
-                this._anchorElement = this._linkifyLocation(consoleMessage.url, consoleMessage.line, consoleMessage.column);
+            if (consoleMessage.scriptId) {
+                this._anchorElement = this._linkifyScriptId(consoleMessage.scriptId, consoleMessage.url || "", consoleMessage.line, consoleMessage.column);
+            } else {
+                var useBlackboxing = (consoleMessage.source === WebInspector.ConsoleMessage.MessageSource.ConsoleAPI);
+                var callFrame = this._callFrameAnchorFromStackTrace(consoleMessage.stackTrace, useBlackboxing);
+                if (callFrame)
+                    this._anchorElement = this._linkifyCallFrame(callFrame);
+                else if (consoleMessage.url && consoleMessage.url !== "undefined")
+                    this._anchorElement = this._linkifyLocation(consoleMessage.url, consoleMessage.line, consoleMessage.column);
+            }
         }
 
         this._formattedMessage.appendChild(this._messageElement);
         if (this._anchorElement) {
-            this._formattedMessage.appendChild(document.createTextNode(" "));
-            this._formattedMessage.appendChild(this._anchorElement);
+            this._formattedMessage.insertBefore(document.createTextNode(" "), this._formattedMessage.firstChild);
+            this._formattedMessage.insertBefore(this._anchorElement, this._formattedMessage.firstChild);
         }
 
         var dumpStackTrace = !!consoleMessage.stackTrace && consoleMessage.stackTrace.length && (consoleMessage.source === WebInspector.ConsoleMessage.MessageSource.Network || consoleMessage.level === WebInspector.ConsoleMessage.MessageLevel.Error || consoleMessage.type === WebInspector.ConsoleMessage.MessageType.Trace);
@@ -217,6 +224,8 @@ WebInspector.ConsoleViewMessage.prototype = {
 
             var content = this._formattedMessage;
             var root = new TreeElement(content, null, true);
+            root.toggleOnClick = true;
+            root.selectable = false;
             content.treeElementForTest = root;
             treeOutline.appendChild(root);
             if (consoleMessage.type === WebInspector.ConsoleMessage.MessageType.Trace)
@@ -260,11 +269,11 @@ WebInspector.ConsoleViewMessage.prototype = {
         columnNumber = columnNumber ? columnNumber - 1 : 0;
         if (this._message.source === WebInspector.ConsoleMessage.MessageSource.CSS) {
             var headerIds = target.cssModel.styleSheetIdsForURL(url);
-            var cssLocation = new WebInspector.CSSLocation(target, url, lineNumber, columnNumber);
-            return this._linkifier.linkifyCSSLocation(headerIds[0] || null, cssLocation, "console-message-url");
+            var cssLocation = new WebInspector.CSSLocation(target, headerIds[0] || null, url, lineNumber, columnNumber);
+            return this._linkifier.linkifyCSSLocation(cssLocation, "console-message-url");
         }
 
-        return this._linkifier.linkifyLocation(target, url, lineNumber, columnNumber, "console-message-url");
+        return this._linkifier.linkifyScriptLocation(target, null, url, lineNumber, columnNumber, "console-message-url");
     },
 
     /**
@@ -275,34 +284,50 @@ WebInspector.ConsoleViewMessage.prototype = {
     {
         console.assert(this._linkifier);
         var target = this._target();
-        if (!this._linkifier || !target)
+        if (!this._linkifier)
             return null;
-        // FIXME(62725): stack trace line/column numbers are one-based.
-        var lineNumber = callFrame.lineNumber ? callFrame.lineNumber - 1 : 0;
-        var columnNumber = callFrame.columnNumber ? callFrame.columnNumber - 1 : 0;
-        var rawLocation = new WebInspector.DebuggerModel.Location(target, callFrame.scriptId, lineNumber, columnNumber);
-        return this._linkifier.linkifyRawLocation(rawLocation, "console-message-url");
+
+        return this._linkifier.linkifyConsoleCallFrame(target, callFrame, "console-message-url");
     },
 
     /**
-     * @param {?Array.<!ConsoleAgent.CallFrame>} stackTrace
+     * @param {string} scriptId
+     * @param {string} url
+     * @param {number} lineNumber
+     * @param {number} columnNumber
+     * @return {?Element}
+     */
+    _linkifyScriptId: function(scriptId, url, lineNumber, columnNumber)
+    {
+        console.assert(this._linkifier);
+        var target = this._target();
+        if (!this._linkifier || !target)
+            return null;
+        // FIXME(62725): stack trace line/column numbers are one-based.
+        lineNumber = lineNumber ? lineNumber - 1 : 0;
+        columnNumber = columnNumber ? columnNumber - 1 : 0;
+        return this._linkifier.linkifyScriptLocation(target, scriptId, url, lineNumber, columnNumber, "console-message-url");
+    },
+
+    /**
+     * @param {?Array.<!ConsoleAgent.CallFrame>|undefined} stackTrace
+     * @param {boolean} useBlackboxing
      * @return {?ConsoleAgent.CallFrame}
      */
-    _callFrameAnchorFromStackTrace: function(stackTrace)
+    _callFrameAnchorFromStackTrace: function(stackTrace, useBlackboxing)
     {
         if (!stackTrace || !stackTrace.length)
             return null;
         var callFrame = stackTrace[0].scriptId ? stackTrace[0] : null;
-        if (!WebInspector.experimentsSettings.frameworksDebuggingSupport.isEnabled())
+        if (!useBlackboxing)
             return callFrame;
-        if (!WebInspector.settings.skipStackFramesSwitch.get())
-            return callFrame;
-        var regex = WebInspector.settings.skipStackFramesPattern.asRegExp();
-        if (!regex)
-            return callFrame;
+        var target = this._target();
         for (var i = 0; i < stackTrace.length; ++i) {
-            var script = this._target().debuggerModel.scriptForId(stackTrace[i].scriptId);
-            if (!script || !regex.test(script.sourceURL))
+            var script = target && target.debuggerModel.scriptForId(stackTrace[i].scriptId);
+            var blackboxed = script ?
+                WebInspector.BlackboxSupport.isBlackboxed(script.sourceURL, script.isContentScript()) :
+                WebInspector.BlackboxSupport.isBlackboxedURL(stackTrace[i].url);
+            if (!blackboxed)
                 return stackTrace[i].scriptId ? stackTrace[i] : null;
         }
         return callFrame;
@@ -344,7 +369,7 @@ WebInspector.ConsoleViewMessage.prototype = {
         }
 
         // There can be string log and string eval result. We distinguish between them based on message type.
-        var shouldFormatMessage = WebInspector.RemoteObject.type(parameters[0]) === "string" && this._message.type !== WebInspector.ConsoleMessage.MessageType.Result;
+        var shouldFormatMessage = WebInspector.RemoteObject.type(parameters[0]) === "string" && (this._message.type !== WebInspector.ConsoleMessage.MessageType.Result || this._message.level === WebInspector.ConsoleMessage.MessageLevel.Error);
 
         // Multiple parameters with the first being a format string. Save unused substitutions.
         if (shouldFormatMessage) {
@@ -352,7 +377,7 @@ WebInspector.ConsoleViewMessage.prototype = {
             var result = this._formatWithSubstitutionString(parameters[0].description, parameters.slice(1), formattedResult);
             parameters = result.unusedSubstitutions;
             if (parameters.length)
-                formattedResult.appendChild(document.createTextNode(" "));
+                formattedResult.createTextChild(" ");
         }
 
         if (this._message.type === WebInspector.ConsoleMessage.MessageType.Table) {
@@ -368,7 +393,7 @@ WebInspector.ConsoleViewMessage.prototype = {
             else
                 formattedResult.appendChild(this._formatParameter(parameters[i], false, true));
             if (i < parameters.length - 1)
-                formattedResult.appendChild(document.createTextNode(" "));
+                formattedResult.createTextChild(" ");
         }
         return formattedResult;
     },
@@ -395,7 +420,7 @@ WebInspector.ConsoleViewMessage.prototype = {
      */
     _formatParameterAsValue: function(obj, elem)
     {
-        elem.appendChild(document.createTextNode(obj.description || ""));
+        elem.createTextChild(obj.description || "");
         if (obj.objectId)
             elem.addEventListener("contextmenu", this._contextMenuEventFired.bind(this, obj), false);
     },
@@ -407,28 +432,27 @@ WebInspector.ConsoleViewMessage.prototype = {
      */
     _formatParameterAsObject: function(obj, elem, includePreview)
     {
-        this._formatParameterAsArrayOrObject(obj, obj.description || "", elem, includePreview);
+        this._formatParameterAsArrayOrObject(obj, elem, includePreview);
     },
 
     /**
      * @param {!WebInspector.RemoteObject} obj
-     * @param {string} description
      * @param {!Element} elem
      * @param {boolean=} includePreview
      */
-    _formatParameterAsArrayOrObject: function(obj, description, elem, includePreview)
+    _formatParameterAsArrayOrObject: function(obj, elem, includePreview)
     {
         var titleElement = document.createElement("span");
-        if (description)
-            titleElement.createTextChild(description);
         if (includePreview && obj.preview) {
             titleElement.classList.add("console-object-preview");
-            var lossless = this._appendObjectPreview(obj, description, titleElement);
+            var lossless = this._appendObjectPreview(titleElement, obj.preview, obj);
             if (lossless) {
                 elem.appendChild(titleElement);
                 titleElement.addEventListener("contextmenu", this._contextMenuEventFired.bind(this, obj), false);
                 return;
             }
+        } else {
+            titleElement.createTextChild(obj.description || "");
         }
         var section = new WebInspector.ObjectPropertiesSection(obj, titleElement);
         section.enableContextMenu();
@@ -440,7 +464,7 @@ WebInspector.ConsoleViewMessage.prototype = {
 
     /**
      * @param {!WebInspector.RemoteObject} obj
-     * @param {?Event} event
+     * @param {!Event} event
      */
     _contextMenuEventFired: function(obj, event)
     {
@@ -450,42 +474,85 @@ WebInspector.ConsoleViewMessage.prototype = {
     },
 
     /**
-     * @param {!WebInspector.RemoteObject} obj
-     * @param {string} description
-     * @param {!Element} titleElement
+     * @param {!Element} parentElement
+     * @param {!RuntimeAgent.ObjectPreview} preview
+     * @param {?WebInspector.RemoteObject} object
      * @return {boolean} true iff preview captured all information.
      */
-    _appendObjectPreview: function(obj, description, titleElement)
+    _appendObjectPreview: function(parentElement, preview, object)
     {
-        var preview = obj.preview;
-        var isArray = obj.subtype === "array";
+        var description = preview.description;
+        if (preview.type !== "object" || preview.subtype === "null") {
+            parentElement.appendChild(this._renderPropertyPreview(preview.type, preview.subtype, description));
+            return true;
+        }
+        if (description && preview.subtype !== "array")
+            parentElement.createTextChildren(description, " ");
+        if (preview.entries)
+            return this._appendEntriesPreview(parentElement, preview);
+        return this._appendPropertiesPreview(parentElement, preview, object);
+    },
 
-        if (description)
-            titleElement.createTextChild(" ");
-        titleElement.createTextChild(isArray ? "[" : "{");
+    /**
+     * @param {!Element} parentElement
+     * @param {!RuntimeAgent.ObjectPreview} preview
+     * @param {?WebInspector.RemoteObject} object
+     * @return {boolean} true iff preview captured all information.
+     */
+    _appendPropertiesPreview: function(parentElement, preview, object)
+    {
+        var isArray = preview.subtype === "array";
+        parentElement.createTextChild(isArray ? "[" : "{");
         for (var i = 0; i < preview.properties.length; ++i) {
             if (i > 0)
-                titleElement.createTextChild(", ");
+                parentElement.createTextChild(", ");
 
             var property = preview.properties[i];
             var name = property.name;
             if (!isArray || name != i) {
                 if (/^\s|\s$|^$|\n/.test(name))
-                    name = "\"" + name.replace(/\n/g, "\u21B5") + "\"";
-                titleElement.createChild("span", "name").textContent = name;
-                titleElement.createTextChild(": ");
+                    parentElement.createChild("span", "name").createTextChildren("\"", name.replace(/\n/g, "\u21B5"), "\"");
+                else
+                    parentElement.createChild("span", "name").textContent = name;
+                parentElement.createTextChild(": ");
             }
 
-            titleElement.appendChild(this._renderPropertyPreviewOrAccessor(obj, [property]));
+            parentElement.appendChild(this._renderPropertyPreviewOrAccessor(object, [property]));
         }
         if (preview.overflow)
-            titleElement.createChild("span").textContent = "\u2026";
-        titleElement.createTextChild(isArray ? "]" : "}");
+            parentElement.createChild("span").textContent = "\u2026";
+        parentElement.createTextChild(isArray ? "]" : "}");
         return preview.lossless;
     },
 
     /**
-     * @param {!WebInspector.RemoteObject} object
+     * @param {!Element} parentElement
+     * @param {!RuntimeAgent.ObjectPreview} preview
+     * @return {boolean} true iff preview captured all information.
+     */
+    _appendEntriesPreview: function(parentElement, preview)
+    {
+        var lossless = preview.lossless && !preview.properties.length;
+        parentElement.createTextChild("{");
+        for (var i = 0; i < preview.entries.length; ++i) {
+            if (i > 0)
+                parentElement.createTextChild(", ");
+
+            var entry = preview.entries[i];
+            if (entry.key) {
+                this._appendObjectPreview(parentElement, entry.key, null);
+                parentElement.createTextChild(" => ");
+            }
+            this._appendObjectPreview(parentElement, entry.value, null);
+        }
+        if (preview.overflow)
+            parentElement.createChild("span").textContent = "\u2026";
+        parentElement.createTextChild("}");
+        return lossless;
+    },
+
+    /**
+     * @param {?WebInspector.RemoteObject} object
      * @param {!Array.<!RuntimeAgent.PropertyPreview>} propertyPath
      * @return {!Element}
      */
@@ -505,17 +572,11 @@ WebInspector.ConsoleViewMessage.prototype = {
      */
     _renderPropertyPreview: function(type, subtype, description)
     {
-        var span = document.createElement("span");
-        span.className = "console-formatted-" + type;
+        var span = document.createElementWithClass("span", "console-formatted-" + (subtype || type));
+        description = description || "";
 
         if (type === "function") {
             span.textContent = "function";
-            return span;
-        }
-
-        if (type === "object" && subtype === "regexp") {
-            span.classList.add("console-formatted-string");
-            span.textContent = description;
             return span;
         }
 
@@ -526,7 +587,7 @@ WebInspector.ConsoleViewMessage.prototype = {
         }
 
         if (type === "string") {
-            span.textContent = "\"" + description.replace(/\n/g, "\u21B5") + "\"";
+            span.createTextChildren("\"", description.replace(/\n/g, "\u21B5"), "\"");
             return span;
         }
 
@@ -552,7 +613,7 @@ WebInspector.ConsoleViewMessage.prototype = {
                 this._formatParameterAsObject(object, elem, false);
                 return;
             }
-            var renderer = WebInspector.moduleManager.instance(WebInspector.Renderer, node);
+            var renderer = self.runtime.instance(WebInspector.Renderer, node);
             if (renderer)
                 elem.appendChild(renderer.render(node));
             else
@@ -577,7 +638,7 @@ WebInspector.ConsoleViewMessage.prototype = {
     _formatParameterAsArray: function(array, elem)
     {
         if (this.useArrayPreviewInFormatter(array)) {
-            this._formatParameterAsArrayOrObject(array, "", elem, true);
+            this._formatParameterAsArrayOrObject(array, elem, true);
             return;
         }
 
@@ -646,10 +707,10 @@ WebInspector.ConsoleViewMessage.prototype = {
         }
 
         columnNames.unshift(WebInspector.UIString("(index)"));
-        var dataGrid = WebInspector.DataGrid.createSortableDataGrid(columnNames, flatValues);
+        var dataGrid = WebInspector.SortableDataGrid.create(columnNames, flatValues);
         dataGrid.renderInline();
         this._dataGrids.push(dataGrid);
-        this._dataGridParents.put(dataGrid, dataGridContainer);
+        this._dataGridParents.set(dataGrid, dataGridContainer);
         return element;
     },
 
@@ -665,9 +726,9 @@ WebInspector.ConsoleViewMessage.prototype = {
 
         // Make black quotes.
         elem.classList.remove("console-formatted-string");
-        elem.appendChild(document.createTextNode("\""));
+        elem.createTextChild("\"");
         elem.appendChild(span);
-        elem.appendChild(document.createTextNode("\""));
+        elem.createTextChild("\"");
     },
 
     /**
@@ -692,7 +753,7 @@ WebInspector.ConsoleViewMessage.prototype = {
                 elements[name] = this._formatAsArrayEntry(property.value);
         }
 
-        elem.appendChild(document.createTextNode("["));
+        elem.createTextChild("[");
         var lastNonEmptyIndex = -1;
 
         function appendUndefined(elem, index)
@@ -711,17 +772,17 @@ WebInspector.ConsoleViewMessage.prototype = {
 
             if (i - lastNonEmptyIndex > 1) {
                 appendUndefined(elem, i);
-                elem.appendChild(document.createTextNode(", "));
+                elem.createTextChild(", ");
             }
 
             elem.appendChild(element);
             lastNonEmptyIndex = i;
             if (i < length - 1)
-                elem.appendChild(document.createTextNode(", "));
+                elem.createTextChild(", ");
         }
         appendUndefined(elem, length);
 
-        elem.appendChild(document.createTextNode("]"));
+        elem.createTextChild("]");
         elem.addEventListener("contextmenu", this._contextMenuEventFired.bind(this, array), false);
     },
 
@@ -736,7 +797,7 @@ WebInspector.ConsoleViewMessage.prototype = {
     },
 
     /**
-     * @param {!WebInspector.RemoteObject} object
+     * @param {?WebInspector.RemoteObject} object
      * @param {!Array.<string>} propertyPath
      * @param {boolean} isArrayEntry
      * @return {!Element}
@@ -1043,28 +1104,48 @@ WebInspector.ConsoleViewMessage.prototype = {
         return this._wrapperElement;
     },
 
+    /**
+     * @param {!TreeElement} parentTreeElement
+     */
     _populateStackTraceTreeElement: function(parentTreeElement)
     {
-        for (var i = 0; i < this._message.stackTrace.length; i++) {
-            var frame = this._message.stackTrace[i];
+        /**
+         * @param {!Array.<!ConsoleAgent.CallFrame>=} stackTrace
+         * @this {WebInspector.ConsoleViewMessage}
+         */
+        function appendStackTrace(stackTrace)
+        {
+            if (!stackTrace)
+                return;
 
-            var content = document.createElementWithClass("div", "stacktrace-entry");
-            var messageTextElement = document.createElement("span");
-            messageTextElement.className = "console-message-text source-code";
-            var functionName = frame.functionName || WebInspector.UIString("(anonymous function)");
-            messageTextElement.appendChild(document.createTextNode(functionName));
-            content.appendChild(messageTextElement);
+            for (var i = 0; i < stackTrace.length; i++) {
+                var frame = stackTrace[i];
 
-            if (frame.scriptId) {
-                content.appendChild(document.createTextNode(" "));
-                var urlElement = this._linkifyCallFrame(frame);
-                if (!urlElement)
-                    continue;
-                content.appendChild(urlElement);
+                var content = document.createElementWithClass("div", "stacktrace-entry");
+                var functionName = frame.functionName || WebInspector.UIString("(anonymous function)");
+                if (frame.scriptId) {
+                    var urlElement = this._linkifyCallFrame(frame);
+                    if (!urlElement)
+                        continue;
+                    content.appendChild(urlElement);
+                    content.createTextChild(" ");
+                }
+
+                content.createChild("span", "console-message-text source-code").textContent = functionName;
+                parentTreeElement.appendChild(new TreeElement(content));
             }
+        }
 
-            var treeElement = new TreeElement(content);
-            parentTreeElement.appendChild(treeElement);
+        appendStackTrace.call(this, this._message.stackTrace);
+
+        for (var asyncTrace = this._message.asyncStackTrace; asyncTrace; asyncTrace = asyncTrace.asyncStackTrace) {
+            if (!asyncTrace.callFrames || !asyncTrace.callFrames.length)
+                break;
+            var content = document.createElementWithClass("div", "stacktrace-entry");
+            var description = WebInspector.asyncStackTraceLabel(asyncTrace.description);
+            content.createChild("span", "console-message-text source-code console-async-trace-text").textContent = description;
+            parentTreeElement.appendChild(new TreeElement(content));
+            appendStackTrace.call(this, asyncTrace.callFrames);
         }
     },
 
@@ -1091,7 +1172,7 @@ WebInspector.ConsoleViewMessage.prototype = {
 
         if (!this._repeatCountElement) {
             this._repeatCountElement = document.createElement("span");
-            this._repeatCountElement.className = "bubble";
+            this._repeatCountElement.className = "bubble-repeat-count";
 
             this._element.insertBefore(this._repeatCountElement, this._element.firstChild);
             this._element.classList.add("repeated-message");

@@ -24,9 +24,10 @@
 #include "core/svg/SVGAnimatedBoolean.h"
 #include "core/svg/SVGGraphicsElement.h"
 
-namespace WebCore {
+namespace blink {
 
 class SVGGElement FINAL : public SVGGraphicsElement {
+    DEFINE_WRAPPERTYPEINFO();
 public:
     DECLARE_NODE_FACTORY(SVGGElement);
 
@@ -36,14 +37,9 @@ protected:
     virtual RenderObject* createRenderer(RenderStyle*) OVERRIDE;
 
 private:
-    bool isSupportedAttribute(const QualifiedName&);
-    virtual void parseAttribute(const QualifiedName&, const AtomicString&) OVERRIDE;
-    virtual void svgAttributeChanged(const QualifiedName&) OVERRIDE;
-
     virtual bool rendererIsNeeded(const RenderStyle&) OVERRIDE;
-
 };
 
-} // namespace WebCore
+} // namespace blink
 
-#endif
+#endif // SVGGElement_h

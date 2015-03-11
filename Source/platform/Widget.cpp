@@ -30,7 +30,7 @@
 
 #include "wtf/Assertions.h"
 
-namespace WebCore {
+namespace blink {
 
 Widget::Widget()
     : m_parent(0)
@@ -62,42 +62,6 @@ Widget* Widget::root() const
     if (top->isFrameView())
         return const_cast<Widget*>(static_cast<const Widget*>(top));
     return 0;
-}
-
-IntRect Widget::convertFromRootView(const IntRect& rootRect) const
-{
-    if (const Widget* parentWidget = parent()) {
-        IntRect parentRect = parentWidget->convertFromRootView(rootRect);
-        return convertFromContainingView(parentRect);
-    }
-    return rootRect;
-}
-
-IntRect Widget::convertToRootView(const IntRect& localRect) const
-{
-    if (const Widget* parentWidget = parent()) {
-        IntRect parentRect = convertToContainingView(localRect);
-        return parentWidget->convertToRootView(parentRect);
-    }
-    return localRect;
-}
-
-IntPoint Widget::convertFromRootView(const IntPoint& rootPoint) const
-{
-    if (const Widget* parentWidget = parent()) {
-        IntPoint parentPoint = parentWidget->convertFromRootView(rootPoint);
-        return convertFromContainingView(parentPoint);
-    }
-    return rootPoint;
-}
-
-IntPoint Widget::convertToRootView(const IntPoint& localPoint) const
-{
-    if (const Widget* parentWidget = parent()) {
-        IntPoint parentPoint = convertToContainingView(localPoint);
-        return parentWidget->convertToRootView(parentPoint);
-    }
-    return localPoint;
 }
 
 IntRect Widget::convertFromContainingWindow(const IntRect& windowRect) const
@@ -202,4 +166,4 @@ IntPoint Widget::convertSelfToChild(const Widget*, const IntPoint& point) const
     return point;
 }
 
-} // namespace WebCore
+} // namespace blink

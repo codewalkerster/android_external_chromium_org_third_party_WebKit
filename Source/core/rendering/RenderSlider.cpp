@@ -21,15 +21,17 @@
 #include "config.h"
 #include "core/rendering/RenderSlider.h"
 
+#include "core/InputTypeNames.h"
 #include "core/dom/shadow/ShadowRoot.h"
 #include "core/html/HTMLInputElement.h"
 #include "core/html/shadow/ShadowElementNames.h"
 #include "core/html/shadow/SliderThumbElement.h"
+#include "core/rendering/RenderSliderThumb.h"
 #include "wtf/MathExtras.h"
 
 using std::min;
 
-namespace WebCore {
+namespace blink {
 
 const int RenderSlider::defaultTrackLength = 129;
 
@@ -37,7 +39,7 @@ RenderSlider::RenderSlider(HTMLInputElement* element)
     : RenderFlexibleBox(element)
 {
     // We assume RenderSlider works only with <input type=range>.
-    ASSERT(element->isRangeControl());
+    ASSERT(element->type() == InputTypeNames::range);
 }
 
 RenderSlider::~RenderSlider()
@@ -107,4 +109,4 @@ bool RenderSlider::inDragMode() const
     return sliderThumbElement()->active();
 }
 
-} // namespace WebCore
+} // namespace blink

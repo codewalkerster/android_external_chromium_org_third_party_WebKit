@@ -60,6 +60,7 @@ WebInspector.LayerDetailsView.CompositingReasonDetail = {
     "animation": WebInspector.UIString("Composition due to association with an animated element."),
     "filters": WebInspector.UIString("Composition due to association with an element with CSS filters applied."),
     "positionFixed": WebInspector.UIString("Composition due to association with an element with a \"position: fixed\" style."),
+    // FIXME: Can we remove this entry now that position: sticky has been removed?
     "positionSticky": WebInspector.UIString("Composition due to association with an element with a \"position: sticky\" style."),
     "overflowScrollingTouch": WebInspector.UIString("Composition due to association with an element with a \"overflow-scrolling: touch\" style."),
     "blending": WebInspector.UIString("Composition due to association with an element that has blend mode other than \"normal\"."),
@@ -105,7 +106,7 @@ WebInspector.LayerDetailsView.prototype = {
 
     /**
      * @param {number} index
-     * @param {?Event} event
+     * @param {!Event} event
      */
     _onScrollRectClicked: function(index, event)
     {
@@ -183,7 +184,7 @@ WebInspector.LayerDetailsView.prototype = {
         var fragment = document.createDocumentFragment();
         for (var i = 0; i < compositingReasons.length; ++i) {
             if (i)
-                fragment.appendChild(document.createTextNode(","));
+                fragment.createTextChild(",");
             var span = document.createElement("span");
             span.title = WebInspector.LayerDetailsView.CompositingReasonDetail[compositingReasons[i]] || "";
             span.textContent = compositingReasons[i];

@@ -26,9 +26,9 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+import StringIO
 import logging
 import os
-import StringIO
 
 from webkitpy.common.system.executive import ScriptError
 
@@ -167,6 +167,9 @@ class MockExecutive(object):
         self.calls = self.calls[:num_previous_calls]
         self.calls.append(new_calls)
         return command_outputs
+
+    def map(self, thunk, arglist, processes=None):
+        return map(thunk, arglist)
 
 
 class MockExecutive2(MockExecutive):

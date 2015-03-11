@@ -25,12 +25,11 @@
 #include "core/SVGNames.h"
 #include "core/rendering/svg/RenderSVGTSpan.h"
 
-namespace WebCore {
+namespace blink {
 
 inline SVGTSpanElement::SVGTSpanElement(Document& document)
     : SVGTextPositioningElement(SVGNames::tspanTag, document)
 {
-    ScriptWrappable::init(this);
 }
 
 DEFINE_NODE_FACTORY(SVGTSpanElement)

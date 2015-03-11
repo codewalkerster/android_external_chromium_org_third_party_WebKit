@@ -26,8 +26,8 @@
 #ifndef History_h
 #define History_h
 
-#include "bindings/v8/ScriptWrappable.h"
-#include "bindings/v8/SerializedScriptValue.h"
+#include "bindings/core/v8/ScriptWrappable.h"
+#include "bindings/core/v8/SerializedScriptValue.h"
 #include "core/loader/FrameLoaderTypes.h"
 #include "core/frame/DOMWindowProperty.h"
 #include "platform/heap/Handle.h"
@@ -35,7 +35,7 @@
 #include "wtf/PassRefPtr.h"
 #include "wtf/RefCounted.h"
 
-namespace WebCore {
+namespace blink {
 
 class LocalFrame;
 class KURL;
@@ -43,6 +43,8 @@ class ExecutionContext;
 class ExceptionState;
 
 class History FINAL : public RefCountedWillBeGarbageCollectedFinalized<History>, public ScriptWrappable, public DOMWindowProperty {
+    DEFINE_WRAPPERTYPEINFO();
+    WILL_BE_USING_GARBAGE_COLLECTED_MIXIN(History);
 public:
     static PassRefPtrWillBeRawPtr<History> create(LocalFrame* frame)
     {
@@ -61,7 +63,7 @@ public:
 
     void stateObjectAdded(PassRefPtr<SerializedScriptValue>, const String& title, const String& url, FrameLoadType, ExceptionState&);
 
-    void trace(Visitor*) { }
+    virtual void trace(Visitor*) OVERRIDE;
 
 private:
     explicit History(LocalFrame*);
@@ -73,6 +75,6 @@ private:
     RefPtr<SerializedScriptValue> m_lastStateObjectRequested;
 };
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // History_h

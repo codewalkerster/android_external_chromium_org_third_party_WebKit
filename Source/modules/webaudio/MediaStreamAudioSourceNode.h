@@ -35,20 +35,22 @@
 #include "wtf/PassRefPtr.h"
 #include "wtf/Threading.h"
 
-namespace WebCore {
+namespace blink {
 
 class AudioContext;
 
 class MediaStreamAudioSourceNode FINAL : public AudioSourceNode, public AudioSourceProviderClient {
-    WILL_BE_USING_GARBAGE_COLLECTED_MIXIN(MediaStreamAudioSourceNode);
+    DEFINE_WRAPPERTYPEINFO();
+    USING_GARBAGE_COLLECTED_MIXIN(MediaStreamAudioSourceNode);
 public:
-    static PassRefPtrWillBeRawPtr<MediaStreamAudioSourceNode> create(AudioContext*, MediaStream*, MediaStreamTrack*, PassOwnPtr<AudioSourceProvider>);
+    static MediaStreamAudioSourceNode* create(AudioContext*, MediaStream*, MediaStreamTrack*, PassOwnPtr<AudioSourceProvider>);
 
     virtual ~MediaStreamAudioSourceNode();
 
     MediaStream* mediaStream() { return m_mediaStream.get(); }
 
     // AudioNode
+    virtual void dispose() OVERRIDE;
     virtual void process(size_t framesToProcess) OVERRIDE;
 
     // AudioSourceProviderClient
@@ -64,8 +66,8 @@ private:
     // As an audio source, we will never propagate silence.
     virtual bool propagatesSilence() const OVERRIDE { return false; }
 
-    RefPtrWillBeMember<MediaStream> m_mediaStream;
-    RefPtrWillBeMember<MediaStreamTrack> m_audioTrack;
+    Member<MediaStream> m_mediaStream;
+    Member<MediaStreamTrack> m_audioTrack;
     OwnPtr<AudioSourceProvider> m_audioSourceProvider;
 
     Mutex m_processLock;
@@ -73,7 +75,7 @@ private:
     unsigned m_sourceNumberOfChannels;
 };
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // ENABLE(WEB_AUDIO)
 

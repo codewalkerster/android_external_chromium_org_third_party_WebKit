@@ -36,7 +36,7 @@
 #include "wtf/MainThread.h"
 #include "wtf/text/StringBuilder.h"
 
-namespace WebCore {
+namespace blink {
 
 using blink::Platform;
 using blink::WebLocalizedString;
@@ -82,7 +82,7 @@ String DateTimeStringBuilder::zeroPadString(const String& string, size_t width)
     StringBuilder zeroPaddedStringBuilder;
     zeroPaddedStringBuilder.reserveCapacity(width);
     for (size_t i = string.length(); i < width; ++i)
-        zeroPaddedStringBuilder.append("0");
+        zeroPaddedStringBuilder.append('0');
     zeroPaddedStringBuilder.append(string);
     return zeroPaddedStringBuilder.toString();
 }
@@ -364,7 +364,7 @@ String Locale::convertFromLocalizedNumber(const String& localized)
     StringBuilder builder;
     builder.reserveCapacity(input.length());
     if (isNegative)
-        builder.append("-");
+        builder.append('-');
     for (unsigned i = startIndex; i < endIndex;) {
         unsigned symbolIndex = matchedDecimalSymbolIndex(input, i);
         if (symbolIndex >= DecimalSymbolsSize)

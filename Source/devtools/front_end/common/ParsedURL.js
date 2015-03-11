@@ -90,9 +90,9 @@ WebInspector.ParsedURL = function(url)
  * @param {string} url
  * @return {!Array.<string>}
  */
-WebInspector.ParsedURL.splitURL = function(url)
+WebInspector.ParsedURL.splitURLIntoPathComponents = function(url)
 {
-    var parsedURL = new WebInspector.ParsedURL(url);
+    var parsedURL = new WebInspector.ParsedURL(decodeURI(url));
     var origin;
     var folderPath;
     var name;
@@ -118,40 +118,6 @@ WebInspector.ParsedURL.splitURL = function(url)
     }
     result.push(name);
     return result;
-}
-
-
-/**
- * http://tools.ietf.org/html/rfc3986#section-5.2.4
- * @param {string} path
- * @return {string}
- */
-
-WebInspector.ParsedURL.normalizePath = function(path)
-{
-    if (path.indexOf("..") === -1 && path.indexOf('.') === -1)
-        return path;
-
-    var normalizedSegments = [];
-    var segments = path.split("/");
-    for (var i = 0; i < segments.length; i++) {
-        var segment = segments[i];
-        if (segment === ".")
-            continue;
-        else if (segment === "..")
-            normalizedSegments.pop();
-        else if (segment)
-            normalizedSegments.push(segment);
-    }
-    var normalizedPath = normalizedSegments.join("/");
-    if (normalizedPath[normalizedPath.length - 1] === "/")
-        return normalizedPath;
-    if (path[0] === "/" && normalizedPath)
-        normalizedPath = "/" + normalizedPath;
-    if ((path[path.length - 1] === "/") || (segments[segments.length - 1] === ".") || (segments[segments.length - 1] === ".."))
-        normalizedPath = normalizedPath + "/";
-
-    return normalizedPath;
 }
 
 /**
@@ -215,7 +181,7 @@ WebInspector.ParsedURL.completeURL = function(baseURL, href)
             // href starts with "//" which is a full URL with the protocol dropped (use the baseURL protocol).
             return parsedURL.scheme + ":" + path + postfix;
         }  // else absolute path
-        return parsedURL.scheme + "://" + parsedURL.host + (parsedURL.port ? (":" + parsedURL.port) : "") + WebInspector.ParsedURL.normalizePath(path) + postfix;
+        return parsedURL.scheme + "://" + parsedURL.host + (parsedURL.port ? (":" + parsedURL.port) : "") + normalizePath(path) + postfix;
     }
     return null;
 }

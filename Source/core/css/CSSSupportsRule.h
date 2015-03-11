@@ -31,9 +31,8 @@
 
 #include "core/css/CSSGroupingRule.h"
 
-namespace WebCore {
+namespace blink {
 
-class CSSRule;
 class StyleRuleSupports;
 
 class CSSSupportsRule FINAL : public CSSGroupingRule {
@@ -58,6 +57,6 @@ private:
 
 DEFINE_CSS_RULE_TYPE_CASTS(CSSSupportsRule, SUPPORTS_RULE);
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // CSSSupportsRule_h

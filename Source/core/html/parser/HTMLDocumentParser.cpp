@@ -46,7 +46,7 @@
 #include "public/platform/WebThreadedDataReceiver.h"
 #include "wtf/Functional.h"
 
-namespace WebCore {
+namespace blink {
 
 using namespace HTMLNames;
 
@@ -112,7 +112,7 @@ HTMLDocumentParser::HTMLDocumentParser(HTMLDocument& document, bool reportErrors
     , m_parserScheduler(HTMLParserScheduler::create(this))
     , m_xssAuditorDelegate(&document)
     , m_weakFactory(this)
-    , m_preloader(adoptPtr(new HTMLResourcePreloader(&document)))
+    , m_preloader(HTMLResourcePreloader::create(document))
     , m_isPinnedToMainThread(false)
     , m_endWasDelayed(false)
     , m_haveBackgroundParser(false)
@@ -164,7 +164,9 @@ HTMLDocumentParser::~HTMLDocumentParser()
 void HTMLDocumentParser::trace(Visitor* visitor)
 {
     visitor->trace(m_treeBuilder);
+    visitor->trace(m_xssAuditorDelegate);
     visitor->trace(m_scriptRunner);
+    visitor->trace(m_preloader);
     ScriptableDocumentParser::trace(visitor);
     HTMLScriptRunnerHost::trace(visitor);
 }
@@ -342,7 +344,7 @@ bool HTMLDocumentParser::canTakeNextToken(SynchronousMode mode, PumpSession& ses
 
 void HTMLDocumentParser::didReceiveParsedChunkFromBackgroundParser(PassOwnPtr<ParsedChunk> chunk)
 {
-    TRACE_EVENT0("webkit", "HTMLDocumentParser::didReceiveParsedChunkFromBackgroundParser");
+    TRACE_EVENT0("blink", "HTMLDocumentParser::didReceiveParsedChunkFromBackgroundParser");
 
     // alert(), runModalDialog, and the JavaScript Debugger all run nested event loops
     // which can cause this method to be re-entered. We detect re-entry using
@@ -428,7 +430,7 @@ void HTMLDocumentParser::discardSpeculationsAndResumeFrom(PassOwnPtr<ParsedChunk
 
 void HTMLDocumentParser::processParsedChunkFromBackgroundParser(PassOwnPtr<ParsedChunk> popChunk)
 {
-    TRACE_EVENT0("webkit", "HTMLDocumentParser::processParsedChunkFromBackgroundParser");
+    TRACE_EVENT0("blink", "HTMLDocumentParser::processParsedChunkFromBackgroundParser");
 
     ASSERT_WITH_SECURITY_IMPLICATION(!document()->activeParserCount());
     ASSERT(!isParsingFragment());
@@ -496,9 +498,10 @@ void HTMLDocumentParser::processParsedChunkFromBackgroundParser(PassOwnPtr<Parse
         ASSERT(!m_token);
     }
 
-    // Make sure any pending text nodes are emitted before returning.
+    // Make sure all required pending text nodes are emitted before returning.
+    // This leaves "script", "style" and "svg" nodes text nodes intact.
     if (!isStopped())
-        m_treeBuilder->flush();
+        m_treeBuilder->flush(FlushIfAtTextLimit);
 }
 
 void HTMLDocumentParser::pumpPendingSpeculations()
@@ -633,7 +636,7 @@ void HTMLDocumentParser::pumpTokenizer(SynchronousMode mode)
     // There should only be PendingText left since the tree-builder always flushes
     // the task queue before returning. In case that ever changes, crash.
     if (mode == ForceSynchronous)
-        m_treeBuilder->flush();
+        m_treeBuilder->flush(FlushAlways);
     RELEASE_ASSERT(!isStopped());
 
     if (session.needsYield)
@@ -699,7 +702,7 @@ void HTMLDocumentParser::insert(const SegmentedString& source)
     if (isStopped())
         return;
 
-    TRACE_EVENT1("webkit", "HTMLDocumentParser::insert", "source_length", source.length());
+    TRACE_EVENT1("blink", "HTMLDocumentParser::insert", "source_length", source.length());
 
     // pumpTokenizer can cause this parser to be detached from the Document,
     // but we need to ensure it isn't deleted yet.
@@ -741,8 +744,10 @@ void HTMLDocumentParser::startBackgroundParser()
     m_backgroundParser = WeakPtr<BackgroundHTMLParser>(reference);
 
     // TODO(oysteine): Disabled due to crbug.com/398076 until a full fix can be implemented.
-    if (RuntimeEnabledFeatures::threadedParserDataReceiverEnabled())
-        document()->loader()->attachThreadedDataReceiver(adoptPtr(new ParserDataReceiver(m_backgroundParser)));
+    if (RuntimeEnabledFeatures::threadedParserDataReceiverEnabled()) {
+        if (DocumentLoader* loader = document()->loader())
+            loader->attachThreadedDataReceiver(adoptPtr(new ParserDataReceiver(m_backgroundParser)));
+    }
 
     OwnPtr<BackgroundHTMLParser::Configuration> config = adoptPtr(new BackgroundHTMLParser::Configuration);
     config->options = m_options;
@@ -826,6 +831,8 @@ void HTMLDocumentParser::end()
 
     // Informs the the rest of WebCore that parsing is really finished (and deletes this).
     m_treeBuilder->finished();
+
+    DocumentParser::stopParsing();
 }
 
 void HTMLDocumentParser::attemptToRunDeferredScriptsAndEnd()
@@ -869,6 +876,12 @@ void HTMLDocumentParser::finish()
     // FIXME: We should ASSERT(!m_parserStopped) here, since it does not
     // makes sense to call any methods on DocumentParser once it's been stopped.
     // However, FrameLoader::stop calls DocumentParser::finish unconditionally.
+
+    // flush may ending up executing arbitrary script, and possibly detach the parser.
+    RefPtrWillBeRawPtr<HTMLDocumentParser> protect(this);
+    flush();
+    if (isDetached())
+        return;
 
     // Empty documents never got an append() call, and thus have never started
     // a background parser. In those cases, we ignore shouldUseThreading()

@@ -43,6 +43,7 @@
 #include "core/page/StorageClient.h"
 #include "platform/DragImage.h"
 #include "platform/geometry/FloatRect.h"
+#include "platform/heap/Handle.h"
 #include "platform/network/ResourceError.h"
 #include "platform/text/TextCheckerClient.h"
 #include "public/platform/WebScreenInfo.h"
@@ -62,7 +63,7 @@
  Brittle, yes.  Unfortunate, yes.  Hopefully temporary.
 */
 
-namespace WebCore {
+namespace blink {
 
 class EmptyChromeClient : public ChromeClient {
     WTF_MAKE_FAST_ALLOCATED;
@@ -116,7 +117,7 @@ public:
     virtual bool runJavaScriptPrompt(LocalFrame*, const String&, const String&, String&) OVERRIDE { return false; }
 
     virtual bool hasOpenedPopup() const OVERRIDE { return false; }
-    virtual PassRefPtr<PopupMenu> createPopupMenu(LocalFrame&, PopupMenuClient*) const OVERRIDE;
+    virtual PassRefPtrWillBeRawPtr<PopupMenu> createPopupMenu(LocalFrame&, PopupMenuClient*) const OVERRIDE;
     virtual void setPagePopupDriver(PagePopupDriver*) OVERRIDE { }
     virtual void resetPagePopupDriver() OVERRIDE { }
 
@@ -128,7 +129,6 @@ public:
 
     virtual void invalidateContentsAndRootView(const IntRect&) OVERRIDE { }
     virtual void invalidateContentsForSlowScroll(const IntRect&) OVERRIDE { }
-    virtual void scroll(const IntSize&, const IntRect&, const IntRect&) OVERRIDE { }
     virtual void scheduleAnimation() OVERRIDE { }
 
     virtual IntRect rootViewToScreen(const IntRect& r) const OVERRIDE { return r; }
@@ -144,7 +144,7 @@ public:
     virtual void enumerateChosenDirectory(FileChooser*) OVERRIDE { }
 
     virtual PassOwnPtr<ColorChooser> createColorChooser(LocalFrame*, ColorChooserClient*, const Color&) OVERRIDE;
-    virtual PassRefPtrWillBeRawPtr<DateTimeChooser> openDateTimeChooser(DateTimeChooserClient*, const DateTimeChooserParameters&) OVERRIDE;
+    virtual PassRefPtr<DateTimeChooser> openDateTimeChooser(DateTimeChooserClient*, const DateTimeChooserParameters&) OVERRIDE;
     virtual void openTextDataListChooser(HTMLInputElement&) OVERRIDE;
 
     virtual void runOpenPanel(LocalFrame*, PassRefPtr<FileChooser>) OVERRIDE;
@@ -163,7 +163,7 @@ public:
     virtual String acceptLanguages() OVERRIDE;
 };
 
-class EmptyFrameLoaderClient FINAL : public FrameLoaderClient {
+class EmptyFrameLoaderClient : public FrameLoaderClient {
     WTF_MAKE_NONCOPYABLE(EmptyFrameLoaderClient); WTF_MAKE_FAST_ALLOCATED;
 public:
     EmptyFrameLoaderClient() { }
@@ -190,7 +190,7 @@ public:
     virtual void dispatchDidHandleOnloadEvents() OVERRIDE { }
     virtual void dispatchDidReceiveServerRedirectForProvisionalLoad() OVERRIDE { }
     virtual void dispatchWillClose() OVERRIDE { }
-    virtual void dispatchDidStartProvisionalLoad() OVERRIDE { }
+    virtual void dispatchDidStartProvisionalLoad(bool isTransitionNavigation) OVERRIDE { }
     virtual void dispatchDidReceiveTitle(const String&) OVERRIDE { }
     virtual void dispatchDidChangeIcons(IconType) OVERRIDE { }
     virtual void dispatchDidCommitLoad(LocalFrame*, HistoryItem*, HistoryCommitType) OVERRIDE { }
@@ -201,7 +201,7 @@ public:
     virtual void dispatchDidFirstVisuallyNonEmptyLayout() OVERRIDE { }
     virtual void dispatchDidChangeThemeColor() OVERRIDE { };
 
-    virtual NavigationPolicy decidePolicyForNavigation(const ResourceRequest&, DocumentLoader*, NavigationPolicy) OVERRIDE;
+    virtual NavigationPolicy decidePolicyForNavigation(const ResourceRequest&, DocumentLoader*, NavigationPolicy, bool isTransitionNavigation) OVERRIDE;
 
     virtual void dispatchWillSendSubmitEvent(HTMLFormElement*) OVERRIDE;
     virtual void dispatchWillSubmitForm(HTMLFormElement*) OVERRIDE;
@@ -226,7 +226,7 @@ public:
     virtual void didDetectXSS(const KURL&, bool) OVERRIDE { }
     virtual void didDispatchPingLoader(const KURL&) OVERRIDE { }
     virtual void selectorMatchChanged(const Vector<String>&, const Vector<String>&) OVERRIDE { }
-    virtual PassRefPtr<LocalFrame> createFrame(const KURL&, const AtomicString&, const Referrer&, HTMLFrameOwnerElement*) OVERRIDE;
+    virtual PassRefPtrWillBeRawPtr<LocalFrame> createFrame(const KURL&, const AtomicString&, const Referrer&, HTMLFrameOwnerElement*) OVERRIDE;
     virtual PassRefPtr<Widget> createPlugin(HTMLPlugInElement*, const KURL&, const Vector<String>&, const Vector<String>&, const String&, bool, DetachedPluginPolicy) OVERRIDE;
     virtual bool canCreatePluginWithoutRenderer(const String& mimeType) const OVERRIDE { return false; }
     virtual PassRefPtr<Widget> createJavaAppletWidget(HTMLAppletElement*, const KURL&, const Vector<String>&, const Vector<String>&) OVERRIDE;
@@ -245,19 +245,22 @@ public:
     virtual void didRequestAutocomplete(HTMLFormElement*) OVERRIDE;
 
     virtual PassOwnPtr<blink::WebServiceWorkerProvider> createServiceWorkerProvider() OVERRIDE;
+    virtual bool isControlledByServiceWorker() OVERRIDE { return false; }
     virtual PassOwnPtr<blink::WebApplicationCacheHost> createApplicationCacheHost(blink::WebApplicationCacheHostClient*) OVERRIDE;
 };
 
-class EmptyTextCheckerClient FINAL : public TextCheckerClient {
+class EmptyTextCheckerClient : public TextCheckerClient {
 public:
+    ~EmptyTextCheckerClient() { }
+
     virtual bool shouldEraseMarkersAfterChangeSelection(TextCheckingType) const OVERRIDE { return true; }
     virtual void checkSpellingOfString(const String&, int*, int*) OVERRIDE { }
     virtual String getAutoCorrectSuggestionForMisspelledWord(const String&) OVERRIDE { return String(); }
     virtual void checkGrammarOfString(const String&, Vector<GrammarDetail>&, int*, int*) OVERRIDE { }
-    virtual void requestCheckingOfString(PassRefPtr<TextCheckingRequest>) OVERRIDE;
+    virtual void requestCheckingOfString(PassRefPtrWillBeRawPtr<TextCheckingRequest>) OVERRIDE;
 };
 
-class EmptySpellCheckerClient FINAL : public SpellCheckerClient {
+class EmptySpellCheckerClient : public SpellCheckerClient {
     WTF_MAKE_NONCOPYABLE(EmptySpellCheckerClient); WTF_MAKE_FAST_ALLOCATED;
 public:
     EmptySpellCheckerClient() { }
@@ -307,7 +310,7 @@ public:
     EmptyDragClient() { }
     virtual ~EmptyDragClient() {}
     virtual DragDestinationAction actionMaskForDrag(DragData*) OVERRIDE { return DragDestinationActionNone; }
-    virtual void startDrag(DragImage*, const IntPoint&, const IntPoint&, Clipboard*, LocalFrame*, bool) OVERRIDE { }
+    virtual void startDrag(DragImage*, const IntPoint&, const IntPoint&, DataTransfer*, LocalFrame*, bool) OVERRIDE { }
 };
 
 class EmptyInspectorClient FINAL : public InspectorClient {

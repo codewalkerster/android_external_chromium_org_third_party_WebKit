@@ -23,9 +23,12 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#ifndef VTTElement_h
+#define VTTElement_h
+
 #include "core/html/HTMLElement.h"
 
-namespace WebCore {
+namespace blink {
 
 enum VTTNodeType {
     VTTNodeTypeNone = 0,
@@ -81,5 +84,6 @@ private:
 
 DEFINE_ELEMENT_TYPE_CASTS(VTTElement, isVTTElement());
 
-} // namespace WebCore
+} // namespace blink
 
+#endif // VTTElement_h

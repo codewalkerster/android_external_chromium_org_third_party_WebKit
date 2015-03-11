@@ -27,7 +27,7 @@
 #include "platform/graphics/filters/FilterEffect.h"
 #include "wtf/text/WTFString.h"
 
-namespace WebCore {
+namespace blink {
 
 enum ChannelSelectorType {
     CHANNEL_UNKNOWN = 0,
@@ -57,6 +57,8 @@ public:
 
     virtual TextStream& externalRepresentation(TextStream&, int indention) const OVERRIDE;
 
+    FloatRect determineAbsolutePaintRect(const FloatRect& requestedRect) OVERRIDE;
+
 private:
     FEDisplacementMap(Filter*, ChannelSelectorType xChannelSelector, ChannelSelectorType yChannelSelector, float);
 
@@ -69,6 +71,6 @@ private:
     float m_scale;
 };
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // FEDisplacementMap_h

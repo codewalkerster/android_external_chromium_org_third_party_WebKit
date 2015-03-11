@@ -36,7 +36,7 @@
 #include "public/platform/Platform.h"
 #include "public/platform/WebScreenInfo.h"
 
-namespace WebCore {
+namespace blink {
 
 static HostWindow* toHostWindow(Widget* widget)
 {
@@ -104,11 +104,4 @@ blink::WebScreenOrientationType screenOrientationType(Widget* widget)
     return hostWindow->screenInfo().orientationType;
 }
 
-void screenColorProfile(ColorProfile& toProfile)
-{
-    blink::WebVector<char> profile;
-    blink::Platform::current()->screenColorProfile(&profile);
-    toProfile.append(profile.data(), profile.size());
-}
-
-} // namespace WebCore
+} // namespace blink

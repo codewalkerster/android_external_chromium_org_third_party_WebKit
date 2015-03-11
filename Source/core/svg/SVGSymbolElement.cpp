@@ -25,13 +25,12 @@
 #include "core/SVGNames.h"
 #include "core/rendering/svg/RenderSVGHiddenContainer.h"
 
-namespace WebCore {
+namespace blink {
 
 inline SVGSymbolElement::SVGSymbolElement(Document& document)
     : SVGElement(SVGNames::symbolTag, document)
     , SVGFitToViewBox(this)
 {
-    ScriptWrappable::init(this);
 }
 
 DEFINE_NODE_FACTORY(SVGSymbolElement)

@@ -30,15 +30,16 @@
 #include "modules/webaudio/WaveShaperProcessor.h"
 #include "wtf/Forward.h"
 
-namespace WebCore {
+namespace blink {
 
 class ExceptionState;
 
 class WaveShaperNode FINAL : public AudioBasicProcessorNode {
+    DEFINE_WRAPPERTYPEINFO();
 public:
-    static PassRefPtrWillBeRawPtr<WaveShaperNode> create(AudioContext* context)
+    static WaveShaperNode* create(AudioContext* context)
     {
-        return adoptRefWillBeNoop(new WaveShaperNode(context));
+        return adoptRefCountedGarbageCollectedWillBeNoop(new WaveShaperNode(context));
     }
 
     // setCurve() is called on the main thread.
@@ -54,6 +55,6 @@ private:
     WaveShaperProcessor* waveShaperProcessor() { return static_cast<WaveShaperProcessor*>(processor()); }
 };
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // WaveShaperNode_h

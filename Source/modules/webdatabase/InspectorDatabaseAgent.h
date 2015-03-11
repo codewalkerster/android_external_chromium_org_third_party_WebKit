@@ -29,14 +29,14 @@
 #ifndef InspectorDatabaseAgent_h
 #define InspectorDatabaseAgent_h
 
-#include "InspectorFrontend.h"
+#include "core/InspectorFrontend.h"
 #include "core/inspector/InspectorBaseAgent.h"
 #include "platform/heap/Handle.h"
 #include "wtf/HashMap.h"
 #include "wtf/PassOwnPtr.h"
 #include "wtf/text/WTFString.h"
 
-namespace WebCore {
+namespace blink {
 
 class Database;
 class DocumentLoader;
@@ -49,11 +49,12 @@ typedef String ErrorString;
 
 class InspectorDatabaseAgent FINAL : public InspectorBaseAgent<InspectorDatabaseAgent>, public InspectorBackendDispatcher::DatabaseCommandHandler {
 public:
-    static PassOwnPtr<InspectorDatabaseAgent> create()
+    static PassOwnPtrWillBeRawPtr<InspectorDatabaseAgent> create()
     {
-        return adoptPtr(new InspectorDatabaseAgent());
+        return adoptPtrWillBeNoop(new InspectorDatabaseAgent());
     }
     virtual ~InspectorDatabaseAgent();
+    virtual void trace(Visitor*) OVERRIDE;
 
     virtual void setFrontend(InspectorFrontend*) OVERRIDE;
     virtual void clearFrontend() OVERRIDE;
@@ -65,7 +66,7 @@ public:
     virtual void enable(ErrorString*) OVERRIDE;
     virtual void disable(ErrorString*) OVERRIDE;
     virtual void getDatabaseTableNames(ErrorString*, const String& databaseId, RefPtr<TypeBuilder::Array<String> >& names) OVERRIDE;
-    virtual void executeSQL(ErrorString*, const String& databaseId, const String& query, PassRefPtr<ExecuteSQLCallback>) OVERRIDE;
+    virtual void executeSQL(ErrorString*, const String& databaseId, const String& query, PassRefPtrWillBeRawPtr<ExecuteSQLCallback>) OVERRIDE;
 
     void didOpenDatabase(PassRefPtrWillBeRawPtr<Database>, const String& domain, const String& name, const String& version);
 private:
@@ -75,11 +76,11 @@ private:
     InspectorDatabaseResource* findByFileName(const String& fileName);
 
     InspectorFrontend::Database* m_frontend;
-    typedef WillBePersistentHeapHashMap<String, RefPtrWillBeMember<InspectorDatabaseResource> > DatabaseResourcesHeapMap;
+    typedef WillBeHeapHashMap<String, RefPtrWillBeMember<InspectorDatabaseResource> > DatabaseResourcesHeapMap;
     DatabaseResourcesHeapMap m_resources;
     bool m_enabled;
 };
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // !defined(InspectorDatabaseAgent_h)

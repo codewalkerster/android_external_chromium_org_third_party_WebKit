@@ -29,11 +29,12 @@
 #include "modules/indexeddb/IDBRequest.h"
 #include "public/platform/WebIDBDatabase.h"
 
-namespace WebCore {
+namespace blink {
 
 class IDBDatabaseCallbacks;
 
 class IDBOpenDBRequest FINAL : public IDBRequest {
+    DEFINE_WRAPPERTYPEINFO();
 public:
     static IDBOpenDBRequest* create(ScriptState*, IDBDatabaseCallbacks*, int64_t transactionId, int64_t version);
     virtual ~IDBOpenDBRequest();
@@ -42,8 +43,8 @@ public:
     using IDBRequest::onSuccess;
 
     virtual void onBlocked(int64_t existingVersion) OVERRIDE;
-    virtual void onUpgradeNeeded(int64_t oldVersion, PassOwnPtr<blink::WebIDBDatabase>, const IDBDatabaseMetadata&, blink::WebIDBDataLoss, String dataLossMessage) OVERRIDE;
-    virtual void onSuccess(PassOwnPtr<blink::WebIDBDatabase>, const IDBDatabaseMetadata&) OVERRIDE;
+    virtual void onUpgradeNeeded(int64_t oldVersion, PassOwnPtr<WebIDBDatabase>, const IDBDatabaseMetadata&, WebIDBDataLoss, String dataLossMessage) OVERRIDE;
+    virtual void onSuccess(PassOwnPtr<WebIDBDatabase>, const IDBDatabaseMetadata&) OVERRIDE;
     virtual void onSuccess(int64_t oldVersion) OVERRIDE;
 
     // EventTarget
@@ -64,6 +65,6 @@ private:
     int64_t m_version;
 };
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // IDBOpenDBRequest_h

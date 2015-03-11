@@ -33,7 +33,7 @@
 
 #include "core/html/forms/BaseTextInputType.h"
 
-namespace WebCore {
+namespace blink {
 
 class TelephoneInputType FINAL : public BaseTextInputType {
 public:
@@ -44,9 +44,8 @@ private:
     virtual void countUsage() OVERRIDE;
     virtual const AtomicString& formControlType() const OVERRIDE;
     virtual bool shouldRespectSpeechAttribute() OVERRIDE;
-    virtual bool isTelephoneField() const OVERRIDE;
 };
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // TelephoneInputType_h

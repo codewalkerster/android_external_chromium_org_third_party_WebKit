@@ -26,9 +26,10 @@
 #include "core/svg/SVGAnimatedLength.h"
 #include "core/svg/SVGGeometryElement.h"
 
-namespace WebCore {
+namespace blink {
 
 class SVGRectElement FINAL : public SVGGeometryElement {
+    DEFINE_WRAPPERTYPEINFO();
 public:
     DECLARE_NODE_FACTORY(SVGRectElement);
 
@@ -58,6 +59,6 @@ private:
     RefPtr<SVGAnimatedLength> m_ry;
 };
 
-} // namespace WebCore
+} // namespace blink
 
-#endif
+#endif // SVGRectElement_h

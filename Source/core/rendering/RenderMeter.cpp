@@ -25,9 +25,7 @@
 #include "core/html/HTMLMeterElement.h"
 #include "core/rendering/RenderTheme.h"
 
-using namespace std;
-
-namespace WebCore {
+namespace blink {
 
 using namespace HTMLNames;
 
@@ -79,7 +77,7 @@ double RenderMeter::valueRatio() const
 
 void RenderMeter::updateFromElement()
 {
-    paintInvalidationForWholeRenderer();
+    setShouldDoFullPaintInvalidation(true);
 }
 
-} // namespace WebCore
+} // namespace blink

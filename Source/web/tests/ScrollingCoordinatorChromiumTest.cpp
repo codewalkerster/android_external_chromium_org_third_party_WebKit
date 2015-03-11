@@ -26,9 +26,12 @@
 
 #include "core/page/scrolling/ScrollingCoordinator.h"
 
+#include "core/page/Page.h"
 #include "core/rendering/RenderView.h"
+#include "core/rendering/RenderWidget.h"
 #include "core/rendering/compositing/CompositedLayerMapping.h"
 #include "core/rendering/compositing/RenderLayerCompositor.h"
+#include "core/testing/URLTestHelpers.h"
 #include "platform/graphics/GraphicsLayer.h"
 #include "public/platform/Platform.h"
 #include "public/platform/WebLayer.h"
@@ -40,10 +43,8 @@
 #include "web/WebLocalFrameImpl.h"
 #include "web/WebViewImpl.h"
 #include "web/tests/FrameTestHelpers.h"
-#include "web/tests/URLTestHelpers.h"
 #include <gtest/gtest.h>
 
-using namespace WebCore;
 using namespace blink;
 
 namespace {
@@ -99,9 +100,7 @@ private:
     {
         settings->setJavaScriptEnabled(true);
         settings->setAcceleratedCompositingEnabled(true);
-        settings->setAcceleratedCompositingForFixedPositionEnabled(true);
-        settings->setAcceleratedCompositingForOverflowScrollEnabled(true);
-        settings->setCompositedScrollingForFramesEnabled(true);
+        settings->setPreferCompositingToLCDTextEnabled(true);
     }
 
     FrameTestHelpers::WebViewHelper m_helper;
@@ -125,6 +124,24 @@ TEST_F(ScrollingCoordinatorChromiumTest, fastScrollingByDefault)
     ASSERT_FALSE(rootScrollLayer->haveWheelEventHandlers());
 }
 
+TEST_F(ScrollingCoordinatorChromiumTest, fastScrollingCanBeDisabledWithSetting)
+{
+    navigateTo("about:blank");
+    webViewImpl()->settings()->setThreadedScrollingEnabled(false);
+    forceFullCompositingUpdate();
+
+    // Make sure the scrolling coordinator is active.
+    FrameView* frameView = frame()->view();
+    Page* page = frame()->page();
+    ASSERT_TRUE(page->scrollingCoordinator());
+    ASSERT_TRUE(page->scrollingCoordinator()->coordinatesScrollingForFrameView(frameView));
+
+    // Main scrolling should be enabled with the setting override.
+    WebLayer* rootScrollLayer = getRootScrollLayer();
+    ASSERT_TRUE(rootScrollLayer->scrollable());
+    ASSERT_TRUE(rootScrollLayer->shouldScrollOnMainThread());
+}
+
 static WebLayer* webLayerFromElement(Element* element)
 {
     if (!element)
@@ -137,7 +154,7 @@ static WebLayer* webLayerFromElement(Element* element)
         return 0;
     if (!layer->hasCompositedLayerMapping())
         return 0;
-    CompositedLayerMappingPtr compositedLayerMapping = layer->compositedLayerMapping();
+    CompositedLayerMapping* compositedLayerMapping = layer->compositedLayerMapping();
     GraphicsLayer* graphicsLayer = compositedLayerMapping->mainGraphicsLayer();
     if (!graphicsLayer)
         return 0;
@@ -289,7 +306,7 @@ TEST_F(ScrollingCoordinatorChromiumTest, overflowScrolling)
     ASSERT_TRUE(box->usesCompositedScrolling());
     ASSERT_EQ(PaintsIntoOwnBacking, box->layer()->compositingState());
 
-    CompositedLayerMappingPtr compositedLayerMapping = box->layer()->compositedLayerMapping();
+    CompositedLayerMapping* compositedLayerMapping = box->layer()->compositedLayerMapping();
     ASSERT_TRUE(compositedLayerMapping->hasScrollingLayer());
     ASSERT(compositedLayerMapping->scrollingContentsLayer());
 
@@ -329,7 +346,7 @@ TEST_F(ScrollingCoordinatorChromiumTest, overflowHidden)
     ASSERT_TRUE(box->usesCompositedScrolling());
     ASSERT_EQ(PaintsIntoOwnBacking, box->layer()->compositingState());
 
-    CompositedLayerMappingPtr compositedLayerMapping = box->layer()->compositedLayerMapping();
+    CompositedLayerMapping* compositedLayerMapping = box->layer()->compositedLayerMapping();
     ASSERT_TRUE(compositedLayerMapping->hasScrollingLayer());
     ASSERT(compositedLayerMapping->scrollingContentsLayer());
 

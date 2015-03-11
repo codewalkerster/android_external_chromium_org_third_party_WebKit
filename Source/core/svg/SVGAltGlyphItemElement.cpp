@@ -25,12 +25,11 @@
 #include "core/dom/ElementTraversal.h"
 #include "core/svg/SVGGlyphRefElement.h"
 
-namespace WebCore {
+namespace blink {
 
 inline SVGAltGlyphItemElement::SVGAltGlyphItemElement(Document& document)
     : SVGElement(SVGNames::altGlyphItemTag, document)
 {
-    ScriptWrappable::init(this);
 }
 
 DEFINE_NODE_FACTORY(SVGAltGlyphItemElement)

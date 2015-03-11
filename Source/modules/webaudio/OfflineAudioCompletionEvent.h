@@ -30,14 +30,15 @@
 #include "wtf/PassRefPtr.h"
 #include "wtf/RefPtr.h"
 
-namespace WebCore {
+namespace blink {
 
 class AudioBuffer;
 
 class OfflineAudioCompletionEvent FINAL : public Event {
+    DEFINE_WRAPPERTYPEINFO();
 public:
     static PassRefPtrWillBeRawPtr<OfflineAudioCompletionEvent> create();
-    static PassRefPtrWillBeRawPtr<OfflineAudioCompletionEvent> create(PassRefPtrWillBeRawPtr<AudioBuffer> renderedBuffer);
+    static PassRefPtrWillBeRawPtr<OfflineAudioCompletionEvent> create(AudioBuffer* renderedBuffer);
 
     virtual ~OfflineAudioCompletionEvent();
 
@@ -49,11 +50,11 @@ public:
 
 private:
     OfflineAudioCompletionEvent();
-    explicit OfflineAudioCompletionEvent(PassRefPtrWillBeRawPtr<AudioBuffer> renderedBuffer);
+    explicit OfflineAudioCompletionEvent(AudioBuffer* renderedBuffer);
 
-    RefPtrWillBeMember<AudioBuffer> m_renderedBuffer;
+    PersistentWillBeMember<AudioBuffer> m_renderedBuffer;
 };
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // OfflineAudioCompletionEvent_h

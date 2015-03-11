@@ -32,7 +32,7 @@
 
 #include "core/html/shadow/MediaControlElementTypes.h"
 
-namespace WebCore {
+namespace blink {
 
 // ----------------------------
 
@@ -82,6 +82,7 @@ public:
 private:
     explicit MediaControlOverlayEnclosureElement(MediaControls&);
     virtual const AtomicString& shadowPseudoId() const OVERRIDE;
+    virtual void* preDispatchEventHandler(Event*) OVERRIDE;
 };
 
 // ----------------------------
@@ -189,6 +190,26 @@ private:
 
 // ----------------------------
 
+class MediaControlCastButtonElement FINAL : public MediaControlInputElement {
+public:
+    static PassRefPtrWillBeRawPtr<MediaControlCastButtonElement> create(MediaControls&, bool isOverlayButton);
+
+    virtual bool willRespondToMouseClickEvents() OVERRIDE { return true; }
+
+    void setIsPlayingRemotely(bool);
+
+private:
+    explicit MediaControlCastButtonElement(MediaControls&, bool isOverlayButton);
+
+    virtual const AtomicString& shadowPseudoId() const OVERRIDE;
+    virtual void defaultEventHandler(Event*) OVERRIDE;
+    virtual bool keepEventInNode(Event*) OVERRIDE;
+
+    bool m_isOverlayButton;
+};
+
+// ----------------------------
+
 class MediaControlVolumeSliderElement FINAL : public MediaControlInputElement {
 public:
     static PassRefPtrWillBeRawPtr<MediaControlVolumeSliderElement> create(MediaControls&);
@@ -248,6 +269,6 @@ private:
 };
 
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // MediaControlElements_h

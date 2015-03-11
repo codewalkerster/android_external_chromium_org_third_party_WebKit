@@ -35,7 +35,7 @@
 #include "wtf/PassOwnPtr.h"
 #include "wtf/text/WTFString.h"
 
-namespace WebCore {
+namespace blink {
 
 class Page;
 
@@ -46,6 +46,7 @@ public:
     static void provideTo(Page*);
 
     virtual ~InspectorIndexedDBAgent();
+    virtual void trace(Visitor*) OVERRIDE;
 
     virtual void clearFrontend() OVERRIDE;
     virtual void restore() OVERRIDE;
@@ -53,17 +54,17 @@ public:
     // Called from the front-end.
     virtual void enable(ErrorString*) OVERRIDE;
     virtual void disable(ErrorString*) OVERRIDE;
-    virtual void requestDatabaseNames(ErrorString*, const String& securityOrigin, PassRefPtr<RequestDatabaseNamesCallback>) OVERRIDE;
-    virtual void requestDatabase(ErrorString*, const String& securityOrigin, const String& databaseName, PassRefPtr<RequestDatabaseCallback>) OVERRIDE;
-    virtual void requestData(ErrorString*, const String& securityOrigin, const String& databaseName, const String& objectStoreName, const String& indexName, int skipCount, int pageSize, const RefPtr<JSONObject>* keyRange, PassRefPtr<RequestDataCallback>) OVERRIDE;
-    virtual void clearObjectStore(ErrorString*, const String& in_securityOrigin, const String& in_databaseName, const String& in_objectStoreName, PassRefPtr<ClearObjectStoreCallback>) OVERRIDE;
+    virtual void requestDatabaseNames(ErrorString*, const String& securityOrigin, PassRefPtrWillBeRawPtr<RequestDatabaseNamesCallback>) OVERRIDE;
+    virtual void requestDatabase(ErrorString*, const String& securityOrigin, const String& databaseName, PassRefPtrWillBeRawPtr<RequestDatabaseCallback>) OVERRIDE;
+    virtual void requestData(ErrorString*, const String& securityOrigin, const String& databaseName, const String& objectStoreName, const String& indexName, int skipCount, int pageSize, const RefPtr<JSONObject>* keyRange, PassRefPtrWillBeRawPtr<RequestDataCallback>) OVERRIDE;
+    virtual void clearObjectStore(ErrorString*, const String& in_securityOrigin, const String& in_databaseName, const String& in_objectStoreName, PassRefPtrWillBeRawPtr<ClearObjectStoreCallback>) OVERRIDE;
 
 private:
-    InspectorIndexedDBAgent(Page*);
+    explicit InspectorIndexedDBAgent(Page*);
 
-    Page* m_page;
+    RawPtrWillBeMember<Page> m_page;
 };
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // !defined(InspectorIndexedDBAgent_h)

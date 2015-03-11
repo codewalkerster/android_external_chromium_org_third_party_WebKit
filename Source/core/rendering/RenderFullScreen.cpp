@@ -25,10 +25,10 @@
 #include "config.h"
 #include "core/rendering/RenderFullScreen.h"
 
-#include "core/dom/FullscreenElementStack.h"
+#include "core/dom/Fullscreen.h"
 #include "core/rendering/RenderBlockFlow.h"
 
-using namespace WebCore;
+using namespace blink;
 
 class RenderFullScreenPlaceholder FINAL : public RenderBlockFlow {
 public:
@@ -47,12 +47,12 @@ private:
 void RenderFullScreenPlaceholder::willBeDestroyed()
 {
     m_owner->setPlaceholder(0);
-    RenderBlock::willBeDestroyed();
+    RenderBlockFlow::willBeDestroyed();
 }
 
 RenderFullScreen::RenderFullScreen()
     : RenderFlexibleBox(0)
-    , m_placeholder(0)
+    , m_placeholder(nullptr)
 {
     setReplaced(false);
 }
@@ -62,6 +62,12 @@ RenderFullScreen* RenderFullScreen::createAnonymous(Document* document)
     RenderFullScreen* renderer = new RenderFullScreen();
     renderer->setDocumentForAnonymous(document);
     return renderer;
+}
+
+void RenderFullScreen::trace(Visitor* visitor)
+{
+    visitor->trace(m_placeholder);
+    RenderFlexibleBox::trace(visitor);
 }
 
 void RenderFullScreen::willBeDestroyed()
@@ -74,10 +80,10 @@ void RenderFullScreen::willBeDestroyed()
     }
 
     // RenderObjects are unretained, so notify the document (which holds a pointer to a RenderFullScreen)
-    // if it's RenderFullScreen is destroyed.
-    FullscreenElementStack& controller = FullscreenElementStack::from(document());
-    if (controller.fullScreenRenderer() == this)
-        controller.fullScreenRendererDestroyed();
+    // if its RenderFullScreen is destroyed.
+    Fullscreen& fullscreen = Fullscreen::from(document());
+    if (fullscreen.fullScreenRenderer() == this)
+        fullscreen.fullScreenRendererDestroyed();
 
     RenderFlexibleBox::willBeDestroyed();
 }
@@ -100,8 +106,8 @@ static PassRefPtr<RenderStyle> createFullScreenStyle()
     fullscreenStyle->setPosition(FixedPosition);
     fullscreenStyle->setWidth(Length(100.0, Percent));
     fullscreenStyle->setHeight(Length(100.0, Percent));
-    fullscreenStyle->setLeft(Length(0, WebCore::Fixed));
-    fullscreenStyle->setTop(Length(0, WebCore::Fixed));
+    fullscreenStyle->setLeft(Length(0, blink::Fixed));
+    fullscreenStyle->setTop(Length(0, blink::Fixed));
 
     fullscreenStyle->setBackgroundColor(StyleColor(Color::black));
 
@@ -144,7 +150,7 @@ RenderObject* RenderFullScreen::wrapRenderer(RenderObject* object, RenderObject*
     }
 
     ASSERT(document);
-    FullscreenElementStack::from(*document).setFullScreenRenderer(fullscreenRenderer);
+    Fullscreen::from(*document).setFullScreenRenderer(fullscreenRenderer);
     return fullscreenRenderer;
 }
 
@@ -155,8 +161,7 @@ void RenderFullScreen::unwrapRenderer()
     DeprecatedDisableModifyRenderTreeStructureAsserts disabler;
 
     if (parent()) {
-        RenderObject* child;
-        while ((child = firstChild())) {
+        for (RenderObject* child = firstChild(); child; child = firstChild()) {
             // We have to clear the override size, because as a flexbox, we
             // may have set one on the child, and we don't want to leave that
             // lying around on the child.

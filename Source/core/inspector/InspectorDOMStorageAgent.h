@@ -29,15 +29,15 @@
 #ifndef InspectorDOMStorageAgent_h
 #define InspectorDOMStorageAgent_h
 
+#include "core/InspectorFrontend.h"
 #include "core/inspector/InspectorBaseAgent.h"
 #include "core/storage/StorageArea.h"
 #include "wtf/PassOwnPtr.h"
 #include "wtf/text/WTFString.h"
 
-namespace WebCore {
+namespace blink {
 
 class LocalFrame;
-class InspectorFrontend;
 class InspectorPageAgent;
 class InstrumentingAgents;
 class JSONObject;
@@ -48,11 +48,12 @@ typedef String ErrorString;
 
 class InspectorDOMStorageAgent FINAL : public InspectorBaseAgent<InspectorDOMStorageAgent>, public InspectorBackendDispatcher::DOMStorageCommandHandler {
 public:
-    static PassOwnPtr<InspectorDOMStorageAgent> create(InspectorPageAgent* pageAgent)
+    static PassOwnPtrWillBeRawPtr<InspectorDOMStorageAgent> create(InspectorPageAgent* pageAgent)
     {
-        return adoptPtr(new InspectorDOMStorageAgent(pageAgent));
+        return adoptPtrWillBeNoop(new InspectorDOMStorageAgent(pageAgent));
     }
     virtual ~InspectorDOMStorageAgent();
+    virtual void trace(Visitor*) OVERRIDE;
 
     virtual void setFrontend(InspectorFrontend*) OVERRIDE;
     virtual void clearFrontend() OVERRIDE;
@@ -70,16 +71,16 @@ public:
 
 private:
 
-    InspectorDOMStorageAgent(InspectorPageAgent*);
+    explicit InspectorDOMStorageAgent(InspectorPageAgent*);
 
     bool isEnabled() const;
     PassOwnPtrWillBeRawPtr<StorageArea> findStorageArea(ErrorString*, const RefPtr<JSONObject>&, LocalFrame*&);
     PassRefPtr<TypeBuilder::DOMStorage::StorageId> storageId(SecurityOrigin*, bool isLocalStorage);
 
-    InspectorPageAgent* m_pageAgent;
-    InspectorFrontend* m_frontend;
+    RawPtrWillBeMember<InspectorPageAgent> m_pageAgent;
+    InspectorFrontend::DOMStorage* m_frontend;
 };
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // !defined(InspectorDOMStorageAgent_h)

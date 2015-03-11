@@ -31,8 +31,8 @@
 #include "config.h"
 #include "modules/webmidi/NavigatorWebMIDI.h"
 
-#include "bindings/v8/ScriptPromise.h"
-#include "bindings/v8/ScriptPromiseResolver.h"
+#include "bindings/core/v8/ScriptPromise.h"
+#include "bindings/core/v8/ScriptPromiseResolver.h"
 #include "core/dom/DOMError.h"
 #include "core/dom/Document.h"
 #include "core/frame/LocalFrame.h"
@@ -40,15 +40,19 @@
 #include "modules/webmidi/MIDIAccessInitializer.h"
 #include "modules/webmidi/MIDIOptions.h"
 
-namespace WebCore {
+namespace blink {
 
 NavigatorWebMIDI::NavigatorWebMIDI(LocalFrame* frame)
     : DOMWindowProperty(frame)
 {
 }
 
-NavigatorWebMIDI::~NavigatorWebMIDI()
+DEFINE_EMPTY_DESTRUCTOR_WILL_BE_REMOVED(NavigatorWebMIDI);
+
+void NavigatorWebMIDI::trace(Visitor* visitor)
 {
+    WillBeHeapSupplement<Navigator>::trace(visitor);
+    DOMWindowProperty::trace(visitor);
 }
 
 const char* NavigatorWebMIDI::supplementName()
@@ -66,12 +70,12 @@ NavigatorWebMIDI& NavigatorWebMIDI::from(Navigator& navigator)
     return *supplement;
 }
 
-ScriptPromise NavigatorWebMIDI::requestMIDIAccess(ScriptState* scriptState, Navigator& navigator, const Dictionary& options)
+ScriptPromise NavigatorWebMIDI::requestMIDIAccess(ScriptState* scriptState, Navigator& navigator, const MIDIOptions& options)
 {
     return NavigatorWebMIDI::from(navigator).requestMIDIAccess(scriptState, options);
 }
 
-ScriptPromise NavigatorWebMIDI::requestMIDIAccess(ScriptState* scriptState, const Dictionary& options)
+ScriptPromise NavigatorWebMIDI::requestMIDIAccess(ScriptState* scriptState, const MIDIOptions& options)
 {
     if (!frame() || frame()->document()->activeDOMObjectsAreStopped()) {
         RefPtr<ScriptPromiseResolver> resolver = ScriptPromiseResolver::create(scriptState);
@@ -81,7 +85,7 @@ ScriptPromise NavigatorWebMIDI::requestMIDIAccess(ScriptState* scriptState, cons
         return promise;
     }
 
-    return MIDIAccessInitializer::start(scriptState, MIDIOptions(options));
+    return MIDIAccessInitializer::start(scriptState, options);
 }
 
-} // namespace WebCore
+} // namespace blink

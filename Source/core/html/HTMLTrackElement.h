@@ -31,11 +31,12 @@
 #include "core/html/track/TextTrack.h"
 #include "platform/heap/Handle.h"
 
-namespace WebCore {
+namespace blink {
 
 class HTMLMediaElement;
 
 class HTMLTrackElement FINAL : public HTMLElement {
+    DEFINE_WRAPPERTYPEINFO();
 public:
     DECLARE_NODE_FACTORY(HTMLTrackElement);
 
@@ -79,6 +80,6 @@ private:
     Timer<HTMLTrackElement> m_loadTimer;
 };
 
-}
+} // namespace blink
 
-#endif
+#endif // HTMLTrackElement_h

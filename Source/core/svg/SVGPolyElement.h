@@ -26,7 +26,7 @@
 #include "core/svg/SVGAnimatedPointList.h"
 #include "core/svg/SVGGeometryElement.h"
 
-namespace WebCore {
+namespace blink {
 
 class SVGPolyElement : public SVGGeometryElement {
 public:
@@ -39,7 +39,6 @@ protected:
     SVGPolyElement(const QualifiedName&, Document&);
 
 private:
-    bool isSupportedAttribute(const QualifiedName&);
     virtual void parseAttribute(const QualifiedName&, const AtomicString&) OVERRIDE FINAL;
     virtual void svgAttributeChanged(const QualifiedName&) OVERRIDE FINAL;
 
@@ -48,13 +47,13 @@ private:
 
 };
 
-inline bool isSVGPolyElement(const Node& node)
+inline bool isSVGPolyElement(const SVGElement& element)
 {
-    return node.hasTagName(SVGNames::polygonTag) || node.hasTagName(SVGNames::polylineTag);
+    return element.hasTagName(SVGNames::polygonTag) || element.hasTagName(SVGNames::polylineTag);
 }
 
-DEFINE_ELEMENT_TYPE_CASTS_WITH_FUNCTION(SVGPolyElement);
+DEFINE_SVGELEMENT_TYPE_CASTS_WITH_FUNCTION(SVGPolyElement);
 
-} // namespace WebCore
+} // namespace blink
 
 #endif

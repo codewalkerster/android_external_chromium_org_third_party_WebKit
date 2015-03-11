@@ -33,6 +33,8 @@
 
 #include "core/dom/Document.h"
 #include "core/dom/Element.h"
+#include "core/editing/FrameSelection.h"
+#include "core/frame/EventHandlerRegistry.h"
 #include "core/frame/FrameView.h"
 #include "core/frame/LocalFrame.h"
 #include "core/frame/Settings.h"
@@ -42,12 +44,15 @@
 #include "core/html/HTMLTextAreaElement.h"
 #include "core/loader/FrameLoadRequest.h"
 #include "core/page/Chrome.h"
+#include "core/page/Page.h"
 #include "core/rendering/RenderLayer.h"
 #include "core/rendering/RenderView.h"
+#include "core/testing/URLTestHelpers.h"
 #include "platform/KeyboardCodes.h"
 #include "platform/geometry/IntSize.h"
 #include "platform/graphics/Color.h"
 #include "public/platform/Platform.h"
+#include "public/platform/WebClipboard.h"
 #include "public/platform/WebDragData.h"
 #include "public/platform/WebSize.h"
 #include "public/platform/WebThread.h"
@@ -62,6 +67,7 @@
 #include "public/web/WebFrameClient.h"
 #include "public/web/WebHitTestResult.h"
 #include "public/web/WebInputEvent.h"
+#include "public/web/WebScriptSource.h"
 #include "public/web/WebSettings.h"
 #include "public/web/WebViewClient.h"
 #include "public/web/WebWidget.h"
@@ -73,10 +79,10 @@
 #include "web/WebSettingsImpl.h"
 #include "web/WebViewImpl.h"
 #include "web/tests/FrameTestHelpers.h"
-#include "web/tests/URLTestHelpers.h"
 #include <gtest/gtest.h>
 
 using namespace blink;
+using blink::FrameTestHelpers::loadFrame;
 using blink::FrameTestHelpers::runPendingTasks;
 using blink::URLTestHelpers::toKURL;
 
@@ -122,6 +128,19 @@ public:
 
 private:
     TestData m_testData;
+};
+
+class SaveImageFromDataURLWebViewClient : public FrameTestHelpers::TestWebViewClient {
+public:
+    // WebViewClient methods
+    virtual void saveImageFromDataURL(const WebString& dataURL) { m_dataURL = dataURL; }
+
+    // Local methods
+    const WebString& result() const { return m_dataURL; }
+    void reset() { m_dataURL = WebString(); }
+
+private:
+    WebString m_dataURL;
 };
 
 class TapHandlingWebViewClient : public FrameTestHelpers::TestWebViewClient {
@@ -213,6 +232,42 @@ protected:
     FrameTestHelpers::WebViewHelper m_webViewHelper;
 };
 
+TEST_F(WebViewTest, SaveImageAt)
+{
+    SaveImageFromDataURLWebViewClient client;
+
+    std::string url = m_baseURL + "image-with-data-url.html";
+    URLTestHelpers::registerMockedURLLoad(toKURL(url), "image-with-data-url.html");
+    WebView* webView = m_webViewHelper.initializeAndLoad(url, true, 0, &client);
+    webView->resize(WebSize(400, 400));
+
+    client.reset();
+    webView->saveImageAt(WebPoint(1, 1));
+    EXPECT_EQ(WebString::fromUTF8("data:image/gif;base64"
+        ",R0lGODlhAQABAIAAAAUEBAAAACwAAAAAAQABAAACAkQBADs="), client.result());
+
+    client.reset();
+    webView->saveImageAt(WebPoint(1, 2));
+    EXPECT_EQ(WebString(), client.result());
+
+    m_webViewHelper.reset(); // Explicitly reset to break dependency on locally scoped client.
+};
+
+TEST_F(WebViewTest, CopyImageAt)
+{
+    std::string url = m_baseURL + "canvas-copy-image.html";
+    URLTestHelpers::registerMockedURLLoad(toKURL(url), "canvas-copy-image.html");
+    WebView* webView = m_webViewHelper.initializeAndLoad(url, true, 0);
+    webView->resize(WebSize(400, 400));
+    webView->copyImageAt(WebPoint(50, 50));
+
+    WebData data = Platform::current()->clipboard()->readImage(WebClipboard::Buffer());
+    WebImage image = WebImage::fromData(data, WebSize());
+
+    SkAutoLockPixels autoLock(image.getSkBitmap());
+    EXPECT_EQ(SkColorSetARGB(255, 255, 0, 0), image.getSkBitmap().getColor(0, 0));
+};
+
 TEST_F(WebViewTest, SetBaseBackgroundColor)
 {
     const WebColor kWhite    = 0xFFFFFFFF;
@@ -244,27 +299,30 @@ TEST_F(WebViewTest, SetBaseBackgroundColor)
     // Expected: transparent on top of kTransparent will still be transparent.
     EXPECT_EQ(kTransparent, webView->backgroundColor());
 
-    WebCore::LocalFrame* frame = webView->mainFrameImpl()->frame();
+    LocalFrame* frame = webView->mainFrameImpl()->frame();
 
     // Creating a new frame view with the background color having 0 alpha.
-    frame->createView(WebCore::IntSize(1024, 768), WebCore::Color::transparent, true);
+    frame->createView(IntSize(1024, 768), Color::transparent, true);
     EXPECT_EQ(kTransparent, frame->view()->baseBackgroundColor());
 
-    WebCore::Color kTransparentRed(100, 0, 0, 0);
-    frame->createView(WebCore::IntSize(1024, 768), kTransparentRed, true);
+    Color kTransparentRed(100, 0, 0, 0);
+    frame->createView(IntSize(1024, 768), kTransparentRed, true);
     EXPECT_EQ(kTransparentRed, frame->view()->baseBackgroundColor());
 }
 
 TEST_F(WebViewTest, SetBaseBackgroundColorBeforeMainFrame)
 {
     const WebColor kBlue = 0xFF0000FF;
-    WebView* webView = WebViewImpl::create(0);
+    FrameTestHelpers::TestWebViewClient webViewClient;
+    WebView* webView = WebViewImpl::create(&webViewClient);
     EXPECT_NE(kBlue, webView->backgroundColor());
     // webView does not have a frame yet, but we should still be able to set the background color.
     webView->setBaseBackgroundColor(kBlue);
     EXPECT_EQ(kBlue, webView->backgroundColor());
-    webView->setMainFrame(WebLocalFrameImpl::create(0));
+    WebLocalFrameImpl* frame = WebLocalFrameImpl::create(0);
+    webView->setMainFrame(frame);
     webView->close();
+    frame->close();
 }
 
 TEST_F(WebViewTest, SetBaseBackgroundColorAndBlendWithExistingContent)
@@ -284,23 +342,23 @@ TEST_F(WebViewTest, SetBaseBackgroundColorAndBlendWithExistingContent)
 
     // Set canvas background to red with alpha.
     SkBitmap bitmap;
-    ASSERT_TRUE(bitmap.allocN32Pixels(kWidth, kHeight));
+    bitmap.allocN32Pixels(kWidth, kHeight);
     SkCanvas canvas(bitmap);
     canvas.clear(kAlphaRed);
 
-    WebCore::GraphicsContext context(&canvas);
+    GraphicsContext context(&canvas);
 
     // Paint the root of the main frame in the way that CompositedLayerMapping would.
-    WebCore::FrameView* view = m_webViewHelper.webViewImpl()->mainFrameImpl()->frameView();
-    WebCore::RenderLayer* rootLayer = view->renderView()->layer();
-    WebCore::IntRect paintRect(0, 0, kWidth, kHeight);
-    WebCore::LayerPaintingInfo paintingInfo(rootLayer, paintRect, WebCore::PaintBehaviorNormal, WebCore::LayoutSize());
-    rootLayer->paintLayerContents(&context, paintingInfo, WebCore::PaintLayerPaintingCompositingAllPhases);
+    FrameView* view = m_webViewHelper.webViewImpl()->mainFrameImpl()->frameView();
+    RenderLayer* rootLayer = view->renderView()->layer();
+    IntRect paintRect(0, 0, kWidth, kHeight);
+    LayerPaintingInfo paintingInfo(rootLayer, paintRect, PaintBehaviorNormal, LayoutSize());
+    rootLayer->paintLayerContents(&context, paintingInfo, PaintLayerPaintingCompositingAllPhases);
 
     // The result should be a blend of red and green.
     SkColor color = bitmap.getColor(kWidth / 2, kHeight / 2);
-    EXPECT_TRUE(WebCore::redChannel(color));
-    EXPECT_TRUE(WebCore::greenChannel(color));
+    EXPECT_TRUE(redChannel(color));
+    EXPECT_TRUE(greenChannel(color));
 }
 
 TEST_F(WebViewTest, FocusIsInactive)
@@ -313,7 +371,7 @@ TEST_F(WebViewTest, FocusIsInactive)
     WebLocalFrameImpl* frame = toWebLocalFrameImpl(webView->mainFrame());
     EXPECT_TRUE(frame->frame()->document()->isHTMLDocument());
 
-    WebCore::HTMLDocument* document = WebCore::toHTMLDocument(frame->frame()->document());
+    HTMLDocument* document = toHTMLDocument(frame->frame()->document());
     EXPECT_TRUE(document->hasFocus());
     webView->setFocus(false);
     webView->setIsActive(false);
@@ -357,14 +415,14 @@ TEST_F(WebViewTest, HitTestResultAtWithPageScale)
     // Image is at top left quandrant, so should not hit it.
     WebHitTestResult negativeResult = webView->hitTestResultAt(hitPoint);
     ASSERT_EQ(WebNode::ElementNode, negativeResult.node().nodeType());
-    EXPECT_FALSE(negativeResult.node().to<WebElement>().hasTagName("img"));
+    EXPECT_FALSE(negativeResult.node().to<WebElement>().hasHTMLTagName("img"));
     negativeResult.reset();
 
     // Scale page up 2x so image should occupy the whole viewport.
     webView->setPageScaleFactor(2.0f);
     WebHitTestResult positiveResult = webView->hitTestResultAt(hitPoint);
     ASSERT_EQ(WebNode::ElementNode, positiveResult.node().nodeType());
-    EXPECT_TRUE(positiveResult.node().to<WebElement>().hasTagName("img"));
+    EXPECT_TRUE(positiveResult.node().to<WebElement>().hasHTMLTagName("img"));
     positiveResult.reset();
 }
 
@@ -380,7 +438,7 @@ void WebViewTest::testAutoResize(const WebSize& minAutoResize, const WebSize& ma
     client.testData().setWebView(webView);
 
     WebLocalFrameImpl* frame = toWebLocalFrameImpl(webView->mainFrame());
-    WebCore::FrameView* frameView = frame->frame()->view();
+    FrameView* frameView = frame->frame()->view();
     frameView->layout();
     EXPECT_FALSE(frameView->layoutPending());
     EXPECT_FALSE(frameView->needsLayout());
@@ -400,7 +458,7 @@ void WebViewTest::testAutoResize(const WebSize& minAutoResize, const WebSize& ma
     m_webViewHelper.reset(); // Explicitly reset to break dependency on locally scoped client.
 }
 
-TEST_F(WebViewTest, DISABLED_AutoResizeMinimumSize)
+TEST_F(WebViewTest, AutoResizeMinimumSize)
 {
     WebSize minAutoResize(91, 56);
     WebSize maxAutoResize(403, 302);
@@ -438,7 +496,7 @@ TEST_F(WebViewTest, AutoResizeFixedHeightAndWidthOverflow)
 
 // Next three tests disabled for https://bugs.webkit.org/show_bug.cgi?id=92318 .
 // It seems we can run three AutoResize tests, then the next one breaks.
-TEST_F(WebViewTest, DISABLED_AutoResizeInBetweenSizes)
+TEST_F(WebViewTest, AutoResizeInBetweenSizes)
 {
     WebSize minAutoResize(90, 95);
     WebSize maxAutoResize(200, 300);
@@ -450,7 +508,7 @@ TEST_F(WebViewTest, DISABLED_AutoResizeInBetweenSizes)
                    expectedWidth, expectedHeight, NoHorizontalScrollbar, NoVerticalScrollbar);
 }
 
-TEST_F(WebViewTest, DISABLED_AutoResizeOverflowSizes)
+TEST_F(WebViewTest, AutoResizeOverflowSizes)
 {
     WebSize minAutoResize(90, 95);
     WebSize maxAutoResize(200, 300);
@@ -462,7 +520,7 @@ TEST_F(WebViewTest, DISABLED_AutoResizeOverflowSizes)
                    expectedWidth, expectedHeight, VisibleHorizontalScrollbar, VisibleVerticalScrollbar);
 }
 
-TEST_F(WebViewTest, DISABLED_AutoResizeMaxSize)
+TEST_F(WebViewTest, AutoResizeMaxSize)
 {
     WebSize minAutoResize(90, 95);
     WebSize maxAutoResize(200, 300);
@@ -653,7 +711,7 @@ TEST_F(WebViewTest, SetCompositionFromExistingText)
     WebView* webView = m_webViewHelper.initializeAndLoad(m_baseURL + "input_field_populated.html");
     webView->setInitialFocus(false);
     WebVector<WebCompositionUnderline> underlines(static_cast<size_t>(1));
-    underlines[0] = blink::WebCompositionUnderline(0, 4, 0, false, 0);
+    underlines[0] = WebCompositionUnderline(0, 4, 0, false, 0);
     WebLocalFrameImpl* frame = toWebLocalFrameImpl(webView->mainFrame());
     frame->setEditableSelectionOffsets(4, 10);
     frame->setCompositionFromExistingText(8, 12, underlines);
@@ -680,7 +738,7 @@ TEST_F(WebViewTest, SetCompositionFromExistingTextInTextArea)
     WebView* webView = m_webViewHelper.initializeAndLoad(m_baseURL + "text_area_populated.html");
     webView->setInitialFocus(false);
     WebVector<WebCompositionUnderline> underlines(static_cast<size_t>(1));
-    underlines[0] = blink::WebCompositionUnderline(0, 4, 0, false, 0);
+    underlines[0] = WebCompositionUnderline(0, 4, 0, false, 0);
     WebLocalFrameImpl* frame = toWebLocalFrameImpl(webView->mainFrame());
     frame->setEditableSelectionOffsets(27, 27);
     std::string newLineText("\n");
@@ -804,7 +862,7 @@ TEST_F(WebViewTest, HistoryResetScrollAndScaleState)
     EXPECT_EQ(2.0f, webViewImpl->pageScaleFactor());
     EXPECT_EQ(116, webViewImpl->mainFrame()->scrollOffset().width);
     EXPECT_EQ(84, webViewImpl->mainFrame()->scrollOffset().height);
-    WebCore::LocalFrame* mainFrameLocal = toLocalFrame(webViewImpl->page()->mainFrame());
+    LocalFrame* mainFrameLocal = toLocalFrame(webViewImpl->page()->mainFrame());
     mainFrameLocal->loader().saveScrollState();
     EXPECT_EQ(2.0f, mainFrameLocal->loader().currentItem()->pageScaleFactor());
     EXPECT_EQ(116, mainFrameLocal->loader().currentItem()->scrollPoint().x());
@@ -831,25 +889,25 @@ TEST_F(WebViewTest, BackForwardRestoreScroll)
 
     // Emulate a user scroll
     webViewImpl->setMainFrameScrollOffset(WebPoint(0, 900));
-    WebCore::LocalFrame* mainFrameLocal = toLocalFrame(webViewImpl->page()->mainFrame());
-    RefPtr<WebCore::HistoryItem> item1 = mainFrameLocal->loader().currentItem();
+    LocalFrame* mainFrameLocal = toLocalFrame(webViewImpl->page()->mainFrame());
+    RefPtr<HistoryItem> item1 = mainFrameLocal->loader().currentItem();
 
     // Click an anchor
-    mainFrameLocal->loader().load(WebCore::FrameLoadRequest(mainFrameLocal->document(), WebCore::ResourceRequest(mainFrameLocal->document()->completeURL("#a"))));
-    RefPtr<WebCore::HistoryItem> item2 = mainFrameLocal->loader().currentItem();
+    mainFrameLocal->loader().load(FrameLoadRequest(mainFrameLocal->document(), ResourceRequest(mainFrameLocal->document()->completeURL("#a"))));
+    RefPtr<HistoryItem> item2 = mainFrameLocal->loader().currentItem();
 
     // Go back, then forward, then back again.
-    mainFrameLocal->loader().loadHistoryItem(item1.get(), WebCore::HistorySameDocumentLoad);
-    mainFrameLocal->loader().loadHistoryItem(item2.get(), WebCore::HistorySameDocumentLoad);
-    mainFrameLocal->loader().loadHistoryItem(item1.get(), WebCore::HistorySameDocumentLoad);
+    mainFrameLocal->loader().loadHistoryItem(item1.get(), HistorySameDocumentLoad);
+    mainFrameLocal->loader().loadHistoryItem(item2.get(), HistorySameDocumentLoad);
+    mainFrameLocal->loader().loadHistoryItem(item1.get(), HistorySameDocumentLoad);
 
     // Click a different anchor
-    mainFrameLocal->loader().load(WebCore::FrameLoadRequest(mainFrameLocal->document(), WebCore::ResourceRequest(mainFrameLocal->document()->completeURL("#b"))));
-    RefPtr<WebCore::HistoryItem> item3 = mainFrameLocal->loader().currentItem();
+    mainFrameLocal->loader().load(FrameLoadRequest(mainFrameLocal->document(), ResourceRequest(mainFrameLocal->document()->completeURL("#b"))));
+    RefPtr<HistoryItem> item3 = mainFrameLocal->loader().currentItem();
 
     // Go back, then forward. The scroll position should be properly set on the forward navigation.
-    mainFrameLocal->loader().loadHistoryItem(item1.get(), WebCore::HistorySameDocumentLoad);
-    mainFrameLocal->loader().loadHistoryItem(item3.get(), WebCore::HistorySameDocumentLoad);
+    mainFrameLocal->loader().loadHistoryItem(item1.get(), HistorySameDocumentLoad);
+    mainFrameLocal->loader().loadHistoryItem(item3.get(), HistorySameDocumentLoad);
     EXPECT_EQ(0, webViewImpl->mainFrame()->scrollOffset().width);
     EXPECT_GT(webViewImpl->mainFrame()->scrollOffset().height, 2000);
 }
@@ -879,9 +937,8 @@ TEST_F(WebViewTest, EnterFullscreenResetScrollAndScaleState)
     EXPECT_EQ(116, webViewImpl->mainFrame()->scrollOffset().width);
     EXPECT_EQ(84, webViewImpl->mainFrame()->scrollOffset().height);
 
-    RefPtrWillBeRawPtr<WebCore::Element> element = static_cast<PassRefPtrWillBeRawPtr<WebCore::Element> >(webViewImpl->mainFrame()->document().body());
+    RefPtrWillBeRawPtr<Element> element = static_cast<PassRefPtrWillBeRawPtr<Element> >(webViewImpl->mainFrame()->document().body());
     webViewImpl->enterFullScreenForElement(element.get());
-    webViewImpl->willEnterFullScreen();
     webViewImpl->didEnterFullScreen();
 
     // Page scale factor must be 1.0 during fullscreen for elements to be sized
@@ -889,11 +946,10 @@ TEST_F(WebViewTest, EnterFullscreenResetScrollAndScaleState)
     EXPECT_EQ(1.0f, webViewImpl->pageScaleFactor());
 
     // Make sure fullscreen nesting doesn't disrupt scroll/scale saving.
-    RefPtrWillBeRawPtr<WebCore::Element> otherElement = static_cast<PassRefPtrWillBeRawPtr<WebCore::Element> >(webViewImpl->mainFrame()->document().head());
+    RefPtrWillBeRawPtr<Element> otherElement = static_cast<PassRefPtrWillBeRawPtr<Element> >(webViewImpl->mainFrame()->document().head());
     webViewImpl->enterFullScreenForElement(otherElement.get());
 
     // Confirm that exiting fullscreen restores the parameters.
-    webViewImpl->willExitFullScreen();
     webViewImpl->didExitFullScreen();
     EXPECT_EQ(2.0f, webViewImpl->pageScaleFactor());
     EXPECT_EQ(116, webViewImpl->mainFrame()->scrollOffset().width);
@@ -928,7 +984,7 @@ TEST_F(WebViewTest, PrintWithXHRInFlight)
     URLTestHelpers::registerMockedURLFromBaseURL(WebString::fromUTF8(m_baseURL.c_str()), WebString::fromUTF8("print_with_xhr_inflight.html"));
     WebViewImpl* webViewImpl = m_webViewHelper.initializeAndLoad(m_baseURL + "print_with_xhr_inflight.html", true, 0, &client);
 
-    ASSERT_EQ(WebCore::FrameStateComplete, toLocalFrame(webViewImpl->page()->mainFrame())->loader().state());
+    ASSERT_EQ(FrameStateComplete, toLocalFrame(webViewImpl->page()->mainFrame())->loader().state());
     EXPECT_TRUE(client.printCalled());
     m_webViewHelper.reset();
 }
@@ -951,7 +1007,7 @@ private:
 };
 static void DragAndDropURL(WebViewImpl* webView, const std::string& url)
 {
-    blink::WebDragData dragData;
+    WebDragData dragData;
     dragData.initialize();
 
     WebDragData::Item item;
@@ -962,7 +1018,7 @@ static void DragAndDropURL(WebViewImpl* webView, const std::string& url)
 
     const WebPoint clientPoint(0, 0);
     const WebPoint screenPoint(0, 0);
-    webView->dragTargetDragEnter(dragData, clientPoint, screenPoint, blink::WebDragOperationCopy, 0);
+    webView->dragTargetDragEnter(dragData, clientPoint, screenPoint, WebDragOperationCopy, 0);
     Platform::current()->currentThread()->postTask(new DropTask(webView));
     FrameTestHelpers::pumpPendingRequestsDoNotUse(webView->mainFrame());
 }
@@ -1038,12 +1094,12 @@ private:
 static bool tapElementById(WebView* webView, WebInputEvent::Type type, const WebString& id)
 {
     ASSERT(webView);
-    RefPtrWillBeRawPtr<WebCore::Element> element = static_cast<PassRefPtrWillBeRawPtr<WebCore::Element> >(webView->mainFrame()->document().getElementById(id));
+    RefPtrWillBeRawPtr<Element> element = static_cast<PassRefPtrWillBeRawPtr<Element> >(webView->mainFrame()->document().getElementById(id));
     if (!element)
         return false;
 
     element->scrollIntoViewIfNeeded();
-    WebCore::IntPoint center = element->screenRect().center();
+    IntPoint center = element->screenRect().center();
 
     WebGestureEvent event;
     event.type = type;
@@ -1150,27 +1206,30 @@ TEST_F(WebViewTest, LongPressSelection)
     EXPECT_TRUE(tapElementById(webView, WebInputEvent::GestureLongPress, target));
     EXPECT_EQ("testword", std::string(frame->selectionAsText().utf8().data()));
 }
-#endif
 
-TEST_F(WebViewTest, SelectionOnDisabledInput)
+TEST_F(WebViewTest, BlinkCaretOnTypingAfterLongPress)
 {
-    URLTestHelpers::registerMockedURLFromBaseURL(WebString::fromUTF8(m_baseURL.c_str()), WebString::fromUTF8("selection_disabled.html"));
-    WebView* webView = m_webViewHelper.initializeAndLoad(m_baseURL + "selection_disabled.html", true);
+    URLTestHelpers::registerMockedURLFromBaseURL(WebString::fromUTF8(m_baseURL.c_str()), WebString::fromUTF8("blink_caret_on_typing_after_long_press.html"));
+
+    WebView* webView = m_webViewHelper.initializeAndLoad(m_baseURL + "blink_caret_on_typing_after_long_press.html", true);
     webView->resize(WebSize(640, 480));
     webView->layout();
     runPendingTasks();
 
-    std::string testWord = "This text should be selected.";
+    WebString target = WebString::fromUTF8("target");
+    WebLocalFrameImpl* mainFrame = toWebLocalFrameImpl(webView->mainFrame());
 
-    WebLocalFrameImpl* frame = toWebLocalFrameImpl(webView->mainFrame());
-    EXPECT_EQ(testWord, std::string(frame->selectionAsText().utf8().data()));
+    EXPECT_TRUE(tapElementById(webView, WebInputEvent::GestureLongPress, target));
+    EXPECT_TRUE(mainFrame->frame()->selection().isCaretBlinkingSuspended());
 
-    size_t location;
-    size_t length;
-    EXPECT_TRUE(toWebViewImpl(webView)->caretOrSelectionRange(&location, &length));
-    EXPECT_EQ(location, 0UL);
-    EXPECT_EQ(length, testWord.length());
+    WebKeyboardEvent keyEvent;
+    keyEvent.type = WebInputEvent::RawKeyDown;
+    webView->handleInputEvent(keyEvent);
+    keyEvent.type = WebInputEvent::KeyUp;
+    webView->handleInputEvent(keyEvent);
+    EXPECT_FALSE(mainFrame->frame()->selection().isCaretBlinkingSuspended());
 }
+#endif
 
 TEST_F(WebViewTest, SelectionOnReadOnlyInput)
 {
@@ -1195,9 +1254,7 @@ TEST_F(WebViewTest, SelectionOnReadOnlyInput)
 static void configueCompositingWebView(WebSettings* settings)
 {
     settings->setAcceleratedCompositingEnabled(true);
-    settings->setAcceleratedCompositingForFixedPositionEnabled(true);
-    settings->setAcceleratedCompositingForOverflowScrollEnabled(true);
-    settings->setCompositedScrollingForFramesEnabled(true);
+    settings->setPreferCompositingToLCDTextEnabled(true);
 }
 
 TEST_F(WebViewTest, ShowPressOnTransformedLink)
@@ -1404,7 +1461,7 @@ TEST_F(WebViewTest, FocusExistingFrameOnNavigate)
     // Make a request that will open a new window
     WebURLRequest webURLRequest;
     webURLRequest.initialize();
-    WebCore::FrameLoadRequest request(0, webURLRequest.toResourceRequest(), "_blank");
+    FrameLoadRequest request(0, webURLRequest.toResourceRequest(), "_blank");
     toLocalFrame(webViewImpl->page()->mainFrame())->loader().load(request);
     ASSERT_TRUE(client.createdWebView());
     EXPECT_FALSE(client.didFocusCalled());
@@ -1412,7 +1469,7 @@ TEST_F(WebViewTest, FocusExistingFrameOnNavigate)
     // Make a request from the new window that will navigate the original window. The original window should be focused.
     WebURLRequest webURLRequestWithTargetStart;
     webURLRequestWithTargetStart.initialize();
-    WebCore::FrameLoadRequest requestWithTargetStart(0, webURLRequestWithTargetStart.toResourceRequest(), "_start");
+    FrameLoadRequest requestWithTargetStart(0, webURLRequestWithTargetStart.toResourceRequest(), "_start");
     toLocalFrame(toWebViewImpl(client.createdWebView())->page()->mainFrame())->loader().load(requestWithTargetStart);
     EXPECT_TRUE(client.didFocusCalled());
 
@@ -1446,12 +1503,12 @@ TEST_F(WebViewTest, DispatchesDomFocusOutDomFocusInOnViewToggleFocus)
 }
 
 #if !ENABLE(INPUT_MULTIPLE_FIELDS_UI)
-static void openDateTimeChooser(WebView* webView, WebCore::HTMLInputElement* inputElement)
+static void openDateTimeChooser(WebView* webView, HTMLInputElement* inputElement)
 {
     inputElement->focus();
 
     WebKeyboardEvent keyEvent;
-    keyEvent.windowsKeyCode = WebCore::VKEY_SPACE;
+    keyEvent.windowsKeyCode = VKEY_SPACE;
     keyEvent.type = WebInputEvent::RawKeyDown;
     keyEvent.setKeyIdentifierFromWindowsKeyCode();
     webView->handleInputEvent(keyEvent);
@@ -1467,9 +1524,9 @@ TEST_F(WebViewTest, ChooseValueFromDateTimeChooser)
     URLTestHelpers::registerMockedURLLoad(toKURL(url), "date_time_chooser.html");
     WebViewImpl* webViewImpl = m_webViewHelper.initializeAndLoad(url, true, 0, &client);
 
-    WebCore::Document* document = webViewImpl->mainFrameImpl()->frame()->document();
+    Document* document = webViewImpl->mainFrameImpl()->frame()->document();
 
-    WebCore::HTMLInputElement* inputElement;
+    HTMLInputElement* inputElement;
 
     inputElement = toHTMLInputElement(document->getElementById("date"));
     openDateTimeChooser(webViewImpl, inputElement);
@@ -1574,7 +1631,7 @@ TEST_F(WebViewTest, SmartClipData)
     webView->setPageScaleFactorLimits(1, 1);
     webView->resize(WebSize(500, 500));
     webView->layout();
-    WebRect cropRect(300, 125, 100, 50);
+    WebRect cropRect(300, 125, 152, 50);
     webView->extractSmartClipData(cropRect, clipText, clipHtml, clipRect);
     EXPECT_STREQ(kExpectedClipText, clipText.utf8().c_str());
     EXPECT_STREQ(kExpectedClipHtml, clipHtml.utf8().c_str());
@@ -1678,15 +1735,17 @@ private:
     int m_hasTouchEventHandlerCount[2];
 };
 
-// This test verifies that WebWidgetClient::hasTouchEventHandlers is called accordingly for various
-// calls to Document::did{Add|Remove|Clear}TouchEventHandler. Verifying that those calls are made
-// correctly is the job of LayoutTests/fast/events/touch/touch-handler-count.html.
+// This test verifies that WebWidgetClient::hasTouchEventHandlers is called
+// accordingly for various calls to EventHandlerRegistry::did{Add|Remove|
+// RemoveAll}EventHandler(..., TouchEvent). Verifying that those calls are made
+// correctly is the job of LayoutTests/fast/events/event-handler-count.html.
 TEST_F(WebViewTest, HasTouchEventHandlers)
 {
     TouchEventHandlerWebViewClient client;
     std::string url = m_baseURL + "has_touch_event_handlers.html";
     URLTestHelpers::registerMockedURLLoad(toKURL(url), "has_touch_event_handlers.html");
     WebViewImpl* webViewImpl = m_webViewHelper.initializeAndLoad(url, true, 0, &client);
+    const EventHandlerRegistry::EventHandlerClass touchEvent = EventHandlerRegistry::TouchEvent;
 
     // The page is initialized with at least one no-handlers call.
     // In practice we get two such calls because WebViewHelper::initializeAndLoad first
@@ -1696,101 +1755,102 @@ TEST_F(WebViewTest, HasTouchEventHandlers)
     EXPECT_EQ(0, client.getAndResetHasTouchEventHandlerCallCount(true));
 
     // Adding the first document handler results in a has-handlers call.
-    WebCore::Document* document = webViewImpl->mainFrameImpl()->frame()->document();
-    document->didAddTouchEventHandler(document);
+    Document* document = webViewImpl->mainFrameImpl()->frame()->document();
+    EventHandlerRegistry* registry = &document->frameHost()->eventHandlerRegistry();
+    registry->didAddEventHandler(*document, touchEvent);
     EXPECT_EQ(0, client.getAndResetHasTouchEventHandlerCallCount(false));
     EXPECT_EQ(1, client.getAndResetHasTouchEventHandlerCallCount(true));
 
     // Adding another handler has no effect.
-    document->didAddTouchEventHandler(document);
+    registry->didAddEventHandler(*document, touchEvent);
     EXPECT_EQ(0, client.getAndResetHasTouchEventHandlerCallCount(false));
     EXPECT_EQ(0, client.getAndResetHasTouchEventHandlerCallCount(true));
 
     // Removing the duplicate handler has no effect.
-    document->didRemoveTouchEventHandler(document);
+    registry->didRemoveEventHandler(*document, touchEvent);
     EXPECT_EQ(0, client.getAndResetHasTouchEventHandlerCallCount(false));
     EXPECT_EQ(0, client.getAndResetHasTouchEventHandlerCallCount(true));
 
     // Removing the final handler results in a no-handlers call.
-    document->didRemoveTouchEventHandler(document);
+    registry->didRemoveEventHandler(*document, touchEvent);
     EXPECT_EQ(1, client.getAndResetHasTouchEventHandlerCallCount(false));
     EXPECT_EQ(0, client.getAndResetHasTouchEventHandlerCallCount(true));
 
     // Adding a handler on a div results in a has-handlers call.
-    WebCore::Element* parentDiv = document->getElementById("parentdiv");
+    Element* parentDiv = document->getElementById("parentdiv");
     ASSERT(parentDiv);
-    document->didAddTouchEventHandler(parentDiv);
+    registry->didAddEventHandler(*parentDiv, touchEvent);
     EXPECT_EQ(0, client.getAndResetHasTouchEventHandlerCallCount(false));
     EXPECT_EQ(1, client.getAndResetHasTouchEventHandlerCallCount(true));
 
     // Adding a duplicate handler on the div, clearing all document handlers
     // (of which there are none) and removing the extra handler on the div
     // all have no effect.
-    document->didAddTouchEventHandler(parentDiv);
-    document->didClearTouchEventHandlers(document);
-    document->didRemoveTouchEventHandler(parentDiv);
+    registry->didAddEventHandler(*parentDiv, touchEvent);
+    registry->didRemoveAllEventHandlers(*document);
+    registry->didRemoveEventHandler(*parentDiv, touchEvent);
     EXPECT_EQ(0, client.getAndResetHasTouchEventHandlerCallCount(false));
     EXPECT_EQ(0, client.getAndResetHasTouchEventHandlerCallCount(true));
 
     // Removing the final handler on the div results in a no-handlers call.
-    document->didRemoveTouchEventHandler(parentDiv);
+    registry->didRemoveEventHandler(*parentDiv, touchEvent);
     EXPECT_EQ(1, client.getAndResetHasTouchEventHandlerCallCount(false));
     EXPECT_EQ(0, client.getAndResetHasTouchEventHandlerCallCount(true));
 
     // Adding two handlers then clearing them in a single call results in a
     // has-handlers then no-handlers call.
-    document->didAddTouchEventHandler(parentDiv);
+    registry->didAddEventHandler(*parentDiv, touchEvent);
     EXPECT_EQ(0, client.getAndResetHasTouchEventHandlerCallCount(false));
     EXPECT_EQ(1, client.getAndResetHasTouchEventHandlerCallCount(true));
-    document->didAddTouchEventHandler(parentDiv);
+    registry->didAddEventHandler(*parentDiv, touchEvent);
     EXPECT_EQ(0, client.getAndResetHasTouchEventHandlerCallCount(false));
     EXPECT_EQ(0, client.getAndResetHasTouchEventHandlerCallCount(true));
-    document->didClearTouchEventHandlers(parentDiv);
+    registry->didRemoveAllEventHandlers(*parentDiv);
     EXPECT_EQ(1, client.getAndResetHasTouchEventHandlerCallCount(false));
     EXPECT_EQ(0, client.getAndResetHasTouchEventHandlerCallCount(true));
 
     // Adding a handler inside of a child iframe results in a has-handlers call.
-    WebCore::Element* childFrame = document->getElementById("childframe");
+    Element* childFrame = document->getElementById("childframe");
     ASSERT(childFrame);
-    WebCore::Document* childDocument = toHTMLIFrameElement(childFrame)->contentDocument();
-    WebCore::Element* childDiv = childDocument->getElementById("childdiv");
+    Document* childDocument = toHTMLIFrameElement(childFrame)->contentDocument();
+    Element* childDiv = childDocument->getElementById("childdiv");
     ASSERT(childDiv);
-    childDocument->didAddTouchEventHandler(childDiv);
+    registry->didAddEventHandler(*childDiv, touchEvent);
     EXPECT_EQ(0, client.getAndResetHasTouchEventHandlerCallCount(false));
     EXPECT_EQ(1, client.getAndResetHasTouchEventHandlerCallCount(true));
 
     // Adding and clearing handlers in the parent doc or elsewhere in the child doc
     // has no impact.
-    document->didAddTouchEventHandler(document);
-    document->didAddTouchEventHandler(childFrame);
-    childDocument->didAddTouchEventHandler(childDocument);
-    document->didClearTouchEventHandlers(document);
-    document->didClearTouchEventHandlers(childFrame);
-    childDocument->didClearTouchEventHandlers(childDocument);
+    registry->didAddEventHandler(*document, touchEvent);
+    registry->didAddEventHandler(*childFrame, touchEvent);
+    registry->didAddEventHandler(*childDocument, touchEvent);
+    registry->didRemoveAllEventHandlers(*document);
+    registry->didRemoveAllEventHandlers(*childFrame);
+    registry->didRemoveAllEventHandlers(*childDocument);
     EXPECT_EQ(0, client.getAndResetHasTouchEventHandlerCallCount(false));
     EXPECT_EQ(0, client.getAndResetHasTouchEventHandlerCallCount(true));
 
     // Removing the final handler inside the child frame results in a no-handlers call.
-    childDocument->didRemoveTouchEventHandler(childDiv);
+    registry->didRemoveAllEventHandlers(*childDiv);
     EXPECT_EQ(1, client.getAndResetHasTouchEventHandlerCallCount(false));
     EXPECT_EQ(0, client.getAndResetHasTouchEventHandlerCallCount(true));
 
     // Adding a handler inside the child frame results in a has-handlers call.
-    childDocument->didAddTouchEventHandler(childDocument);
+    registry->didAddEventHandler(*childDocument, touchEvent);
     EXPECT_EQ(0, client.getAndResetHasTouchEventHandlerCallCount(false));
     EXPECT_EQ(1, client.getAndResetHasTouchEventHandlerCallCount(true));
 
     // Adding a handler in the parent document and removing the one in the frame
     // has no effect.
-    document->didAddTouchEventHandler(childFrame);
-    childDocument->didRemoveTouchEventHandler(childDocument);
-    childDocument->didClearTouchEventHandlers(childDocument);
-    document->didClearTouchEventHandlers(document);
+    registry->didAddEventHandler(*childFrame, touchEvent);
+    registry->didRemoveEventHandler(*childDocument, touchEvent);
+    registry->didRemoveAllEventHandlers(*childDocument);
+    registry->didRemoveAllEventHandlers(*document);
     EXPECT_EQ(0, client.getAndResetHasTouchEventHandlerCallCount(false));
     EXPECT_EQ(0, client.getAndResetHasTouchEventHandlerCallCount(true));
 
     // Now removing the handler in the parent document results in a no-handlers call.
-    document->didRemoveTouchEventHandler(childFrame);
+    registry->didRemoveEventHandler(*childFrame, touchEvent);
     EXPECT_EQ(1, client.getAndResetHasTouchEventHandlerCallCount(false));
     EXPECT_EQ(0, client.getAndResetHasTouchEventHandlerCallCount(true));
 
@@ -1798,17 +1858,46 @@ TEST_F(WebViewTest, HasTouchEventHandlers)
     m_webViewHelper.reset();
 }
 
-static WebRect ExpectedRootBounds(WebCore::Document* document, float scaleFactor)
+// This test checks that deleting nodes which have only non-JS-registered touch
+// handlers also removes them from the event handler registry. Note that this
+// is different from detaching and re-attaching the same node, which is covered
+// by layout tests under fast/events/.
+TEST_F(WebViewTest, DeleteElementWithRegisteredHandler)
 {
-    WebCore::Element* element = document->getElementById("root");
+    std::string url = m_baseURL + "simple_div.html";
+    URLTestHelpers::registerMockedURLLoad(toKURL(url), "simple_div.html");
+    WebViewImpl* webViewImpl = m_webViewHelper.initializeAndLoad(url, true);
+
+    RefPtrWillBePersistent<Document> document = webViewImpl->mainFrameImpl()->frame()->document();
+    Element* div = document->getElementById("div");
+    EventHandlerRegistry& registry = document->frameHost()->eventHandlerRegistry();
+
+    registry.didAddEventHandler(*div, EventHandlerRegistry::ScrollEvent);
+    EXPECT_TRUE(registry.hasEventHandlers(EventHandlerRegistry::ScrollEvent));
+
+    TrackExceptionState exceptionState;
+    div->remove(exceptionState);
+#if ENABLE(OILPAN)
+    // For oilpan we have to force a GC to ensure the event handlers have been removed when
+    // checking below. We do a precise GC (collectAllGarbage does not scan the stack)
+    // to ensure the div element dies. This is also why the Document is in a Persistent
+    // since we want that to stay around.
+    Heap::collectAllGarbage();
+#endif
+    EXPECT_FALSE(registry.hasEventHandlers(EventHandlerRegistry::ScrollEvent));
+}
+
+static WebRect ExpectedRootBounds(Document* document, float scaleFactor)
+{
+    Element* element = document->getElementById("root");
     if (!element)
         element = document->getElementById("target");
-    if (element->hasTagName(WebCore::HTMLNames::iframeTag))
+    if (element->hasTagName(HTMLNames::iframeTag))
         return ExpectedRootBounds(toHTMLIFrameElement(element)->contentDocument(), scaleFactor);
 
-    WebCore::IntRect boundingBox;
-    if (element->hasTagName(WebCore::HTMLNames::htmlTag))
-        boundingBox = WebCore::IntRect(WebCore::IntPoint(0, 0), document->frame()->view()->contentsSize());
+    IntRect boundingBox;
+    if (element->hasTagName(HTMLNames::htmlTag))
+        boundingBox = IntRect(IntPoint(0, 0), document->frame()->view()->contentsSize());
     else
         boundingBox = element->pixelSnappedBoundingBox();
     boundingBox = document->frame()->view()->contentsToWindow(boundingBox);
@@ -1828,7 +1917,7 @@ void WebViewTest::testSelectionRootBounds(const char* htmlFile, float pageScaleF
 
     WebLocalFrameImpl* frame = toWebLocalFrameImpl(webView->mainFrame());
     EXPECT_TRUE(frame->frame()->document()->isHTMLDocument());
-    WebCore::HTMLDocument* document = WebCore::toHTMLDocument(frame->frame()->document());
+    HTMLDocument* document = toHTMLDocument(frame->frame()->document());
 
     WebRect expectedRootBounds = ExpectedRootBounds(document, webView->pageScaleFactor());
     WebRect actualRootBounds;
@@ -1837,7 +1926,7 @@ void WebViewTest::testSelectionRootBounds(const char* htmlFile, float pageScaleF
 
     WebRect anchor, focus;
     webView->selectionBounds(anchor, focus);
-    WebCore::IntRect expectedIntRect = expectedRootBounds;
+    IntRect expectedIntRect = expectedRootBounds;
     ASSERT_TRUE(expectedIntRect.contains(anchor));
     // The "overflow" tests have the focus boundary outside of the element box.
     ASSERT_EQ(url.find("overflow") == std::string::npos, expectedIntRect.contains(focus));
@@ -1946,17 +2035,17 @@ TEST_F(WebViewTest, NonUserInputTextUpdate)
     webViewImpl->setInitialFocus(false);
 
     WebLocalFrameImpl* frame = toWebLocalFrameImpl(webViewImpl->mainFrame());
-    WebCore::HTMLDocument* document = WebCore::toHTMLDocument(frame->frame()->document());
+    HTMLDocument* document = toHTMLDocument(frame->frame()->document());
 
     // (A) <input>
     // (A.1) Focused and value is changed by script.
     client.reset();
     EXPECT_FALSE(client.textIsUpdated());
 
-    WebCore::HTMLInputElement* inputElement = toHTMLInputElement(document->getElementById("input"));
+    HTMLInputElement* inputElement = toHTMLInputElement(document->getElementById("input"));
     document->setFocusedElement(inputElement);
     webViewImpl->setFocus(true);
-    EXPECT_EQ(document->focusedElement(), static_cast<WebCore::Element*>(inputElement));
+    EXPECT_EQ(document->focusedElement(), static_cast<Element*>(inputElement));
 
     // Emulate value change from script.
     inputElement->setValue("testA");
@@ -1980,7 +2069,7 @@ TEST_F(WebViewTest, NonUserInputTextUpdate)
     EXPECT_FALSE(client.textIsUpdated());
     document->setFocusedElement(nullptr);
     webViewImpl->setFocus(false);
-    EXPECT_NE(document->focusedElement(), static_cast<WebCore::Element*>(inputElement));
+    EXPECT_NE(document->focusedElement(), static_cast<Element*>(inputElement));
     inputElement->setValue("testA3");
     EXPECT_FALSE(client.textIsUpdated());
 
@@ -1988,10 +2077,10 @@ TEST_F(WebViewTest, NonUserInputTextUpdate)
     // (B.1) Focused and value is changed by script.
     client.reset();
     EXPECT_FALSE(client.textIsUpdated());
-    WebCore::HTMLTextAreaElement* textAreaElement = toHTMLTextAreaElement(document->getElementById("textarea"));
+    HTMLTextAreaElement* textAreaElement = toHTMLTextAreaElement(document->getElementById("textarea"));
     document->setFocusedElement(textAreaElement);
     webViewImpl->setFocus(true);
-    EXPECT_EQ(document->focusedElement(), static_cast<WebCore::Element*>(textAreaElement));
+    EXPECT_EQ(document->focusedElement(), static_cast<Element*>(textAreaElement));
     textAreaElement->setValue("testB");
     EXPECT_TRUE(client.textIsUpdated());
     info = webViewImpl->textInputInfo();
@@ -2010,7 +2099,7 @@ TEST_F(WebViewTest, NonUserInputTextUpdate)
     EXPECT_FALSE(client.textIsUpdated());
     document->setFocusedElement(nullptr);
     webViewImpl->setFocus(false);
-    EXPECT_NE(document->focusedElement(), static_cast<WebCore::Element*>(textAreaElement));
+    EXPECT_NE(document->focusedElement(), static_cast<Element*>(textAreaElement));
     inputElement->setValue("testB3");
     EXPECT_FALSE(client.textIsUpdated());
 
@@ -2031,7 +2120,7 @@ TEST_F(WebViewTest, FirstUserGestureObservedKeyEvent)
     EXPECT_EQ(0, client.getUserGestureNotificationsCount());
 
     WebKeyboardEvent keyEvent;
-    keyEvent.windowsKeyCode = WebCore::VKEY_SPACE;
+    keyEvent.windowsKeyCode = VKEY_SPACE;
     keyEvent.type = WebInputEvent::RawKeyDown;
     keyEvent.setKeyIdentifierFromWindowsKeyCode();
     webView->handleInputEvent(keyEvent);
@@ -2081,5 +2170,35 @@ TEST_F(WebViewTest, FirstUserGestureObservedGestureTap)
     EXPECT_EQ(1, client.getUserGestureNotificationsCount());
     webView->setAutofillClient(0);
 }
+
+TEST_F(WebViewTest, CompareSelectAllToContentAsText)
+{
+    URLTestHelpers::registerMockedURLFromBaseURL(WebString::fromUTF8(m_baseURL.c_str()), WebString::fromUTF8("longpress_selection.html"));
+    WebView* webView = m_webViewHelper.initializeAndLoad(m_baseURL + "longpress_selection.html", true);
+
+    WebLocalFrameImpl* frame = toWebLocalFrameImpl(webView->mainFrame());
+    frame->executeScript(WebScriptSource(WebString::fromUTF8("document.execCommand('SelectAll', false, null)")));
+    std::string actual = frame->selectionAsText().utf8();
+
+    const int kMaxOutputCharacters = 1024;
+    std::string expected = frame->contentAsText(kMaxOutputCharacters).utf8();
+    EXPECT_EQ(expected, actual);
+}
+
+TEST_F(WebViewTest, AutoResizeSubtreeLayout)
+{
+    std::string url = m_baseURL + "subtree-layout.html";
+    URLTestHelpers::registerMockedURLLoad(toKURL(url), "subtree-layout.html");
+    WebView* webView = m_webViewHelper.initialize(true);
+
+    webView->enableAutoResizeMode(WebSize(200, 200), WebSize(200, 200));
+    loadFrame(webView->mainFrame(), url);
+
+    FrameView* frameView = m_webViewHelper.webViewImpl()->mainFrameImpl()->frameView();
+
+    // Auto-resizing used to ASSERT(needsLayout()) in RenderBlockFlow::layout. This EXPECT is
+    // merely a dummy. The real test is that we don't trigger asserts in debug builds.
+    EXPECT_FALSE(frameView->needsLayout());
+};
 
 } // namespace

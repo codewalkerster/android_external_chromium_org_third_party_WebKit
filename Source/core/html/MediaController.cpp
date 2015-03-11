@@ -26,9 +26,9 @@
 #include "config.h"
 #include "core/html/MediaController.h"
 
-#include "bindings/v8/ExceptionMessages.h"
-#include "bindings/v8/ExceptionState.h"
-#include "bindings/v8/ExceptionStatePlaceholder.h"
+#include "bindings/core/v8/ExceptionMessages.h"
+#include "bindings/core/v8/ExceptionState.h"
+#include "bindings/core/v8/ExceptionStatePlaceholder.h"
 #include "core/dom/ExceptionCode.h"
 #include "core/dom/ExecutionContext.h"
 #include "core/events/Event.h"
@@ -40,11 +40,11 @@
 #include "wtf/StdLibExtras.h"
 #include "wtf/text/AtomicString.h"
 
-namespace WebCore {
+namespace blink {
 
 PassRefPtrWillBeRawPtr<MediaController> MediaController::create(ExecutionContext* context)
 {
-    return adoptRefWillBeRefCountedGarbageCollected(new MediaController(context));
+    return adoptRefWillBeNoop(new MediaController(context));
 }
 
 MediaController::MediaController(ExecutionContext* context)
@@ -62,7 +62,6 @@ MediaController::MediaController(ExecutionContext* context)
     , m_timeupdateTimer(this, &MediaController::timeupdateTimerFired)
     , m_previousTimeupdateTime(0)
 {
-    ScriptWrappable::init(this);
 }
 
 MediaController::~MediaController()
@@ -85,7 +84,7 @@ void MediaController::removeMediaElement(HTMLMediaElement* element)
     m_mediaElements.remove(m_mediaElements.find(element));
 }
 
-PassRefPtr<TimeRanges> MediaController::buffered() const
+PassRefPtrWillBeRawPtr<TimeRanges> MediaController::buffered() const
 {
     if (m_mediaElements.isEmpty())
         return TimeRanges::create();
@@ -94,13 +93,13 @@ PassRefPtr<TimeRanges> MediaController::buffered() const
     // the intersection of the ranges of the media resources of the slaved media elements that the
     // user agent has buffered, at the time the attribute is evaluated.
     MediaElementSequence::const_iterator it = m_mediaElements.begin();
-    RefPtr<TimeRanges> bufferedRanges = (*it)->buffered();
+    RefPtrWillBeRawPtr<TimeRanges> bufferedRanges = (*it)->buffered();
     for (++it; it != m_mediaElements.end(); ++it)
         bufferedRanges->intersectWith((*it)->buffered().get());
     return bufferedRanges;
 }
 
-PassRefPtr<TimeRanges> MediaController::seekable() const
+PassRefPtrWillBeRawPtr<TimeRanges> MediaController::seekable() const
 {
     if (m_mediaElements.isEmpty())
         return TimeRanges::create();
@@ -109,13 +108,13 @@ PassRefPtr<TimeRanges> MediaController::seekable() const
     // the intersection of the ranges of the media resources of the slaved media elements that the
     // user agent is able to seek to, at the time the attribute is evaluated.
     MediaElementSequence::const_iterator it = m_mediaElements.begin();
-    RefPtr<TimeRanges> seekableRanges = (*it)->seekable();
+    RefPtrWillBeRawPtr<TimeRanges> seekableRanges = (*it)->seekable();
     for (++it; it != m_mediaElements.end(); ++it)
         seekableRanges->intersectWith((*it)->seekable().get());
     return seekableRanges;
 }
 
-PassRefPtr<TimeRanges> MediaController::played()
+PassRefPtrWillBeRawPtr<TimeRanges> MediaController::played()
 {
     if (m_mediaElements.isEmpty())
         return TimeRanges::create();
@@ -124,7 +123,7 @@ PassRefPtr<TimeRanges> MediaController::played()
     // the union of the ranges of the media resources of the slaved media elements that the
     // user agent has so far rendered, at the time the attribute is evaluated.
     MediaElementSequence::const_iterator it = m_mediaElements.begin();
-    RefPtr<TimeRanges> playedRanges = (*it)->played();
+    RefPtrWillBeRawPtr<TimeRanges> playedRanges = (*it)->played();
     for (++it; it != m_mediaElements.end(); ++it)
         playedRanges->unionWith((*it)->played().get());
     return playedRanges;
@@ -158,7 +157,7 @@ double MediaController::currentTime() const
     return m_position;
 }
 
-void MediaController::setCurrentTime(double time, ExceptionState& exceptionState)
+void MediaController::setCurrentTime(double time)
 {
     // When the user agent is to seek the media controller to a particular new playback position,
     // it must follow these steps:
@@ -175,7 +174,7 @@ void MediaController::setCurrentTime(double time, ExceptionState& exceptionState
 
     // Seek each slaved media element to the new playback position relative to the media element timeline.
     for (MediaElementSequence::const_iterator it = m_mediaElements.begin(); it != m_mediaElements.end(); ++it)
-        (*it)->seek(time, exceptionState);
+        (*it)->seek(time);
 
     scheduleTimeupdateEvent();
 }
@@ -484,7 +483,10 @@ void MediaController::bringElementUpToSpeed(HTMLMediaElement* element)
     // When the user agent is to bring a media element up to speed with its new media controller,
     // it must seek that media element to the MediaController's media controller position relative
     // to the media element's timeline.
-    element->seek(currentTime(), IGNORE_EXCEPTION);
+    element->seek(currentTime());
+
+    // Update volume to take controller volume and mute into account.
+    element->updateVolume();
 }
 
 bool MediaController::isRestrained() const
@@ -500,10 +502,6 @@ bool MediaController::isRestrained() const
     bool allPaused = true;
     for (MediaElementSequence::const_iterator it = m_mediaElements.begin(); it != m_mediaElements.end(); ++it) {
         HTMLMediaElement* element = *it;
-
-        // and none of its slaved media elements are blocked media elements,
-        if (element->isBlocked())
-            return false;
 
         if (element->isAutoplaying() && element->paused())
             anyAutoplayingAndPaused = true;
@@ -613,9 +611,11 @@ void MediaController::scheduleTimeupdateEvent()
 
 void MediaController::trace(Visitor* visitor)
 {
+#if ENABLE(OILPAN)
     visitor->trace(m_mediaElements);
     visitor->trace(m_pendingEventsQueue);
     visitor->trace(m_executionContext);
+#endif
     EventTargetWithInlineData::trace(visitor);
 }
 

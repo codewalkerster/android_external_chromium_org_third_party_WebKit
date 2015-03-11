@@ -33,7 +33,7 @@
 #include "wtf/MathExtras.h"
 #include "wtf/PassRefPtr.h"
 
-namespace WebCore {
+namespace blink {
 
 class GraphicsContext;
 class IntRect;
@@ -64,7 +64,6 @@ public:
 
     void removeFromParent();
     ScrollView* parentScrollView() const;
-    ScrollView* rootScrollView() const;
 
     virtual void setFrameRect(const IntRect&) OVERRIDE;
     virtual IntRect frameRect() const OVERRIDE { return Widget::frameRect(); }
@@ -198,6 +197,6 @@ private:
 
 DEFINE_TYPE_CASTS(Scrollbar, Widget, widget, widget->isScrollbar(), widget.isScrollbar());
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // Scrollbar_h

@@ -26,7 +26,7 @@
 #include "config.h"
 #include "core/frame/History.h"
 
-#include "bindings/v8/ExceptionState.h"
+#include "bindings/core/v8/ExceptionState.h"
 #include "core/dom/Document.h"
 #include "core/dom/ExceptionCode.h"
 #include "core/frame/LocalFrame.h"
@@ -40,13 +40,17 @@
 #include "platform/weborigin/SecurityOrigin.h"
 #include "wtf/MainThread.h"
 
-namespace WebCore {
+namespace blink {
 
 History::History(LocalFrame* frame)
     : DOMWindowProperty(frame)
     , m_lastStateObjectRequested(nullptr)
 {
-    ScriptWrappable::init(this);
+}
+
+void History::trace(Visitor* visitor)
+{
+    DOMWindowProperty::trace(visitor);
 }
 
 unsigned History::length() const
@@ -137,4 +141,4 @@ void History::stateObjectAdded(PassRefPtr<SerializedScriptValue> data, const Str
     m_frame->loader().updateForSameDocumentNavigation(fullURL, SameDocumentNavigationHistoryApi, data, type);
 }
 
-} // namespace WebCore
+} // namespace blink

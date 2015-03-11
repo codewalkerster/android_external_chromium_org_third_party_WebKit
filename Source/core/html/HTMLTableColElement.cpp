@@ -30,7 +30,7 @@
 #include "core/html/HTMLTableElement.h"
 #include "core/rendering/RenderTableCol.h"
 
-namespace WebCore {
+namespace blink {
 
 using namespace HTMLNames;
 
@@ -38,7 +38,6 @@ inline HTMLTableColElement::HTMLTableColElement(const QualifiedName& tagName, Do
     : HTMLTablePartElement(tagName, document)
     , m_span(1)
 {
-    ScriptWrappable::init(this);
 }
 
 DEFINE_ELEMENT_FACTORY_WITH_TAGNAME(HTMLTableColElement)
@@ -82,7 +81,7 @@ void HTMLTableColElement::parseAttribute(const QualifiedName& name, const Atomic
 
 const StylePropertySet* HTMLTableColElement::additionalPresentationAttributeStyle()
 {
-    if (!hasLocalName(colgroupTag))
+    if (!hasTagName(colgroupTag))
         return 0;
     if (HTMLTableElement* table = findParentTable())
         return table->additionalGroupStyle(false);

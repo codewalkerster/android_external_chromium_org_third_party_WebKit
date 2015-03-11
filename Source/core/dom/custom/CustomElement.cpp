@@ -36,14 +36,20 @@
 #include "core/SVGNames.h"
 #include "core/dom/Document.h"
 #include "core/dom/Element.h"
+#include "core/dom/custom/CustomElementMicrotaskRunQueue.h"
 #include "core/dom/custom/CustomElementObserver.h"
 #include "core/dom/custom/CustomElementScheduler.h"
 
-namespace WebCore {
+namespace blink {
 
 CustomElementMicrotaskImportStep* CustomElement::didCreateImport(HTMLImportChild* import)
 {
     return CustomElementScheduler::scheduleImport(import);
+}
+
+void CustomElement::didFinishLoadingImport(Document& master)
+{
+    master.customElementMicrotaskRunQueue()->requestDispatchIfNeeded();
 }
 
 Vector<AtomicString>& CustomElement::embedderCustomElementNames()
@@ -98,7 +104,7 @@ void CustomElement::define(Element* element, PassRefPtr<CustomElementDefinition>
 
     case Element::WaitingForUpgrade:
         element->setCustomElementDefinition(definition);
-        CustomElementScheduler::scheduleCallback(definition->callbacks(), element, CustomElementLifecycleCallbacks::Created);
+        CustomElementScheduler::scheduleCallback(definition->callbacks(), element, CustomElementLifecycleCallbacks::CreatedCallback);
         break;
     }
 }
@@ -109,20 +115,20 @@ void CustomElement::attributeDidChange(Element* element, const AtomicString& nam
     CustomElementScheduler::scheduleAttributeChangedCallback(element->customElementDefinition()->callbacks(), element, name, oldValue, newValue);
 }
 
-void CustomElement::didEnterDocument(Element* element, const Document& document)
+void CustomElement::didAttach(Element* element, const Document& document)
 {
     ASSERT(element->customElementState() == Element::Upgraded);
     if (!document.domWindow())
         return;
-    CustomElementScheduler::scheduleCallback(element->customElementDefinition()->callbacks(), element, CustomElementLifecycleCallbacks::Attached);
+    CustomElementScheduler::scheduleCallback(element->customElementDefinition()->callbacks(), element, CustomElementLifecycleCallbacks::AttachedCallback);
 }
 
-void CustomElement::didLeaveDocument(Element* element, const Document& document)
+void CustomElement::didDetach(Element* element, const Document& document)
 {
     ASSERT(element->customElementState() == Element::Upgraded);
     if (!document.domWindow())
         return;
-    CustomElementScheduler::scheduleCallback(element->customElementDefinition()->callbacks(), element, CustomElementLifecycleCallbacks::Detached);
+    CustomElementScheduler::scheduleCallback(element->customElementDefinition()->callbacks(), element, CustomElementLifecycleCallbacks::DetachedCallback);
 }
 
 void CustomElement::wasDestroyed(Element* element)
@@ -139,4 +145,4 @@ void CustomElement::wasDestroyed(Element* element)
     }
 }
 
-} // namespace WebCore
+} // namespace blink

@@ -3,10 +3,13 @@
 // found in the LICENSE file.
 
 #include "config.h"
-
 #include "core/testing/NullExecutionContext.h"
 
-namespace WebCore {
+#include "core/dom/ExecutionContextTask.h"
+#include "core/events/Event.h"
+#include "core/frame/DOMTimer.h"
+
+namespace blink {
 
 namespace {
 
@@ -27,4 +30,13 @@ NullExecutionContext::NullExecutionContext()
 {
 }
 
-} // namespace WebCore
+void NullExecutionContext::postTask(PassOwnPtr<ExecutionContextTask>)
+{
+}
+
+double NullExecutionContext::timerAlignmentInterval() const
+{
+    return DOMTimer::visiblePageAlignmentInterval();
+}
+
+} // namespace blink

@@ -30,7 +30,7 @@
 #include "config.h"
 #include "core/frame/LocalFrame.h"
 
-#include "bindings/v8/ScriptController.h"
+#include "bindings/core/v8/ScriptController.h"
 #include "core/dom/DocumentType.h"
 #include "core/editing/Editor.h"
 #include "core/editing/FrameSelection.h"
@@ -40,18 +40,21 @@
 #include "core/editing/markup.h"
 #include "core/events/Event.h"
 #include "core/fetch/ResourceFetcher.h"
-#include "core/frame/LocalDOMWindow.h"
 #include "core/frame/EventHandlerRegistry.h"
 #include "core/frame/FrameConsole.h"
+#include "core/frame/FrameDestructionObserver.h"
 #include "core/frame/FrameHost.h"
 #include "core/frame/FrameView.h"
+#include "core/frame/LocalDOMWindow.h"
 #include "core/frame/Settings.h"
 #include "core/html/HTMLFrameElementBase.h"
+#include "core/inspector/ConsoleMessageStorage.h"
 #include "core/inspector/InspectorInstrumentation.h"
 #include "core/loader/FrameLoaderClient.h"
 #include "core/page/Chrome.h"
 #include "core/page/EventHandler.h"
 #include "core/page/FocusController.h"
+#include "core/page/Page.h"
 #include "core/page/scrolling/ScrollingCoordinator.h"
 #include "core/rendering/HitTestResult.h"
 #include "core/rendering/RenderLayer.h"
@@ -66,7 +69,7 @@
 #include "wtf/PassOwnPtr.h"
 #include "wtf/StdLibExtras.h"
 
-namespace WebCore {
+namespace blink {
 
 using namespace HTMLNames;
 
@@ -103,18 +106,70 @@ inline LocalFrame::LocalFrame(FrameLoaderClient* client, FrameHost* host, FrameO
 {
 }
 
-PassRefPtr<LocalFrame> LocalFrame::create(FrameLoaderClient* client, FrameHost* host, FrameOwner* owner)
+PassRefPtrWillBeRawPtr<LocalFrame> LocalFrame::create(FrameLoaderClient* client, FrameHost* host, FrameOwner* owner)
 {
-    RefPtr<LocalFrame> frame = adoptRef(new LocalFrame(client, host, owner));
+    RefPtrWillBeRawPtr<LocalFrame> frame = adoptRefWillBeNoop(new LocalFrame(client, host, owner));
     InspectorInstrumentation::frameAttachedToParent(frame.get());
     return frame.release();
 }
 
 LocalFrame::~LocalFrame()
 {
+#if ENABLE(OILPAN)
+    // Verify that the FrameView has been cleared as part of detaching
+    // the frame owner.
+    ASSERT(!m_view);
+    // Oilpan: see setDOMWindow() comment why it is acceptable not to
+    // mirror the non-Oilpan call below.
+    //
+    // Also, FrameDestructionObservers that live longer than this
+    // frame object keep weak references to the frame; those will be
+    // automatically cleared by the garbage collector. Hence, explicit
+    // frameDestroyed() notifications aren't needed.
+#else
+    // FIXME: follow Oilpan and clear the FrameView and FrameLoader
+    // during FrameOwner detachment instead, see LocalFrame::disconnectOwnerElement().
     setView(nullptr);
-    loader().clear();
+    m_loader.clear();
     setDOMWindow(nullptr);
+
+    HashSet<RawPtr<FrameDestructionObserver> >::iterator stop = m_destructionObservers.end();
+    for (HashSet<RawPtr<FrameDestructionObserver> >::iterator it = m_destructionObservers.begin(); it != stop; ++it)
+        (*it)->frameDestroyed();
+#endif
+}
+
+void LocalFrame::trace(Visitor* visitor)
+{
+#if ENABLE(OILPAN)
+    visitor->trace(m_destructionObservers);
+    visitor->trace(m_loader);
+    visitor->trace(m_navigationScheduler);
+    visitor->trace(m_pagePopupOwner);
+    visitor->trace(m_editor);
+    visitor->trace(m_spellChecker);
+    visitor->trace(m_selection);
+    visitor->trace(m_eventHandler);
+    visitor->trace(m_console);
+    visitor->trace(m_inputMethodController);
+    HeapSupplementable<LocalFrame>::trace(visitor);
+#endif
+    Frame::trace(visitor);
+}
+
+void LocalFrame::detach()
+{
+    // A lot of the following steps can result in the current frame being
+    // detached, so protect a reference to it.
+    RefPtrWillBeRawPtr<LocalFrame> protect(this);
+    m_loader.stopAllLoaders();
+    m_loader.closeURL();
+    detachChildren();
+    // stopAllLoaders() needs to be called after detachChildren(), because detachChildren()
+    // will trigger the unload event handlers of any child frames, and those event
+    // handlers might start a new subresource load in this frame.
+    m_loader.stopAllLoaders();
+    m_loader.detachFromParent();
 }
 
 bool LocalFrame::inScope(TreeScope* scope) const
@@ -130,13 +185,20 @@ bool LocalFrame::inScope(TreeScope* scope) const
     return owner->treeScope() == scope;
 }
 
-void LocalFrame::setView(PassRefPtr<FrameView> view)
+void LocalFrame::detachView()
 {
-    // We the custom scroll bars as early as possible to prevent m_doc->detach()
-    // from messing with the view such that its scroll bars won't be torn down.
+    // We detach the FrameView's custom scroll bars as early as
+    // possible to prevent m_doc->detach() from messing with the view
+    // such that its scroll bars won't be torn down.
+    //
     // FIXME: We should revisit this.
     if (m_view)
         m_view->prepareForDetach();
+}
+
+void LocalFrame::setView(PassRefPtr<FrameView> view)
+{
+    detachView();
 
     // Prepare for destruction now, so any unload event handlers get run and the LocalDOMWindow is
     // notified. If we wait until the view is destroyed, then things won't be hooked up enough for
@@ -158,30 +220,6 @@ void LocalFrame::setView(PassRefPtr<FrameView> view)
     }
 }
 
-void LocalFrame::sendOrientationChangeEvent()
-{
-    if (!RuntimeEnabledFeatures::orientationEventEnabled() && !RuntimeEnabledFeatures::screenOrientationEnabled())
-        return;
-
-    if (page()->visibilityState() != PageVisibilityStateVisible)
-        return;
-
-    LocalDOMWindow* window = domWindow();
-    if (!window)
-        return;
-    window->dispatchEvent(Event::create(EventTypeNames::orientationchange));
-
-    // Notify subframes.
-    Vector<RefPtr<LocalFrame> > childFrames;
-    for (Frame* child = tree().firstChild(); child; child = child->tree().nextSibling()) {
-        if (child->isLocalFrame())
-            childFrames.append(toLocalFrame(child));
-    }
-
-    for (size_t i = 0; i < childFrames.size(); ++i)
-        childFrames[i]->sendOrientationChangeEvent();
-}
-
 void LocalFrame::setPrinting(bool printing, const FloatSize& pageSize, const FloatSize& originalPageSize, float maximumShrinkRatio)
 {
     // In setting printing, we should not validate resources already cached for the document.
@@ -200,7 +238,7 @@ void LocalFrame::setPrinting(bool printing, const FloatSize& pageSize, const Flo
     }
 
     // Subframes of the one we're printing don't lay out to the page size.
-    for (RefPtr<Frame> child = tree().firstChild(); child; child = child->tree().nextSibling()) {
+    for (RefPtrWillBeRawPtr<Frame> child = tree().firstChild(); child; child = child->tree().nextSibling()) {
         if (child->isLocalFrame())
             toLocalFrame(child.get())->setPrinting(printing, FloatSize(), FloatSize(), 0);
     }
@@ -235,9 +273,17 @@ FloatSize LocalFrame::resizePageRectsKeepingRatio(const FloatSize& originalSize,
 
 void LocalFrame::setDOMWindow(PassRefPtrWillBeRawPtr<LocalDOMWindow> domWindow)
 {
-    InspectorInstrumentation::frameWindowDiscarded(this, m_domWindow.get());
+    if (m_domWindow) {
+        // Oilpan: the assumption is that FrameDestructionObserver::willDetachFrameHost()
+        // on LocalWindow will have signalled these frameWindowDiscarded() notifications.
+        //
+        // It is not invoked when finalizing the LocalFrame, as setDOMWindow() isn't
+        // performed (accessing the m_domWindow heap object is unsafe then.)
+        console().messageStorage()->frameWindowDiscarded(m_domWindow.get());
+        InspectorInstrumentation::frameWindowDiscarded(this, m_domWindow.get());
+    }
     if (domWindow)
-        script().clearWindowShell();
+        script().clearWindowProxy();
     Frame::setDOMWindow(domWindow);
 }
 
@@ -246,7 +292,7 @@ void LocalFrame::didChangeVisibilityState()
     if (document())
         document()->didChangeVisibilityState();
 
-    Vector<RefPtr<LocalFrame> > childFrames;
+    WillBeHeapVector<RefPtrWillBeMember<LocalFrame> > childFrames;
     for (Frame* child = tree().firstChild(); child; child = child->tree().nextSibling()) {
         if (child->isLocalFrame())
             childFrames.append(toLocalFrame(child));
@@ -254,6 +300,16 @@ void LocalFrame::didChangeVisibilityState()
 
     for (size_t i = 0; i < childFrames.size(); ++i)
         childFrames[i]->didChangeVisibilityState();
+}
+
+void LocalFrame::addDestructionObserver(FrameDestructionObserver* observer)
+{
+    m_destructionObservers.add(observer);
+}
+
+void LocalFrame::removeDestructionObserver(FrameDestructionObserver* observer)
+{
+    m_destructionObservers.remove(observer);
 }
 
 void LocalFrame::willDetachFrameHost()
@@ -265,7 +321,15 @@ void LocalFrame::willDetachFrameHost()
     if (parent && parent->isLocalFrame())
         toLocalFrame(parent)->loader().checkLoadComplete();
 
-    Frame::willDetachFrameHost();
+    WillBeHeapHashSet<RawPtrWillBeWeakMember<FrameDestructionObserver> >::iterator stop = m_destructionObservers.end();
+    for (WillBeHeapHashSet<RawPtrWillBeWeakMember<FrameDestructionObserver> >::iterator it = m_destructionObservers.begin(); it != stop; ++it)
+        (*it)->willDetachFrameHost();
+
+    // FIXME: Page should take care of updating focus/scrolling instead of Frame.
+    // FIXME: It's unclear as to why this is called more than once, but it is,
+    // so page() could be null.
+    if (page() && page()->focusController().focusedFrame() == this)
+        page()->focusController().setFocusedFrame(nullptr);
     script().clearScriptObjects();
 
     if (page() && page()->scrollingCoordinator() && m_view)
@@ -274,9 +338,9 @@ void LocalFrame::willDetachFrameHost()
 
 void LocalFrame::detachFromFrameHost()
 {
-    // We should never be detatching the page during a Layout.
+    // We should never be detaching the page during a Layout.
     RELEASE_ASSERT(!m_view || !m_view->isInPerformLayout());
-    Frame::detachFromFrameHost();
+    m_host = nullptr;
 }
 
 String LocalFrame::documentTypeString() const
@@ -331,7 +395,7 @@ Document* LocalFrame::documentAtPoint(const IntPoint& point)
     HitTestResult result = HitTestResult(pt);
 
     if (contentRenderer())
-        result = eventHandler().hitTestResultAtPoint(pt, HitTestRequest::ReadOnly | HitTestRequest::Active | HitTestRequest::ConfusingAndOftenMisusedDisallowShadowContent);
+        result = eventHandler().hitTestResultAtPoint(pt, HitTestRequest::ReadOnly | HitTestRequest::Active);
     return result.innerNode() ? &result.innerNode()->document() : 0;
 }
 
@@ -366,15 +430,15 @@ void LocalFrame::createView(const IntSize& viewportSize, const Color& background
     ASSERT(this);
     ASSERT(page());
 
-    bool isMainFrame = this->isMainFrame();
+    bool isLocalRoot = this->isLocalRoot();
 
-    if (isMainFrame && view())
+    if (isLocalRoot && view())
         view()->setParentVisible(false);
 
     setView(nullptr);
 
     RefPtr<FrameView> frameView;
-    if (isMainFrame) {
+    if (isLocalRoot) {
         frameView = FrameView::create(this, viewportSize);
 
         // The layout size is set by WebViewImpl to support @viewport
@@ -388,7 +452,7 @@ void LocalFrame::createView(const IntSize& viewportSize, const Color& background
 
     frameView->updateBackgroundRecursively(backgroundColor, transparent);
 
-    if (isMainFrame)
+    if (isLocalRoot)
         frameView->setParentVisible(true);
 
     // FIXME: Not clear what the right thing for OOPI is here.
@@ -451,13 +515,6 @@ String LocalFrame::localLayerTreeAsText(unsigned flags) const
     return contentRenderer()->compositor()->layerTreeAsText(static_cast<LayerTreeFlags>(flags));
 }
 
-String LocalFrame::trackedRepaintRectsAsText() const
-{
-    if (!m_view)
-        return String();
-    return m_view->trackedPaintInvalidationRectsAsText();
-}
-
 void LocalFrame::setPageZoomFactor(float factor)
 {
     setPageAndTextZoomFactors(factor, m_textZoomFactor);
@@ -500,7 +557,7 @@ void LocalFrame::setPageAndTextZoomFactors(float pageZoomFactor, float textZoomF
     m_pageZoomFactor = pageZoomFactor;
     m_textZoomFactor = textZoomFactor;
 
-    for (RefPtr<Frame> child = tree().firstChild(); child; child = child->tree().nextSibling()) {
+    for (RefPtrWillBeRawPtr<Frame> child = tree().firstChild(); child; child = child->tree().nextSibling()) {
         if (child->isLocalFrame())
             toLocalFrame(child.get())->setPageAndTextZoomFactors(m_pageZoomFactor, m_textZoomFactor);
     }
@@ -512,7 +569,7 @@ void LocalFrame::setPageAndTextZoomFactors(float pageZoomFactor, float textZoomF
 void LocalFrame::deviceOrPageScaleFactorChanged()
 {
     document()->mediaQueryAffectingValueChanged();
-    for (RefPtr<Frame> child = tree().firstChild(); child; child = child->tree().nextSibling()) {
+    for (RefPtrWillBeRawPtr<Frame> child = tree().firstChild(); child; child = child->tree().nextSibling()) {
         if (child->isLocalFrame())
             toLocalFrame(child.get())->deviceOrPageScaleFactorChanged();
     }
@@ -535,6 +592,16 @@ bool LocalFrame::isURLAllowed(const KURL& url) const
         }
     }
     return true;
+}
+
+bool LocalFrame::shouldReuseDefaultView(const KURL& url) const
+{
+    return loader().stateMachine()->isDisplayingInitialEmptyDocument() && document()->isSecureTransitionTo(url);
+}
+
+void LocalFrame::removeSpellingMarkersUnderWords(const Vector<String>& words)
+{
+    spellChecker().removeSpellingMarkersUnderWords(words);
 }
 
 struct ScopedFramePaintingState {
@@ -607,7 +674,7 @@ PassOwnPtr<DragImage> LocalFrame::dragImageForSelection()
 
     const ScopedFramePaintingState state(this, 0);
     m_view->setPaintBehavior(PaintBehaviorSelectionOnly | PaintBehaviorFlattenCompositingLayers);
-    document()->updateLayout();
+    m_view->updateLayoutAndStyleForPainting();
 
     IntRect paintingRect = enclosingIntRect(selection().bounds());
 
@@ -642,8 +709,15 @@ double LocalFrame::devicePixelRatio() const
 void LocalFrame::disconnectOwnerElement()
 {
     if (owner()) {
-        if (Document* doc = document())
-            doc->topDocument().clearAXObjectCache();
+        if (Document* document = this->document())
+            document->topDocument().clearAXObjectCache();
+#if ENABLE(OILPAN)
+        // Clear the FrameView and FrameLoader right here rather than
+        // during finalization. Too late to access various heap objects
+        // at that stage.
+        setView(nullptr);
+        loader().clear();
+#endif
     }
     Frame::disconnectOwnerElement();
 }
@@ -657,4 +731,9 @@ LocalFrame* LocalFrame::localFrameRoot()
     return curFrame;
 }
 
-} // namespace WebCore
+void LocalFrame::setPagePopupOwner(Element& owner)
+{
+    m_pagePopupOwner = &owner;
+}
+
+} // namespace blink

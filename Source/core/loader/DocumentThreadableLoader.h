@@ -43,7 +43,7 @@
 #include "wtf/PassRefPtr.h"
 #include "wtf/text/WTFString.h"
 
-namespace WebCore {
+namespace blink {
 
 class Document;
 class KURL;
@@ -57,6 +57,8 @@ class DocumentThreadableLoader FINAL : public ThreadableLoader, private Resource
         static void loadResourceSynchronously(Document&, const ResourceRequest&, ThreadableLoaderClient&, const ThreadableLoaderOptions&, const ResourceLoaderOptions&);
         static PassRefPtr<DocumentThreadableLoader> create(Document&, ThreadableLoaderClient*, const ResourceRequest&, const ThreadableLoaderOptions&, const ResourceLoaderOptions&);
         virtual ~DocumentThreadableLoader();
+
+        virtual void overrideTimeout(unsigned long timeout) OVERRIDE;
 
         virtual void cancel() OVERRIDE;
         void setDefersLoading(bool);
@@ -79,6 +81,9 @@ class DocumentThreadableLoader FINAL : public ThreadableLoader, private Resource
 
         void cancelWithError(const ResourceError&);
 
+        // Notify Inspector about resource response. Use this method if response is not going to be finished normally.
+        void notifyResponseReceived(unsigned long identifier, const ResourceResponse&);
+
         // Methods containing code to handle resource fetch results which is
         // common to both sync and async mode.
         void handleResponse(unsigned long identifier, const ResourceResponse&);
@@ -94,7 +99,7 @@ class DocumentThreadableLoader FINAL : public ThreadableLoader, private Resource
         void handlePreflightFailure(const String& url, const String& errorDescription);
         // Investigates the response for the preflight request. If successful,
         // the actual request will be made later in handleSuccessfulFinish().
-        void handlePreflightResponse(unsigned long identifier, const ResourceResponse&);
+        void handlePreflightResponse(const ResourceResponse&);
 
         void loadRequest(const ResourceRequest&, ResourceLoaderOptions);
         bool isAllowedRedirect(const KURL&) const;
@@ -129,8 +134,9 @@ class DocumentThreadableLoader FINAL : public ThreadableLoader, private Resource
 
         HTTPHeaderMap m_simpleRequestHeaders; // stores simple request headers in case of a cross-origin redirect.
         Timer<DocumentThreadableLoader> m_timeoutTimer;
+        double m_requestStartedSeconds; // Time an asynchronous fetch request is started
     };
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // DocumentThreadableLoader_h

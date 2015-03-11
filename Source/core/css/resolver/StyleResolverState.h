@@ -30,16 +30,16 @@
 #include "core/css/resolver/ElementResolveContext.h"
 #include "core/css/resolver/ElementStyleResources.h"
 #include "core/css/resolver/FontBuilder.h"
+#include "core/dom/Document.h"
 #include "core/dom/Element.h"
 #include "core/rendering/style/CachedUAStyle.h"
 #include "core/rendering/style/RenderStyle.h"
 #include "core/rendering/style/StyleInheritedData.h"
 
-namespace WebCore {
+namespace blink {
 
 class CSSAnimationUpdate;
 class FontDescription;
-class StyleRule;
 
 class StyleResolverState {
     STACK_ALLOCATED();
@@ -50,7 +50,7 @@ public:
 
     // In FontFaceSet and CanvasRenderingContext2D, we don't have an element to grab the document from.
     // This is why we have to store the document separately.
-    Document& document() const { return m_document; }
+    Document& document() const { return *m_document; }
     // These are all just pass-through methods to ElementResolveContext.
     Element* element() const { return m_elementContext.element(); }
     const ContainerNode* parentNode() const { return m_elementContext.parentNode(); }
@@ -74,9 +74,6 @@ public:
     void setParentStyle(PassRefPtr<RenderStyle> parentStyle) { m_parentStyle = parentStyle; }
     const RenderStyle* parentStyle() const { return m_parentStyle.get(); }
     RenderStyle* parentStyle() { return m_parentStyle.get(); }
-
-    void setCurrentRule(StyleRule* currentRule) { m_currentRule = currentRule; }
-    const StyleRule* currentRule() const { return m_currentRule; }
 
     // FIXME: These are effectively side-channel "out parameters" for the various
     // map functions. When we map from CSS to style objects we use this state object
@@ -135,7 +132,7 @@ public:
 
 private:
     ElementResolveContext m_elementContext;
-    Document& m_document;
+    RawPtrWillBeMember<Document> m_document;
 
     // m_style is the primary output for each element's style resolve.
     RefPtr<RenderStyle> m_style;
@@ -162,10 +159,8 @@ private:
     // a back-pointer to this object.
     CSSToStyleMap m_styleMap;
     Vector<AtomicString> m_contentAttrValues;
-
-    RawPtrWillBeMember<StyleRule> m_currentRule;
 };
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // StyleResolverState_h

@@ -22,18 +22,18 @@
 #include "config.h"
 #include "core/css/PropertySetCSSStyleDeclaration.h"
 
-#include "bindings/v8/ExceptionState.h"
+#include "bindings/core/v8/ExceptionState.h"
 #include "core/HTMLNames.h"
-#include "core/css/parser/BisonCSSParser.h"
 #include "core/css/CSSStyleSheet.h"
 #include "core/css/StylePropertySet.h"
+#include "core/css/parser/CSSParser.h"
 #include "core/dom/Element.h"
 #include "core/dom/MutationObserverInterestGroup.h"
 #include "core/dom/MutationRecord.h"
 #include "core/inspector/InspectorInstrumentation.h"
 #include "platform/RuntimeEnabledFeatures.h"
 
-namespace WebCore {
+namespace blink {
 
 namespace {
 
@@ -425,4 +425,4 @@ void InlineCSSStyleDeclaration::trace(Visitor* visitor)
     AbstractPropertySetCSSStyleDeclaration::trace(visitor);
 }
 
-} // namespace WebCore
+} // namespace blink

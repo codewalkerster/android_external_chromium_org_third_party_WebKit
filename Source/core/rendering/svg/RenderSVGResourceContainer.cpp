@@ -29,7 +29,7 @@
 
 #include "wtf/TemporaryChange.h"
 
-namespace WebCore {
+namespace blink {
 
 static inline SVGDocumentExtensions& svgExtensionsFromElement(SVGElement* element)
 {
@@ -49,8 +49,6 @@ RenderSVGResourceContainer::RenderSVGResourceContainer(SVGElement* node)
 
 RenderSVGResourceContainer::~RenderSVGResourceContainer()
 {
-    if (m_registered)
-        svgExtensionsFromElement(element()).removeResource(m_id);
 }
 
 void RenderSVGResourceContainer::layout()
@@ -72,6 +70,8 @@ void RenderSVGResourceContainer::willBeDestroyed()
 {
     SVGResourcesCache::resourceDestroyed(this);
     RenderSVGHiddenContainer::willBeDestroyed();
+    if (m_registered)
+        svgExtensionsFromElement(element()).removeResource(m_id);
 }
 
 void RenderSVGResourceContainer::styleDidChange(StyleDifference diff, const RenderStyle* oldStyle)
@@ -133,7 +133,7 @@ void RenderSVGResourceContainer::markAllClientLayersForInvalidation()
 {
     HashSet<RenderLayer*>::iterator layerEnd = m_clientLayers.end();
     for (HashSet<RenderLayer*>::iterator it = m_clientLayers.begin(); it != layerEnd; ++it)
-        (*it)->filterNeedsRepaint();
+        (*it)->filterNeedsPaintInvalidation();
 }
 
 void RenderSVGResourceContainer::markClientForInvalidation(RenderObject* client, InvalidationMode mode)
@@ -146,13 +146,8 @@ void RenderSVGResourceContainer::markClientForInvalidation(RenderObject* client,
     case BoundariesInvalidation:
         client->setNeedsBoundariesUpdate();
         break;
-    case RepaintInvalidation:
-        if (client->view()) {
-            if (RuntimeEnabledFeatures::repaintAfterLayoutEnabled() && frameView()->isInPerformLayout())
-                client->setShouldDoFullPaintInvalidationAfterLayout(true);
-            else
-                client->paintInvalidationForWholeRenderer();
-        }
+    case PaintInvalidation:
+        client->setShouldDoFullPaintInvalidation(true);
         break;
     case ParentOnlyInvalidation:
         break;
@@ -214,7 +209,7 @@ void RenderSVGResourceContainer::registerResource()
         return;
     }
 
-    OwnPtr<SVGDocumentExtensions::SVGPendingElements> clients(extensions.removePendingResource(m_id));
+    OwnPtrWillBeRawPtr<SVGDocumentExtensions::SVGPendingElements> clients(extensions.removePendingResource(m_id));
 
     // Cache us with the new id.
     extensions.addResource(m_id, this);
@@ -252,7 +247,7 @@ static bool shouldTransformOnTextPainting(RenderObject* object, AffineTransform&
     return true;
 }
 
-AffineTransform RenderSVGResourceContainer::computeResourceSpaceTransform(RenderObject* object, const AffineTransform& baseTransform, const SVGRenderStyle* svgStyle, unsigned short resourceMode)
+AffineTransform RenderSVGResourceContainer::computeResourceSpaceTransform(RenderObject* object, const AffineTransform& baseTransform, const SVGRenderStyle& svgStyle, unsigned short resourceMode)
 {
     AffineTransform computedSpaceTransform = baseTransform;
     if (resourceMode & ApplyToTextMode) {
@@ -266,7 +261,7 @@ AffineTransform RenderSVGResourceContainer::computeResourceSpaceTransform(Render
     }
     if (resourceMode & ApplyToStrokeMode) {
         // Non-scaling stroke needs to reset the transform back to the host transform.
-        if (svgStyle->vectorEffect() == VE_NON_SCALING_STROKE)
+        if (svgStyle.vectorEffect() == VE_NON_SCALING_STROKE)
             computedSpaceTransform = transformOnNonScalingStroke(object, computedSpaceTransform);
     }
     return computedSpaceTransform;

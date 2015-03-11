@@ -29,7 +29,7 @@
 #include "modules/EventModules.h"
 #include "wtf/text/WTFString.h"
 
-namespace WebCore {
+namespace blink {
 
 struct SpeechRecognitionErrorInit : public EventInit {
     SpeechRecognitionErrorInit();
@@ -39,6 +39,7 @@ struct SpeechRecognitionErrorInit : public EventInit {
 };
 
 class SpeechRecognitionError FINAL : public Event {
+    DEFINE_WRAPPERTYPEINFO();
 public:
     enum ErrorCode {
         // FIXME: This is an unspecified error and Chromium should stop using it.
@@ -76,6 +77,6 @@ private:
     String m_message;
 };
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // SpeechRecognitionError_h

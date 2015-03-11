@@ -26,9 +26,10 @@
 
 #include "core/html/HTMLFrameElementBase.h"
 
-namespace WebCore {
+namespace blink {
 
 class HTMLFrameElement FINAL : public HTMLFrameElementBase {
+    DEFINE_WRAPPERTYPEINFO();
 public:
     DECLARE_NODE_FACTORY(HTMLFrameElement);
 
@@ -50,6 +51,6 @@ private:
     bool m_frameBorderSet;
 };
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // HTMLFrameElement_h

@@ -33,7 +33,9 @@
 
 #include "core/svg/properties/SVGProperty.h"
 
-namespace WebCore {
+namespace blink {
+
+class ExceptionState;
 
 class SVGString : public SVGPropertyBase {
 public:
@@ -91,6 +93,6 @@ inline PassRefPtr<SVGString> toSVGString(PassRefPtr<SVGPropertyBase> passBase)
     return static_pointer_cast<SVGString>(base.release());
 }
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // SVGString_h

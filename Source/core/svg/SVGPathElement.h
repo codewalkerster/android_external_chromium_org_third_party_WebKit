@@ -29,7 +29,7 @@
 #include "core/svg/SVGPathByteStream.h"
 #include "wtf/WeakPtr.h"
 
-namespace WebCore {
+namespace blink {
 
 class SVGPathSegArcAbs;
 class SVGPathSegArcRel;
@@ -52,6 +52,7 @@ class SVGPathSegCurvetoQuadraticSmoothAbs;
 class SVGPathSegCurvetoQuadraticSmoothRel;
 
 class SVGPathElement FINAL : public SVGGeometryElement {
+    DEFINE_WRAPPERTYPEINFO();
 public:
     DECLARE_NODE_FACTORY(SVGPathElement);
 
@@ -111,6 +112,6 @@ private:
     RefPtr<SVGAnimatedPath> m_pathSegList;
 };
 
-} // namespace WebCore
+} // namespace blink
 
-#endif
+#endif // SVGPathElement_h

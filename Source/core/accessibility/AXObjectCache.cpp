@@ -57,6 +57,7 @@
 #include "core/accessibility/AXTableRow.h"
 #include "core/dom/Document.h"
 #include "core/frame/LocalFrame.h"
+#include "core/frame/Settings.h"
 #include "core/html/HTMLAreaElement.h"
 #include "core/html/HTMLImageElement.h"
 #include "core/html/HTMLInputElement.h"
@@ -77,7 +78,7 @@
 #include "platform/scroll/ScrollView.h"
 #include "wtf/PassRefPtr.h"
 
-namespace WebCore {
+namespace blink {
 
 using namespace HTMLNames;
 
@@ -103,9 +104,6 @@ void AXComputedObjectAttributeCache::clear()
 {
     m_idMapping.clear();
 }
-
-bool AXObjectCache::gAccessibilityEnabled = false;
-bool AXObjectCache::gInlineTextBoxAccessibility = false;
 
 AXObjectCache::AXObjectCache(Document& document)
     : m_document(document)
@@ -158,7 +156,7 @@ AXObject* AXObjectCache::focusedImageMapUIElement(HTMLAreaElement* areaElement)
 
 AXObject* AXObjectCache::focusedUIElementForPage(const Page* page)
 {
-    if (!gAccessibilityEnabled)
+    if (!page->settings().accessibilityEnabled())
         return 0;
 
     // Cross-process accessibility is not yet implemented.
@@ -289,6 +287,9 @@ static PassRefPtr<AXObject> createFromRenderer(RenderObject* renderer)
     // media controls
     if (node && node->isMediaControlElement())
         return AccessibilityMediaControl::create(renderer);
+
+    if (isHTMLOptionElement(node))
+        return AXListBoxOption::create(renderer);
 
     if (renderer->isSVGRoot())
         return AXSVGRoot::create(renderer);
@@ -448,7 +449,7 @@ AXObject* AXObjectCache::getOrCreate(AbstractInlineTextBox* inlineTextBox)
 
 AXObject* AXObjectCache::rootObject()
 {
-    if (!gAccessibilityEnabled)
+    if (!accessibilityEnabled())
         return 0;
 
     return getOrCreate(m_document.view());
@@ -460,9 +461,6 @@ AXObject* AXObjectCache::getOrCreate(AccessibilityRole role)
 
     // will be filled in...
     switch (role) {
-    case ListBoxOptionRole:
-        obj = AXListBoxOption::create();
-        break;
     case ImageMapLinkRole:
         obj = AXImageMapLink::create();
         break;
@@ -704,7 +702,7 @@ void AXObjectCache::notificationPostTimerFired(Timer<AXObjectCache>*)
         if (!obj->axObjectCache())
             continue;
 
-#ifndef NDEBUG
+#if ENABLE(ASSERT)
         // Make sure none of the render views are in the process of being layed out.
         // Notifications should only be sent after the renderer has finished
         if (obj->isAXRenderObject()) {
@@ -864,7 +862,7 @@ void AXObjectCache::handleAttributeChanged(const QualifiedName& attrName, Elemen
     else if (attrName == forAttr && isHTMLLabelElement(*element))
         labelChanged(element);
 
-    if (!attrName.localName().string().startsWith("aria-"))
+    if (!attrName.localName().startsWith("aria-"))
         return;
 
     if (attrName == aria_activedescendantAttr)
@@ -900,7 +898,7 @@ void AXObjectCache::recomputeIsIgnored(RenderObject* renderer)
 
 void AXObjectCache::inlineTextBoxesUpdated(RenderObject* renderer)
 {
-    if (!gInlineTextBoxAccessibility)
+    if (!inlineTextBoxAccessibilityEnabled())
         return;
 
     // Only update if the accessibility object already exists and it's
@@ -911,6 +909,27 @@ void AXObjectCache::inlineTextBoxesUpdated(RenderObject* renderer)
             postNotification(renderer, AXChildrenChanged, true);
         }
     }
+}
+
+Settings* AXObjectCache::settings()
+{
+    return m_document.settings();
+}
+
+bool AXObjectCache::accessibilityEnabled()
+{
+    Settings* settings = this->settings();
+    if (!settings)
+        return false;
+    return settings->accessibilityEnabled();
+}
+
+bool AXObjectCache::inlineTextBoxAccessibilityEnabled()
+{
+    Settings* settings = this->settings();
+    if (!settings)
+        return false;
+    return settings->inlineTextBoxAccessibilityEnabled();
 }
 
 const Element* AXObjectCache::rootAXEditableElement(const Node* node)
@@ -972,7 +991,7 @@ void AXObjectCache::postPlatformNotification(AXObject* obj, AXNotification notif
     if (!obj || !obj->document() || !obj->documentFrameView() || !obj->documentFrameView()->frame().page())
         return;
 
-    ChromeClient& client = obj->documentFrameView()->frame().page()->chrome().client();
+    ChromeClient& client = obj->document()->axObjectCacheOwner().page()->chrome().client();
 
     if (notification == AXActiveDescendantChanged
         && obj->document()->focusedElement()
@@ -1018,4 +1037,13 @@ void AXObjectCache::handleScrollPositionChanged(RenderObject* renderObject)
     postPlatformNotification(getOrCreate(renderObject), AXScrollPositionChanged);
 }
 
-} // namespace WebCore
+void AXObjectCache::setCanvasObjectBounds(Element* element, const LayoutRect& rect)
+{
+    AXObject* obj = getOrCreate(element);
+    if (!obj)
+        return;
+
+    obj->setElementRect(rect);
+}
+
+} // namespace blink

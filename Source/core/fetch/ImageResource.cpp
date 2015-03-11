@@ -32,15 +32,15 @@
 #include "core/frame/FrameView.h"
 #include "core/rendering/RenderObject.h"
 #include "core/svg/graphics/SVGImage.h"
+#include "platform/Logging.h"
 #include "platform/RuntimeEnabledFeatures.h"
 #include "platform/SharedBuffer.h"
 #include "platform/TraceEvent.h"
 #include "platform/graphics/BitmapImage.h"
 #include "wtf/CurrentTime.h"
 #include "wtf/StdLibExtras.h"
-#include "wtf/Vector.h"
 
-namespace WebCore {
+namespace blink {
 
 ImageResource::ImageResource(const ResourceRequest& resourceRequest)
     : Resource(resourceRequest, Image)
@@ -49,23 +49,26 @@ ImageResource::ImageResource(const ResourceRequest& resourceRequest)
     , m_loadingMultipartContent(false)
     , m_hasDevicePixelRatioHeaderValue(false)
 {
+    WTF_LOG(Timers, "new ImageResource(ResourceRequest) %p", this);
     setStatus(Unknown);
     setCustomAcceptHeader();
 }
 
-ImageResource::ImageResource(WebCore::Image* image)
+ImageResource::ImageResource(blink::Image* image)
     : Resource(ResourceRequest(""), Image)
     , m_image(image)
 {
+    WTF_LOG(Timers, "new ImageResource(Image) %p", this);
     setStatus(Cached);
     setLoading(false);
     setCustomAcceptHeader();
 }
 
-ImageResource::ImageResource(const ResourceRequest& resourceRequest, WebCore::Image* image)
+ImageResource::ImageResource(const ResourceRequest& resourceRequest, blink::Image* image)
     : Resource(resourceRequest, Image)
     , m_image(image)
 {
+    WTF_LOG(Timers, "new ImageResource(ResourceRequest, Image) %p", this);
     setStatus(Cached);
     setLoading(false);
     setCustomAcceptHeader();
@@ -73,6 +76,7 @@ ImageResource::ImageResource(const ResourceRequest& resourceRequest, WebCore::Im
 
 ImageResource::~ImageResource()
 {
+    WTF_LOG(Timers, "~ImageResource %p", this);
     clearImage();
 }
 
@@ -154,14 +158,14 @@ void ImageResource::allClientsRemoved()
     Resource::allClientsRemoved();
 }
 
-pair<WebCore::Image*, float> ImageResource::brokenImage(float deviceScaleFactor)
+pair<blink::Image*, float> ImageResource::brokenImage(float deviceScaleFactor)
 {
     if (deviceScaleFactor >= 2) {
-        DEFINE_STATIC_REF(WebCore::Image, brokenImageHiRes, (WebCore::Image::loadPlatformResource("missingImage@2x")));
+        DEFINE_STATIC_REF(blink::Image, brokenImageHiRes, (blink::Image::loadPlatformResource("missingImage@2x")));
         return std::make_pair(brokenImageHiRes, 2);
     }
 
-    DEFINE_STATIC_REF(WebCore::Image, brokenImageLoRes, (WebCore::Image::loadPlatformResource("missingImage")));
+    DEFINE_STATIC_REF(blink::Image, brokenImageLoRes, (blink::Image::loadPlatformResource("missingImage")));
     return std::make_pair(brokenImageLoRes, 1);
 }
 
@@ -170,7 +174,7 @@ bool ImageResource::willPaintBrokenImage() const
     return errorOccurred();
 }
 
-WebCore::Image* ImageResource::image()
+blink::Image* ImageResource::image()
 {
     ASSERT(!isPurgeable());
 
@@ -184,10 +188,10 @@ WebCore::Image* ImageResource::image()
     if (m_image)
         return m_image.get();
 
-    return WebCore::Image::nullImage();
+    return blink::Image::nullImage();
 }
 
-WebCore::Image* ImageResource::imageForRenderer(const RenderObject* renderer)
+blink::Image* ImageResource::imageForRenderer(const RenderObject* renderer)
 {
     ASSERT(!isPurgeable());
 
@@ -199,11 +203,11 @@ WebCore::Image* ImageResource::imageForRenderer(const RenderObject* renderer)
     }
 
     if (!m_image)
-        return WebCore::Image::nullImage();
+        return blink::Image::nullImage();
 
     if (m_image->isSVGImage()) {
-        WebCore::Image* image = m_svgImageCache->imageForRenderer(renderer);
-        if (image != WebCore::Image::nullImage())
+        blink::Image* image = m_svgImageCache->imageForRenderer(renderer);
+        if (image != blink::Image::nullImage())
             return image;
     }
 
@@ -350,7 +354,7 @@ void ImageResource::appendData(const char* data, int length)
 
 void ImageResource::updateImage(bool allDataReceived)
 {
-    TRACE_EVENT0("webkit", "ImageResource::updateImage");
+    TRACE_EVENT0("blink", "ImageResource::updateImage");
 
     if (m_data)
         createImage();
@@ -378,6 +382,19 @@ void ImageResource::updateImage(bool allDataReceived)
         // It would be nice to only redraw the decoded band of the image, but with the current design
         // (decoding delayed until painting) that seems hard.
         notifyObservers();
+    }
+}
+
+void ImageResource::updateBitmapImages(HashSet<ImageResource*>& images, bool redecodeImages)
+{
+    for (HashSet<ImageResource*>::iterator it = images.begin(); it != images.end(); ++it) {
+        ImageResource* imageResource = *it;
+        if (!imageResource->hasImage() || imageResource->image()->isNull())
+            continue;
+        BitmapImage* image = toBitmapImage(imageResource->image());
+        if (redecodeImages)
+            image->resetDecoder();
+        imageResource->updateImage(image->isAllDataReceived());
     }
 }
 
@@ -414,7 +431,7 @@ void ImageResource::responseReceived(const ResourceResponse& response)
     Resource::responseReceived(response);
 }
 
-void ImageResource::decodedSizeChanged(const WebCore::Image* image, int delta)
+void ImageResource::decodedSizeChanged(const blink::Image* image, int delta)
 {
     if (!image || image != m_image)
         return;
@@ -422,14 +439,18 @@ void ImageResource::decodedSizeChanged(const WebCore::Image* image, int delta)
     setDecodedSize(decodedSize() + delta);
 }
 
-void ImageResource::didDraw(const WebCore::Image* image)
+void ImageResource::didDraw(const blink::Image* image)
 {
     if (!image || image != m_image)
         return;
-    Resource::didAccessDecodedData();
+    // decodedSize() == 0 indicates that the image is decoded into DiscardableMemory,
+    // not in MemoryCache. So we don't need to call Resource::didAccessDecodedData()
+    // to update MemoryCache.
+    if (decodedSize() != 0)
+        Resource::didAccessDecodedData();
 }
 
-bool ImageResource::shouldPauseAnimation(const WebCore::Image* image)
+bool ImageResource::shouldPauseAnimation(const blink::Image* image)
 {
     if (!image || image != m_image)
         return false;
@@ -443,14 +464,14 @@ bool ImageResource::shouldPauseAnimation(const WebCore::Image* image)
     return true;
 }
 
-void ImageResource::animationAdvanced(const WebCore::Image* image)
+void ImageResource::animationAdvanced(const blink::Image* image)
 {
     if (!image || image != m_image)
         return;
     notifyObservers();
 }
 
-void ImageResource::changedInRect(const WebCore::Image* image, const IntRect& rect)
+void ImageResource::changedInRect(const blink::Image* image, const IntRect& rect)
 {
     if (!image || image != m_image)
         return;
@@ -459,7 +480,7 @@ void ImageResource::changedInRect(const WebCore::Image* image, const IntRect& re
 
 bool ImageResource::currentFrameKnownToBeOpaque(const RenderObject* renderer)
 {
-    WebCore::Image* image = imageForRenderer(renderer);
+    blink::Image* image = imageForRenderer(renderer);
     if (image->isBitmapImage())
         image->nativeImageForCurrentFrame(); // force decode
     return image->currentFrameKnownToBeOpaque();
@@ -474,4 +495,4 @@ bool ImageResource::isAccessAllowed(SecurityOrigin* securityOrigin)
     return !securityOrigin->taintsCanvas(response().url());
 }
 
-} // namespace WebCore
+} // namespace blink

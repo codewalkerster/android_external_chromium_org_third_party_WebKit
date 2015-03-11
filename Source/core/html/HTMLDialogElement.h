@@ -28,13 +28,14 @@
 
 #include "core/html/HTMLElement.h"
 
-namespace WebCore {
+namespace blink {
 
 class Document;
 class ExceptionState;
 class QualifiedName;
 
 class HTMLDialogElement FINAL : public HTMLElement {
+    DEFINE_WRAPPERTYPEINFO();
 public:
     DECLARE_NODE_FACTORY(HTMLDialogElement);
 
@@ -73,6 +74,6 @@ private:
     String m_returnValue;
 };
 
-} // namespace WebCore
+} // namespace blink
 
-#endif
+#endif // HTMLDialogElement_h

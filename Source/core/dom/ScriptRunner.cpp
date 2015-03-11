@@ -33,7 +33,7 @@
 #include "core/fetch/ScriptResource.h"
 #include "platform/heap/Handle.h"
 
-namespace WebCore {
+namespace blink {
 
 ScriptRunner::ScriptRunner(Document* document)
     : m_document(document)
@@ -46,6 +46,12 @@ ScriptRunner::~ScriptRunner()
 {
 }
 
+void ScriptRunner::addPendingAsyncScript(ScriptLoader* scriptLoader, const PendingScript& pendingScript)
+{
+    m_document->incrementLoadEventDelayCount();
+    m_pendingAsyncScripts.add(scriptLoader, pendingScript);
+}
+
 void ScriptRunner::queueScriptForExecution(ScriptLoader* scriptLoader, ResourcePtr<ScriptResource> resource, ExecutionType executionType)
 {
     ASSERT(scriptLoader);
@@ -55,14 +61,13 @@ void ScriptRunner::queueScriptForExecution(ScriptLoader* scriptLoader, ResourceP
     ASSERT(element);
     ASSERT(element->inDocument());
 
-    m_document->incrementLoadEventDelayCount();
-
     switch (executionType) {
     case ASYNC_EXECUTION:
-        m_pendingAsyncScripts.add(scriptLoader, PendingScript(element, resource.get()));
+        addPendingAsyncScript(scriptLoader, PendingScript(element, resource.get()));
         break;
 
     case IN_ORDER_EXECUTION:
+        m_document->incrementLoadEventDelayCount();
         m_scriptsToExecuteInOrder.append(PendingScript(element, resource.get()));
         break;
     }
@@ -109,6 +114,14 @@ void ScriptRunner::notifyScriptLoadError(ScriptLoader* scriptLoader, ExecutionTy
     }
 }
 
+void ScriptRunner::movePendingAsyncScript(ScriptRunner* newRunner, ScriptLoader* scriptLoader)
+{
+    if (m_pendingAsyncScripts.contains(scriptLoader)) {
+        newRunner->addPendingAsyncScript(scriptLoader, m_pendingAsyncScripts.take(scriptLoader));
+        m_document->decrementLoadEventDelayCount();
+    }
+}
+
 void ScriptRunner::timerFired(Timer<ScriptRunner>* timer)
 {
     ASSERT_UNUSED(timer, timer == &m_timer);
@@ -135,10 +148,12 @@ void ScriptRunner::timerFired(Timer<ScriptRunner>* timer)
 
 void ScriptRunner::trace(Visitor* visitor)
 {
+#if ENABLE(OILPAN)
     visitor->trace(m_document);
     visitor->trace(m_scriptsToExecuteInOrder);
     visitor->trace(m_scriptsToExecuteSoon);
     visitor->trace(m_pendingAsyncScripts);
+#endif
 }
 
 }

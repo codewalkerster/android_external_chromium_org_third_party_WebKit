@@ -32,14 +32,14 @@
 #include "config.h"
 #include "modules/webdatabase/SQLTransactionCoordinator.h"
 
-#include "modules/webdatabase/DatabaseBackend.h"
+#include "modules/webdatabase/Database.h"
 #include "modules/webdatabase/SQLTransactionBackend.h"
 
-namespace WebCore {
+namespace blink {
 
 static String getDatabaseIdentifier(SQLTransactionBackend* transaction)
 {
-    DatabaseBackend* database = transaction->database();
+    Database* database = transaction->database();
     ASSERT(database);
     return database->stringIdentifier();
 }
@@ -51,7 +51,9 @@ SQLTransactionCoordinator::SQLTransactionCoordinator()
 
 void SQLTransactionCoordinator::trace(Visitor* visitor)
 {
+#if ENABLE(OILPAN)
     visitor->trace(m_coordinationInfoMap);
+#endif
 }
 
 void SQLTransactionCoordinator::processPendingTransactions(CoordinationInfo& info)
@@ -142,7 +144,7 @@ void SQLTransactionCoordinator::shutdown()
         // Transaction phase 3 cleanup. See comment on "What happens if a
         // transaction is interrupted?" at the top of SQLTransactionBackend.cpp.
         while (!info.pendingTransactions.isEmpty()) {
-            RefPtrWillBeRawPtr<SQLTransactionBackend> transaction = info.pendingTransactions.first();
+            RefPtrWillBeRawPtr<SQLTransactionBackend> transaction = info.pendingTransactions.takeFirst();
             transaction->notifyDatabaseThreadIsShuttingDown();
         }
     }
@@ -151,4 +153,4 @@ void SQLTransactionCoordinator::shutdown()
     m_coordinationInfoMap.clear();
 }
 
-} // namespace WebCore
+} // namespace blink

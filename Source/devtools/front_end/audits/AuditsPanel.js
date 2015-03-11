@@ -51,8 +51,7 @@ WebInspector.AuditsPanel = function()
 
     this._constructCategories();
 
-    var target = /** @type {!WebInspector.Target} */ (WebInspector.targetManager.activeTarget());
-    this._auditController = new WebInspector.AuditController(target, this);
+    this._auditController = new WebInspector.AuditController(this);
     this._launcherView = new WebInspector.AuditLauncherView(this._auditController);
     for (var id in this.categoriesById)
         this._launcherView.addCategory(this.categoriesById[id]);
@@ -267,9 +266,6 @@ WebInspector.AuditRule.Severity = {
     Severe: "severe"
 }
 
-/**
- * @enum {number}
- */
 WebInspector.AuditRule.SeverityOrder = {
     "info": 3,
     "warning": 2,
@@ -466,9 +462,13 @@ WebInspector.AuditsSidebarTreeElement.prototype = {
         WebInspector.SidebarTreeElement.prototype.onattach.call(this);
     },
 
+    /**
+     * @return {boolean}
+     */
     onselect: function()
     {
         this._panel.showLauncherView();
+        return true;
     },
 
     get selectable()
@@ -501,9 +501,13 @@ WebInspector.AuditResultSidebarTreeElement = function(panel, results, mainResour
 }
 
 WebInspector.AuditResultSidebarTreeElement.prototype = {
+    /**
+     * @return {boolean}
+     */
     onselect: function()
     {
         this._panel.showResults(this.results);
+        return true;
     },
 
     get selectable()
@@ -522,11 +526,3 @@ WebInspector.AuditRules = {};
  * @type {!Object.<string, function(new:WebInspector.AuditCategory)>}
  */
 WebInspector.AuditCategories = {};
-
-importScript("AuditCategory.js");
-importScript("AuditCategories.js");
-importScript("AuditController.js");
-importScript("AuditFormatters.js");
-importScript("AuditLauncherView.js");
-importScript("AuditResultView.js");
-importScript("AuditRules.js");

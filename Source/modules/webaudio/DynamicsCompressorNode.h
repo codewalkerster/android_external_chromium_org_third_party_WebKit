@@ -29,20 +29,22 @@
 #include "modules/webaudio/AudioParam.h"
 #include "wtf/OwnPtr.h"
 
-namespace WebCore {
+namespace blink {
 
 class DynamicsCompressor;
 
 class DynamicsCompressorNode FINAL : public AudioNode {
+    DEFINE_WRAPPERTYPEINFO();
 public:
-    static PassRefPtrWillBeRawPtr<DynamicsCompressorNode> create(AudioContext* context, float sampleRate)
+    static DynamicsCompressorNode* create(AudioContext* context, float sampleRate)
     {
-        return adoptRefWillBeNoop(new DynamicsCompressorNode(context, sampleRate));
+        return adoptRefCountedGarbageCollectedWillBeNoop(new DynamicsCompressorNode(context, sampleRate));
     }
 
     virtual ~DynamicsCompressorNode();
 
     // AudioNode
+    virtual void dispose() OVERRIDE;
     virtual void process(size_t framesToProcess) OVERRIDE;
     virtual void initialize() OVERRIDE;
     virtual void uninitialize() OVERRIDE;
@@ -66,14 +68,14 @@ private:
     DynamicsCompressorNode(AudioContext*, float sampleRate);
 
     OwnPtr<DynamicsCompressor> m_dynamicsCompressor;
-    RefPtrWillBeMember<AudioParam> m_threshold;
-    RefPtrWillBeMember<AudioParam> m_knee;
-    RefPtrWillBeMember<AudioParam> m_ratio;
-    RefPtrWillBeMember<AudioParam> m_reduction;
-    RefPtrWillBeMember<AudioParam> m_attack;
-    RefPtrWillBeMember<AudioParam> m_release;
+    Member<AudioParam> m_threshold;
+    Member<AudioParam> m_knee;
+    Member<AudioParam> m_ratio;
+    Member<AudioParam> m_reduction;
+    Member<AudioParam> m_attack;
+    Member<AudioParam> m_release;
 };
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // DynamicsCompressorNode_h

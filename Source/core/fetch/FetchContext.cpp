@@ -32,12 +32,12 @@
 #include "core/fetch/FetchContext.h"
 
 
-namespace WebCore {
+namespace blink {
 
 FetchContext& FetchContext::nullInstance()
 {
-    DEFINE_STATIC_LOCAL(FetchContext, instance, ());
-    return instance;
+    DEFINE_STATIC_LOCAL(OwnPtrWillBePersistent<FetchContext>, instance, (adoptPtrWillBeNoop(new FetchContext())));
+    return *instance;
 }
 
 void FetchContext::dispatchDidChangeResourcePriority(unsigned long, ResourceLoadPriority, int)
@@ -93,4 +93,4 @@ void FetchContext::sendRemainingDelegateMessages(DocumentLoader*, unsigned long,
 {
 }
 
-} // namespace WebCore
+} // namespace blink

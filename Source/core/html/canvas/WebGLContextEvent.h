@@ -28,7 +28,7 @@
 
 #include "core/events/Event.h"
 
-namespace WebCore {
+namespace blink {
 
 struct WebGLContextEventInit : public EventInit {
     WebGLContextEventInit();
@@ -37,6 +37,8 @@ struct WebGLContextEventInit : public EventInit {
 };
 
 class WebGLContextEvent FINAL : public Event {
+    DEFINE_WRAPPERTYPEINFO();
+
 public:
     static PassRefPtrWillBeRawPtr<WebGLContextEvent> create()
     {
@@ -66,6 +68,6 @@ private:
     String m_statusMessage;
 };
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // WebGLContextEvent_h

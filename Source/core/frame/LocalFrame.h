@@ -35,17 +35,20 @@
 #include "platform/Supplementable.h"
 #include "platform/heap/Handle.h"
 #include "platform/scroll/ScrollTypes.h"
+#include "wtf/HashSet.h"
 
-namespace WebCore {
+namespace blink {
 
     class Color;
     class Document;
     class DragImage;
     class Editor;
+    class Element;
     class EventHandler;
     class FetchContext;
     class FloatSize;
     class FrameConsole;
+    class FrameDestructionObserver;
     class FrameSelection;
     class FrameView;
     class InputMethodController;
@@ -60,9 +63,9 @@ namespace WebCore {
     class TreeScope;
     class VisiblePosition;
 
-    class LocalFrame : public Frame, public WillBePersistentHeapSupplementable<LocalFrame>  {
+    class LocalFrame : public Frame, public WillBeHeapSupplementable<LocalFrame>  {
     public:
-        static PassRefPtr<LocalFrame> create(FrameLoaderClient*, FrameHost*, FrameOwner*);
+        static PassRefPtrWillBeRawPtr<LocalFrame> create(FrameLoaderClient*, FrameHost*, FrameOwner*);
 
         virtual bool isLocalFrame() const OVERRIDE { return true; }
 
@@ -73,15 +76,23 @@ namespace WebCore {
             ScrollbarMode = ScrollbarAuto, bool verticalLock = false);
 
         virtual ~LocalFrame();
+        virtual void trace(Visitor*) OVERRIDE;
 
-        virtual void willDetachFrameHost() OVERRIDE;
-        virtual void detachFromFrameHost() OVERRIDE;
+        virtual void detach() OVERRIDE;
+
+        void addDestructionObserver(FrameDestructionObserver*);
+        void removeDestructionObserver(FrameDestructionObserver*);
+
+        void willDetachFrameHost();
+        void detachFromFrameHost();
 
         virtual void disconnectOwnerElement() OVERRIDE;
 
         virtual void setDOMWindow(PassRefPtrWillBeRawPtr<LocalDOMWindow>) OVERRIDE;
         FrameView* view() const;
         Document* document() const;
+        void setPagePopupOwner(Element&);
+        Element* pagePopupOwner() const { return m_pagePopupOwner.get(); }
 
         RenderView* contentRenderer() const; // Root of the render tree for the document contained in this frame.
 
@@ -111,7 +122,6 @@ namespace WebCore {
 
         // See GraphicsLayerClient.h for accepted flags.
         String layerTreeAsText(unsigned flags = 0) const;
-        String trackedRepaintRectsAsText() const;
 
         void setPrinting(bool printing, const FloatSize& pageSize, const FloatSize& originalPageSize, float maximumShrinkRatio);
         bool shouldUsePrintingLayout() const;
@@ -129,8 +139,6 @@ namespace WebCore {
         void deviceOrPageScaleFactorChanged();
         double devicePixelRatio() const;
 
-        void sendOrientationChangeEvent();
-
         String documentTypeString() const;
 
         PassOwnPtr<DragImage> nodeImage(Node&);
@@ -144,6 +152,8 @@ namespace WebCore {
         PassRefPtrWillBeRawPtr<Range> rangeForPoint(const IntPoint& framePoint);
 
         bool isURLAllowed(const KURL&) const;
+        bool shouldReuseDefaultView(const KURL&) const;
+        void removeSpellingMarkersUnderWords(const Vector<String>& words);
 
     // ========
 
@@ -152,18 +162,23 @@ namespace WebCore {
 
         String localLayerTreeAsText(unsigned flags) const;
 
+        void detachView();
+
+        WillBeHeapHashSet<RawPtrWillBeWeakMember<FrameDestructionObserver> > m_destructionObservers;
         mutable FrameLoader m_loader;
         mutable NavigationScheduler m_navigationScheduler;
 
         RefPtr<FrameView> m_view;
+        // Usually 0. Non-null if this is the top frame of PagePopup.
+        RefPtrWillBeMember<Element> m_pagePopupOwner;
 
         OwnPtr<ScriptController> m_script;
-        const OwnPtrWillBePersistent<Editor> m_editor;
-        const OwnPtr<SpellChecker> m_spellChecker;
-        const OwnPtrWillBePersistent<FrameSelection> m_selection;
-        const OwnPtrWillBePersistent<EventHandler> m_eventHandler;
-        const OwnPtr<FrameConsole> m_console;
-        OwnPtr<InputMethodController> m_inputMethodController;
+        const OwnPtrWillBeMember<Editor> m_editor;
+        const OwnPtrWillBeMember<SpellChecker> m_spellChecker;
+        const OwnPtrWillBeMember<FrameSelection> m_selection;
+        const OwnPtrWillBeMember<EventHandler> m_eventHandler;
+        const OwnPtrWillBeMember<FrameConsole> m_console;
+        OwnPtrWillBeMember<InputMethodController> m_inputMethodController;
 
         float m_pageZoomFactor;
         float m_textZoomFactor;
@@ -239,7 +254,7 @@ namespace WebCore {
 
     DEFINE_TYPE_CASTS(LocalFrame, Frame, localFrame, localFrame->isLocalFrame(), localFrame.isLocalFrame());
 
-} // namespace WebCore
+} // namespace blink
 
 // During refactoring, there are some places where we need to do type conversions that
 // will not be needed once all instances of LocalFrame and RemoteFrame are sorted out.

@@ -26,10 +26,11 @@
 #include "core/svg/SVGGraphicsElement.h"
 #include "core/svg/SVGURIReference.h"
 
-namespace WebCore {
+namespace blink {
 
 class SVGAElement FINAL : public SVGGraphicsElement,
                           public SVGURIReference {
+    DEFINE_WRAPPERTYPEINFO();
 public:
     DECLARE_NODE_FACTORY(SVGAElement);
     SVGAnimatedString* svgTarget() { return m_svgTarget.get(); }
@@ -39,7 +40,6 @@ private:
 
     virtual String title() const OVERRIDE;
 
-    bool isSupportedAttribute(const QualifiedName&);
     virtual void parseAttribute(const QualifiedName&, const AtomicString&) OVERRIDE;
     virtual void svgAttributeChanged(const QualifiedName&) OVERRIDE;
 
@@ -47,7 +47,11 @@ private:
 
     virtual void defaultEventHandler(Event*) OVERRIDE;
 
+    virtual bool isLiveLink() const OVERRIDE { return isLink(); }
+
     virtual bool supportsFocus() const OVERRIDE;
+    virtual bool shouldHaveFocusAppearance() const OVERRIDE FINAL;
+    virtual void dispatchFocusEvent(Element* oldFocusedElement, FocusType) OVERRIDE;
     virtual bool isMouseFocusable() const OVERRIDE;
     virtual bool isKeyboardFocusable() const OVERRIDE;
     virtual bool isURLAttribute(const Attribute&) const OVERRIDE;
@@ -57,8 +61,9 @@ private:
     virtual bool willRespondToMouseClickEvents() OVERRIDE;
 
     RefPtr<SVGAnimatedString> m_svgTarget;
+    bool m_wasFocusedByMouse;
 };
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // SVGAElement_h

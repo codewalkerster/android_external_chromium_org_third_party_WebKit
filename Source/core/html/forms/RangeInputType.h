@@ -33,7 +33,7 @@
 
 #include "core/html/forms/InputType.h"
 
-namespace WebCore {
+namespace blink {
 
 class ExceptionState;
 class SliderThumbElement;
@@ -45,7 +45,6 @@ public:
 private:
     RangeInputType(HTMLInputElement&);
     virtual void countUsage() OVERRIDE;
-    virtual bool isRangeControl() const OVERRIDE;
     virtual const AtomicString& formControlType() const OVERRIDE;
     virtual double valueAsDouble() const OVERRIDE;
     virtual void setValueAsDouble(double, TextFieldEventBehavior, ExceptionState&) const OVERRIDE;
@@ -78,6 +77,6 @@ private:
     Vector<Decimal> m_tickMarkValues;
 };
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // RangeInputType_h

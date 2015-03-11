@@ -30,10 +30,14 @@
 #include "config.h"
 #include "core/inspector/InspectorFrontendHost.h"
 
-#include "bindings/v8/ScriptFunctionCall.h"
-#include "bindings/v8/ScriptState.h"
+#include "bindings/core/v8/ScriptFunctionCall.h"
+#include "bindings/core/v8/ScriptState.h"
 #include "core/clipboard/Pasteboard.h"
+#include "core/dom/ExecutionContext.h"
+#include "core/events/Event.h"
+#include "core/events/EventTarget.h"
 #include "core/fetch/ResourceFetcher.h"
+#include "core/frame/LocalDOMWindow.h"
 #include "core/frame/LocalFrame.h"
 #include "core/html/parser/TextResourceDecoder.h"
 #include "core/inspector/InspectorController.h"
@@ -51,7 +55,7 @@
 #include "platform/network/ResourceRequest.h"
 #include "platform/network/ResourceResponse.h"
 
-namespace WebCore {
+namespace blink {
 
 class FrontendMenuProvider FINAL : public ContextMenuProvider {
 public:
@@ -106,6 +110,7 @@ private:
             m_frontendHost->m_menuProvider = 0;
         }
         m_items.clear();
+        m_frontendHost = 0;
     }
 
     InspectorFrontendHost* m_frontendHost;
@@ -118,7 +123,6 @@ InspectorFrontendHost::InspectorFrontendHost(InspectorFrontendClient* client, Pa
     , m_frontendPage(frontendPage)
     , m_menuProvider(0)
 {
-    ScriptWrappable::init(this);
 }
 
 InspectorFrontendHost::~InspectorFrontendHost()
@@ -126,26 +130,40 @@ InspectorFrontendHost::~InspectorFrontendHost()
     ASSERT(!m_client);
 }
 
+void InspectorFrontendHost::trace(Visitor* visitor)
+{
+    visitor->trace(m_frontendPage);
+}
+
 void InspectorFrontendHost::disconnectClient()
 {
     m_client = 0;
     if (m_menuProvider)
         m_menuProvider->disconnect();
-    m_frontendPage = 0;
+    m_frontendPage = nullptr;
 }
 
 void InspectorFrontendHost::setZoomFactor(float zoom)
 {
-    m_frontendPage->deprecatedLocalMainFrame()->setPageAndTextZoomFactors(zoom, 1);
+    if (!m_frontendPage)
+        return;
+    if (LocalFrame* frame = m_frontendPage->deprecatedLocalMainFrame())
+        frame->setPageAndTextZoomFactors(zoom, 1);
 }
 
 float InspectorFrontendHost::zoomFactor()
 {
-    return m_frontendPage->deprecatedLocalMainFrame()->pageZoomFactor();
+    if (!m_frontendPage)
+        return 1;
+    if (LocalFrame* frame = m_frontendPage->deprecatedLocalMainFrame())
+        return frame->pageZoomFactor();
+    return 1;
 }
 
 void InspectorFrontendHost::setInjectedScriptForOrigin(const String& origin, const String& script)
 {
+    if (!m_frontendPage)
+        return;
     m_frontendPage->inspectorController().setInjectedScriptForOrigin(origin, script);
 }
 
@@ -156,17 +174,25 @@ void InspectorFrontendHost::copyText(const String& text)
 
 static String escapeUnicodeNonCharacters(const String& str)
 {
+    const UChar nonChar = 0xD800;
+
+    unsigned i = 0;
+    while (i < str.length() && str[i] < nonChar)
+        ++i;
+    if (i == str.length())
+        return str;
+
     StringBuilder dst;
-    for (unsigned i = 0; i < str.length(); ++i) {
+    dst.append(str, 0, i);
+    for (; i < str.length(); ++i) {
         UChar c = str[i];
-        if (c >= 0xD800) {
+        if (c >= nonChar) {
             unsigned symbol = static_cast<unsigned>(c);
             String symbolCode = String::format("\\u%04X", symbol);
             dst.append(symbolCode);
         } else {
             dst.append(c);
         }
-
     }
     return dst.toString();
 }
@@ -183,6 +209,19 @@ void InspectorFrontendHost::sendMessageToEmbedder(const String& message)
         m_client->sendMessageToEmbedder(escapeUnicodeNonCharacters(message));
 }
 
+void InspectorFrontendHost::showContextMenu(Page* page, float x, float y, const Vector<ContextMenuItem>& items)
+{
+    ASSERT(m_frontendPage);
+    ScriptState* frontendScriptState = ScriptState::forMainWorld(m_frontendPage->deprecatedLocalMainFrame());
+    ScriptValue frontendApiObject = frontendScriptState->getFromGlobalObject("InspectorFrontendAPI");
+    ASSERT(frontendApiObject.isObject());
+
+    RefPtr<FrontendMenuProvider> menuProvider = FrontendMenuProvider::create(this, frontendApiObject, items);
+    m_menuProvider = menuProvider.get();
+    float zoom = page->deprecatedLocalMainFrame()->pageZoomFactor();
+    page->inspectorController().showContextMenu(x * zoom, y * zoom, menuProvider);
+}
+
 void InspectorFrontendHost::showContextMenu(Event* event, const Vector<ContextMenuItem>& items)
 {
     if (!event)
@@ -192,8 +231,16 @@ void InspectorFrontendHost::showContextMenu(Event* event, const Vector<ContextMe
     ScriptState* frontendScriptState = ScriptState::forMainWorld(m_frontendPage->deprecatedLocalMainFrame());
     ScriptValue frontendApiObject = frontendScriptState->getFromGlobalObject("InspectorFrontendAPI");
     ASSERT(frontendApiObject.isObject());
+
+    Page* targetPage = m_frontendPage;
+    if (event->target() && event->target()->executionContext() && event->target()->executionContext()->executingWindow()) {
+        LocalDOMWindow* window = event->target()->executionContext()->executingWindow();
+        if (window->document() && window->document()->page())
+            targetPage = window->document()->page();
+    }
+
     RefPtr<FrontendMenuProvider> menuProvider = FrontendMenuProvider::create(this, frontendApiObject, items);
-    m_frontendPage->contextMenuController().showContextMenu(event, menuProvider);
+    targetPage->contextMenuController().showContextMenu(event, menuProvider);
     m_menuProvider = menuProvider.get();
 }
 
@@ -212,4 +259,9 @@ bool InspectorFrontendHost::isUnderTest()
     return m_client && m_client->isUnderTest();
 }
 
-} // namespace WebCore
+bool InspectorFrontendHost::isHostedMode()
+{
+    return false;
+}
+
+} // namespace blink

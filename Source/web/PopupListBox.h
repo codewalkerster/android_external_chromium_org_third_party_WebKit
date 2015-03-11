@@ -32,11 +32,13 @@
 #define PopupListBox_h
 
 #include "core/dom/Element.h"
-#include "platform/scroll/FramelessScrollView.h"
+#include "platform/scroll/ScrollTypes.h"
+#include "platform/scroll/ScrollView.h"
 #include "platform/text/TextDirection.h"
 #include "wtf/text/WTFString.h"
 
-namespace WebCore {
+namespace blink {
+
 class Font;
 class GraphicsContext;
 class IntRect;
@@ -45,11 +47,8 @@ class PlatformMouseEvent;
 class PlatformGestureEvent;
 class PlatformTouchEvent;
 class PlatformWheelEvent;
+class PopupContainer;
 class PopupMenuClient;
-}
-
-namespace blink {
-
 typedef unsigned long long TimeStamp;
 
 class PopupContent {
@@ -79,35 +78,55 @@ struct PopupItem {
     String label;
     Type type;
     int yOffset; // y offset of this item, relative to the top of the popup.
-    WebCore::TextDirection textDirection;
+    TextDirection textDirection;
     bool hasTextDirectionOverride;
     bool enabled;
+    bool displayNone;
 };
 
-// This class uses WebCore code to paint and handle events for a drop-down list
-// box ("combobox" on Windows).
-class PopupListBox FINAL : public WebCore::FramelessScrollView, public PopupContent {
+// This class manages the scrollable content inside a <select> popup.
+class PopupListBox FINAL : public Widget, public ScrollableArea, public PopupContent {
 public:
-    static PassRefPtr<PopupListBox> create(WebCore::PopupMenuClient* client, bool deviceSupportsTouch)
+    static PassRefPtr<PopupListBox> create(PopupMenuClient* client, bool deviceSupportsTouch, PopupContainer* container)
     {
-        return adoptRef(new PopupListBox(client, deviceSupportsTouch));
+        return adoptRef(new PopupListBox(client, deviceSupportsTouch, container));
     }
 
-    // FramelessScrollView
-    virtual void paint(WebCore::GraphicsContext*, const WebCore::IntRect&) OVERRIDE;
-    virtual bool handleMouseDownEvent(const WebCore::PlatformMouseEvent&) OVERRIDE;
-    virtual bool handleMouseMoveEvent(const WebCore::PlatformMouseEvent&) OVERRIDE;
-    virtual bool handleMouseReleaseEvent(const WebCore::PlatformMouseEvent&) OVERRIDE;
-    virtual bool handleWheelEvent(const WebCore::PlatformWheelEvent&) OVERRIDE;
-    virtual bool handleKeyEvent(const WebCore::PlatformKeyboardEvent&) OVERRIDE;
-    virtual bool handleTouchEvent(const WebCore::PlatformTouchEvent&) OVERRIDE;
-    virtual bool handleGestureEvent(const WebCore::PlatformGestureEvent&) OVERRIDE;
+    // Widget
+    virtual void invalidateRect(const IntRect&) OVERRIDE;
+    virtual void paint(GraphicsContext*, const IntRect&) OVERRIDE;
+    virtual HostWindow* hostWindow() const OVERRIDE;
+    virtual void setFrameRect(const IntRect&) OVERRIDE;
+    virtual IntPoint convertChildToSelf(const Widget* child, const IntPoint&) const OVERRIDE;
+    virtual IntPoint convertSelfToChild(const Widget* child, const IntPoint&) const OVERRIDE;
 
-    // ScrollView
-    virtual WebCore::HostWindow* hostWindow() const OVERRIDE;
+    // ScrollableArea
+    virtual void invalidateScrollbarRect(Scrollbar*, const IntRect&) OVERRIDE;
+    virtual bool isActive() const OVERRIDE;
+    virtual bool scrollbarsCanBeActive() const OVERRIDE;
+    virtual IntRect scrollableAreaBoundingBox() const OVERRIDE;
     virtual bool shouldPlaceVerticalScrollbarOnLeft() const OVERRIDE;
+    virtual int scrollSize(ScrollbarOrientation) const OVERRIDE;
+    virtual void setScrollOffset(const IntPoint&) OVERRIDE;
+    virtual bool isScrollCornerVisible() const OVERRIDE { return false; }
+    virtual bool userInputScrollable(ScrollbarOrientation orientation) const OVERRIDE { return orientation == VerticalScrollbar; }
+    virtual Scrollbar* verticalScrollbar() const OVERRIDE { return m_verticalScrollbar.get(); }
+    virtual IntRect visibleContentRect(IncludeScrollbarsInRect = ExcludeScrollbars) const OVERRIDE;
+    virtual IntSize contentsSize() const OVERRIDE { return m_contentsSize; }
+    virtual IntPoint scrollPosition() const OVERRIDE { return visibleContentRect().location(); }
+    virtual IntPoint maximumScrollPosition() const OVERRIDE; // The maximum position we can be scrolled to.
+    virtual IntPoint minimumScrollPosition() const OVERRIDE; // The minimum position we can be scrolled to.
+    virtual IntRect scrollCornerRect() const OVERRIDE { return IntRect(); }
 
     // PopupListBox methods
+
+    bool handleMouseDownEvent(const PlatformMouseEvent&);
+    bool handleMouseMoveEvent(const PlatformMouseEvent&);
+    bool handleMouseReleaseEvent(const PlatformMouseEvent&);
+    bool handleWheelEvent(const PlatformWheelEvent&);
+    bool handleKeyEvent(const PlatformKeyboardEvent&);
+    bool handleTouchEvent(const PlatformTouchEvent&);
+    bool handleGestureEvent(const PlatformGestureEvent&);
 
     // Closes the popup
     void abandon();
@@ -143,7 +162,9 @@ public:
     bool isInterestedInEventForKey(int keyCode);
 
     // Gets the height of a row.
-    int getRowHeight(int index);
+    int getRowHeight(int index) const;
+
+    int getRowBaseWidth(int index);
 
     virtual void setMaxHeight(int maxHeight) OVERRIDE { m_maxHeight = maxHeight; }
 
@@ -159,16 +180,15 @@ public:
 
     static const int defaultMaxHeight;
 
+protected:
+    virtual void invalidateScrollCornerRect(const IntRect&) OVERRIDE { }
+
 private:
     friend class PopupContainer;
     friend class RefCounted<PopupListBox>;
 
-    PopupListBox(WebCore::PopupMenuClient*, bool deviceSupportsTouch);
-
-    virtual ~PopupListBox()
-    {
-        clear();
-    }
+    PopupListBox(PopupMenuClient*, bool deviceSupportsTouch, PopupContainer*);
+    virtual ~PopupListBox();
 
     // Hides the popup. Other classes should not call this. Use abandon instead.
     void hidePopup();
@@ -196,27 +216,38 @@ private:
     void invalidateRow(int index);
 
     // Get the bounds of a row.
-    WebCore::IntRect getRowBounds(int index);
+    IntRect getRowBounds(int index);
 
     // Converts a point to an index of the row the point is over
-    int pointToRowIndex(const WebCore::IntPoint&);
+    int pointToRowIndex(const IntPoint&);
 
     // Paint an individual row
-    void paintRow(WebCore::GraphicsContext*, const WebCore::IntRect&, int rowIndex);
+    void paintRow(GraphicsContext*, const IntRect&, int rowIndex);
 
     // Test if the given point is within the bounds of the popup window.
-    bool isPointInBounds(const WebCore::IntPoint&);
+    bool isPointInBounds(const IntPoint&);
 
     // Called when the user presses a text key. Does a prefix-search of the items.
-    void typeAheadFind(const WebCore::PlatformKeyboardEvent&);
+    void typeAheadFind(const PlatformKeyboardEvent&);
 
     // Returns the font to use for the given row
-    WebCore::Font getRowFont(int index);
+    Font getRowFont(int index) const;
 
     // Moves the selection down/up one item, taking care of looping back to the
     // first/last element if m_loopSelectionNavigation is true.
     void selectPreviousRow();
     void selectNextRow();
+
+    int scrollX() const { return scrollPosition().x(); }
+    int scrollY() const { return scrollPosition().y(); }
+    void updateScrollbars(IntPoint desiredOffset);
+    void setHasVerticalScrollbar(bool);
+    Scrollbar* scrollbarAtWindowPoint(const IntPoint& windowPoint);
+    IntRect contentsToWindow(const IntRect&) const;
+    void setContentsSize(const IntSize&);
+    void adjustScrollbarExistence();
+    void updateScrollbarGeometry();
+    IntRect windowClipRect() const;
 
     // If the device is a touch screen we increase the height of menu items
     // to make it easier to unambiguously touch them.
@@ -252,14 +283,14 @@ private:
     Vector<PopupItem*> m_items;
 
     // The <select> PopupMenuClient that opened us.
-    WebCore::PopupMenuClient* m_popupClient;
+    PopupMenuClient* m_popupClient;
 
     // The scrollbar which has mouse capture. Mouse events go straight to this
     // if not null.
-    RefPtr<WebCore::Scrollbar> m_capturingScrollbar;
+    RefPtr<Scrollbar> m_capturingScrollbar;
 
     // The last scrollbar that the mouse was over. Used for mouseover highlights.
-    RefPtr<WebCore::Scrollbar> m_lastScrollbarUnderMouse;
+    RefPtr<Scrollbar> m_lastScrollbarUnderMouse;
 
     // The string the user has typed so far into the popup. Used for typeAheadFind.
     String m_typedString;
@@ -274,7 +305,13 @@ private:
     int m_maxWindowWidth;
 
     // To forward last mouse release event.
-    RefPtrWillBePersistent<WebCore::Element> m_focusedElement;
+    RefPtrWillBePersistent<Element> m_focusedElement;
+
+    PopupContainer* m_container;
+
+    RefPtr<Scrollbar> m_verticalScrollbar;
+    IntSize m_contentsSize;
+    IntPoint m_scrollOffset;
 };
 
 } // namespace blink

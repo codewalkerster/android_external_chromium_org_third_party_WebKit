@@ -25,7 +25,7 @@
 #include "config.h"
 #include "core/html/ImageDocument.h"
 
-#include "bindings/v8/ExceptionStatePlaceholder.h"
+#include "bindings/core/v8/ExceptionStatePlaceholder.h"
 #include "core/HTMLNames.h"
 #include "core/dom/RawDataDocumentParser.h"
 #include "core/events/EventListener.h"
@@ -46,7 +46,7 @@
 
 using std::min;
 
-namespace WebCore {
+namespace blink {
 
 using namespace HTMLNames;
 
@@ -108,12 +108,12 @@ static String imageTitle(const String& filename, const IntSize& size)
 {
     StringBuilder result;
     result.append(filename);
-    result.append(" (");
+    result.appendLiteral(" (");
     // FIXME: Localize numbers. Safari/OSX shows localized numbers with group
     // separaters. For example, "1,920x1,080".
-    result.append(String::number(size.width()));
+    result.appendNumber(size.width());
     result.append(static_cast<UChar>(0xD7)); // U+00D7 (multiplication sign)
-    result.append(String::number(size.height()));
+    result.appendNumber(size.height());
     result.append(')');
     return result.toString();
 }
@@ -199,7 +199,7 @@ void ImageDocument::createDocumentStructure()
 
     m_imageElement = HTMLImageElement::create(*this);
     m_imageElement->setAttribute(styleAttr, "-webkit-user-select: none");
-    m_imageElement->setLoadManually(true);
+    m_imageElement->setLoadingImageDocument();
     m_imageElement->setSrc(url().string());
     body->appendChild(m_imageElement.get());
 

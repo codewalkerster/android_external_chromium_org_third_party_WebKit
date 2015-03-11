@@ -34,7 +34,7 @@
 
 namespace blink { class WebLayer; }
 
-namespace WebCore {
+namespace blink {
 
 class CanvasImageSource;
 class HTMLCanvasElement;
@@ -58,6 +58,7 @@ public:
     virtual bool is3d() const { return false; }
     virtual bool isAccelerated() const { return false; }
     virtual bool hasAlpha() const { return true; }
+    virtual void setIsHidden(bool) = 0;
 
     virtual void paintRenderingResultsToCanvas() {}
 
@@ -76,6 +77,6 @@ private:
     HashSet<String> m_dirtyURLs;
 };
 
-} // namespace WebCore
+} // namespace blink
 
 #endif

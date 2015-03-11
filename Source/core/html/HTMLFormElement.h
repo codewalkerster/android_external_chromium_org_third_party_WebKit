@@ -35,7 +35,7 @@ namespace WTF{
 class TextEncoding;
 }
 
-namespace WebCore {
+namespace blink {
 
 class Event;
 class FormAssociatedElement;
@@ -47,6 +47,7 @@ class HTMLImageElement;
 class HTMLInputElement;
 
 class HTMLFormElement FINAL : public HTMLElement {
+    DEFINE_WRAPPERTYPEINFO();
 public:
     static PassRefPtrWillBeRawPtr<HTMLFormElement> create(Document&);
     virtual ~HTMLFormElement();
@@ -56,7 +57,7 @@ public:
     void getNamedElements(const AtomicString&, WillBeHeapVector<RefPtrWillBeMember<Element> >&);
 
     unsigned length() const;
-    Element* item(unsigned index);
+    HTMLElement* item(unsigned index);
 
     String enctype() const { return m_attributes.encodingType(); }
     void setEnctype(const AtomicString&);
@@ -117,7 +118,7 @@ public:
     const FormAssociatedElement::List& associatedElements() const;
     const WillBeHeapVector<RawPtrWillBeMember<HTMLImageElement> >& imageElements();
 
-    void anonymousNamedGetter(const AtomicString& name, bool&, RefPtrWillBeRawPtr<RadioNodeList>&, bool&, RefPtrWillBeRawPtr<Element>&);
+    void anonymousNamedGetter(const AtomicString& name, RefPtrWillBeRawPtr<RadioNodeList>&, RefPtrWillBeRawPtr<Element>&);
 
 private:
     explicit HTMLFormElement(Document&);
@@ -129,6 +130,7 @@ private:
 
     virtual void handleLocalEvents(Event*) OVERRIDE;
 
+    virtual void attributeWillChange(const QualifiedName&, const AtomicString& oldValue, const AtomicString& newValue) OVERRIDE;
     virtual void parseAttribute(const QualifiedName&, const AtomicString&) OVERRIDE;
     virtual bool isURLAttribute(const Attribute&) const OVERRIDE;
     virtual bool hasLegalLinkAttribute(const QualifiedName&) const OVERRIDE;
@@ -171,22 +173,22 @@ private:
 #if !ENABLE(OILPAN)
     WeakPtrFactory<HTMLFormElement> m_weakPtrFactory;
 #endif
-    bool m_associatedElementsAreDirty;
-    bool m_imageElementsAreDirty;
-    bool m_hasElementsAssociatedByParser;
-    bool m_didFinishParsingChildren;
+    bool m_associatedElementsAreDirty : 1;
+    bool m_imageElementsAreDirty : 1;
+    bool m_hasElementsAssociatedByParser : 1;
+    bool m_didFinishParsingChildren : 1;
 
-    bool m_wasUserSubmitted;
-    bool m_isSubmittingOrInUserJSSubmitEvent;
-    bool m_shouldSubmit;
+    bool m_wasUserSubmitted : 1;
+    bool m_isSubmittingOrInUserJSSubmitEvent : 1;
+    bool m_shouldSubmit : 1;
 
-    bool m_isInResetFunction;
+    bool m_isInResetFunction : 1;
 
-    bool m_wasDemoted;
+    bool m_wasDemoted : 1;
 
     OwnPtrWillBeMember<GenericEventQueue> m_pendingAutocompleteEventsQueue;
 };
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // HTMLFormElement_h

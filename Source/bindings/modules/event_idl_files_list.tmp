@@ -11,9 +11,9 @@
 ../../modules/mediastream/RTCDataChannelEvent.idl
 ../../modules/mediastream/RTCIceCandidateEvent.idl
 ../../modules/push_messaging/PushEvent.idl
+../../modules/serviceworkers/ExtendableEvent.idl
 ../../modules/serviceworkers/FetchEvent.idl
 ../../modules/serviceworkers/InstallEvent.idl
-../../modules/serviceworkers/InstallPhaseEvent.idl
 ../../modules/speech/SpeechRecognitionError.idl
 ../../modules/speech/SpeechRecognitionEvent.idl
 ../../modules/speech/SpeechSynthesisEvent.idl

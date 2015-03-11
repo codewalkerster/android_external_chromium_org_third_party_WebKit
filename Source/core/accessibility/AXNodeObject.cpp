@@ -29,6 +29,7 @@
 #include "config.h"
 #include "core/accessibility/AXNodeObject.h"
 
+#include "core/InputTypeNames.h"
 #include "core/accessibility/AXObjectCache.h"
 #include "core/dom/NodeTraversal.h"
 #include "core/dom/Text.h"
@@ -37,6 +38,7 @@
 #include "core/html/HTMLInputElement.h"
 #include "core/html/HTMLLabelElement.h"
 #include "core/html/HTMLLegendElement.h"
+#include "core/html/HTMLPlugInElement.h"
 #include "core/html/HTMLSelectElement.h"
 #include "core/html/HTMLTextAreaElement.h"
 #include "core/rendering/RenderObject.h"
@@ -44,7 +46,7 @@
 #include "wtf/text/StringBuilder.h"
 
 
-namespace WebCore {
+namespace blink {
 
 using namespace HTMLNames;
 
@@ -52,7 +54,7 @@ AXNodeObject::AXNodeObject(Node* node)
     : AXObject()
     , m_ariaRole(UnknownRole)
     , m_childrenDirty(false)
-#ifndef NDEBUG
+#if ENABLE(ASSERT)
     , m_initialized(false)
 #endif
     , m_node(node)
@@ -91,7 +93,7 @@ static String accessibleNameForNode(Node* node)
     return String();
 }
 
-String AXNodeObject::accessibilityDescriptionForElements(Vector<Element*> &elements) const
+String AXNodeObject::accessibilityDescriptionForElements(WillBeHeapVector<RawPtrWillBeMember<Element> > &elements) const
 {
     StringBuilder builder;
     unsigned size = elements.size();
@@ -133,7 +135,7 @@ String AXNodeObject::ariaAccessibilityDescription() const
 }
 
 
-void AXNodeObject::ariaLabeledByElements(Vector<Element*>& elements) const
+void AXNodeObject::ariaLabeledByElements(WillBeHeapVector<RawPtrWillBeMember<Element> >& elements) const
 {
     elementsFromAttribute(elements, aria_labeledbyAttr);
     if (!elements.size())
@@ -154,7 +156,7 @@ void AXNodeObject::changeValueByStep(bool increase)
 
 bool AXNodeObject::computeAccessibilityIsIgnored() const
 {
-#ifndef NDEBUG
+#if ENABLE(ASSERT)
     // Double-check that an AXObject is never accessed before
     // it's been initialized.
     ASSERT(m_initialized);
@@ -189,21 +191,27 @@ AccessibilityRole AXNodeObject::determineAccessibilityRole()
         return StaticTextRole;
     if (isHTMLButtonElement(*node()))
         return buttonRoleType();
+    if (isHTMLDetailsElement(*node()))
+        return DetailsRole;
+    if (isHTMLSummaryElement(*node())) {
+        if (node()->parentNode() && isHTMLDetailsElement(node()->parentNode()))
+            return DisclosureTriangleRole;
+        return UnknownRole;
+    }
+
     if (isHTMLInputElement(*node())) {
         HTMLInputElement& input = toHTMLInputElement(*node());
-        if (input.isCheckbox())
+        const AtomicString& type = input.type();
+        if (type == InputTypeNames::checkbox)
             return CheckBoxRole;
-        if (input.isRadioButton())
+        if (type == InputTypeNames::radio)
             return RadioButtonRole;
         if (input.isTextButton())
             return buttonRoleType();
-        if (input.isRangeControl())
+        if (type == InputTypeNames::range)
             return SliderRole;
-
-        const AtomicString& type = input.getAttribute(typeAttr);
-        if (equalIgnoringCase(type, "color"))
+        if (type == InputTypeNames::color)
             return ColorWellRole;
-
         return TextFieldRole;
     }
     if (isHTMLSelectElement(*node())) {
@@ -220,11 +228,15 @@ AccessibilityRole AXNodeObject::determineAccessibilityRole()
         return ParagraphRole;
     if (isHTMLLabelElement(*node()))
         return LabelRole;
+    if (node()->isElementNode() && node()->hasTagName(figcaptionTag))
+        return FigcaptionRole;
+    if (node()->isElementNode() && node()->hasTagName(figureTag))
+        return FigureRole;
     if (node()->isElementNode() && toElement(node())->isFocusable())
         return GroupRole;
     if (isHTMLAnchorElement(*node()) && isClickable())
         return LinkRole;
-    if (node()->hasTagName(iframeTag))
+    if (isHTMLIFrameElement(*node()))
         return IframeRole;
     if (isEmbeddedObject())
         return EmbeddedObjectRole;
@@ -241,7 +253,7 @@ AccessibilityRole AXNodeObject::determineAriaRoleAttribute() const
     AccessibilityRole role = ariaRoleToWebCoreRole(ariaRole);
 
     // ARIA states if an item can get focus, it should not be presentational.
-    if (role == PresentationalRole && canSetFocusAttribute())
+    if ((role == NoneRole || role == PresentationalRole) && canSetFocusAttribute())
         return UnknownRole;
 
     if (role == ButtonRole)
@@ -258,7 +270,7 @@ AccessibilityRole AXNodeObject::determineAriaRoleAttribute() const
     return UnknownRole;
 }
 
-void AXNodeObject::elementsFromAttribute(Vector<Element*>& elements, const QualifiedName& attribute) const
+void AXNodeObject::elementsFromAttribute(WillBeHeapVector<RawPtrWillBeMember<Element> >& elements, const QualifiedName& attribute) const
 {
     Node* node = this->node();
     if (!node || !node->isElementNode())
@@ -283,7 +295,7 @@ void AXNodeObject::elementsFromAttribute(Vector<Element*>& elements, const Quali
     }
 }
 
-// If you call node->rendererIsEditable() since that will return true if an ancestor is editable.
+// If you call node->hasEditableStyle() since that will return true if an ancestor is editable.
 // This only returns true if this is the element that actually has the contentEditable attribute set.
 bool AXNodeObject::hasContentEditableAttributeSet() const
 {
@@ -350,12 +362,7 @@ HTMLLabelElement* AXNodeObject::labelForElement(Element* element) const
             return label;
     }
 
-    for (Element* parent = element->parentElement(); parent; parent = parent->parentElement()) {
-        if (isHTMLLabelElement(*parent))
-            return toHTMLLabelElement(parent);
-    }
-
-    return 0;
+    return Traversal<HTMLLabelElement>::firstAncestor(*element);
 }
 
 AXObject* AXNodeObject::menuButtonForMenu() const
@@ -401,8 +408,8 @@ Element* AXNodeObject::mouseButtonListener() const
         return 0;
 
     // check if our parent is a mouse button listener
-    while (node && !node->isElementNode())
-        node = node->parentNode();
+    if (!node->isElementNode())
+        node = node->parentElement();
 
     if (!node)
         return 0;
@@ -446,7 +453,7 @@ AccessibilityRole AXNodeObject::remapAriaRoleDueToParent(AccessibilityRole role)
 
 void AXNodeObject::init()
 {
-#ifndef NDEBUG
+#if ENABLE(ASSERT)
     ASSERT(!m_initialized);
     m_initialized = true;
 #endif
@@ -477,9 +484,7 @@ bool AXNodeObject::isControl() const
 
 bool AXNodeObject::isEmbeddedObject() const
 {
-    return node()
-        && (node()->hasTagName(objectTag) || node()->hasTagName(embedTag)
-        || node()->hasTagName(appletTag));
+    return isHTMLPlugInElement(node());
 }
 
 bool AXNodeObject::isFieldset() const
@@ -515,7 +520,7 @@ bool AXNodeObject::isInputImage() const
 {
     Node* node = this->node();
     if (roleValue() == ButtonRole && isHTMLInputElement(node))
-        return toHTMLInputElement(*node).isImageButton();
+        return toHTMLInputElement(*node).type() == InputTypeNames::image;
 
     return false;
 }
@@ -553,7 +558,7 @@ bool AXNodeObject::isNativeCheckboxOrRadio() const
         return false;
 
     HTMLInputElement* input = toHTMLInputElement(node);
-    return input->isCheckbox() || input->isRadioButton();
+    return input->type() == InputTypeNames::checkbox || input->type() == InputTypeNames::radio;
 }
 
 bool AXNodeObject::isNativeImage() const
@@ -565,11 +570,11 @@ bool AXNodeObject::isNativeImage() const
     if (isHTMLImageElement(*node))
         return true;
 
-    if (isHTMLAppletElement(*node) || isHTMLEmbedElement(*node) || isHTMLObjectElement(*node))
+    if (isHTMLPlugInElement(*node))
         return true;
 
     if (isHTMLInputElement(*node))
-        return toHTMLInputElement(*node).isImageButton();
+        return toHTMLInputElement(*node).type() == InputTypeNames::image;
 
     return false;
 }
@@ -583,10 +588,8 @@ bool AXNodeObject::isNativeTextControl() const
     if (isHTMLTextAreaElement(*node))
         return true;
 
-    if (isHTMLInputElement(*node)) {
-        HTMLInputElement* input = toHTMLInputElement(node);
-        return input->isText() || input->isNumberField();
-    }
+    if (isHTMLInputElement(*node))
+        return toHTMLInputElement(node)->isTextField();
 
     return false;
 }
@@ -614,7 +617,7 @@ bool AXNodeObject::isPasswordField() const
     if (ariaRoleAttribute() != UnknownRole)
         return false;
 
-    return toHTMLInputElement(node)->isPasswordField();
+    return toHTMLInputElement(node)->type() == InputTypeNames::password;
 }
 
 bool AXNodeObject::isProgressIndicator() const
@@ -718,7 +721,7 @@ bool AXNodeObject::isReadOnly() const
             return input.isReadOnly();
     }
 
-    return !node->rendererIsEditable();
+    return !node->hasEditableStyle();
 }
 
 bool AXNodeObject::isRequired() const
@@ -814,27 +817,31 @@ int AXNodeObject::headingLevel() const
     // headings can be in block flow and non-block flow
     Node* node = this->node();
     if (!node)
-        return false;
+        return 0;
 
     if (ariaRoleAttribute() == HeadingRole)
         return getAttribute(aria_levelAttr).toInt();
 
-    if (node->hasTagName(h1Tag))
+    if (!node->isHTMLElement())
+        return 0;
+
+    HTMLElement& element = toHTMLElement(*node);
+    if (element.hasTagName(h1Tag))
         return 1;
 
-    if (node->hasTagName(h2Tag))
+    if (element.hasTagName(h2Tag))
         return 2;
 
-    if (node->hasTagName(h3Tag))
+    if (element.hasTagName(h3Tag))
         return 3;
 
-    if (node->hasTagName(h4Tag))
+    if (element.hasTagName(h4Tag))
         return 4;
 
-    if (node->hasTagName(h5Tag))
+    if (element.hasTagName(h5Tag))
         return 5;
 
-    if (node->hasTagName(h6Tag))
+    if (element.hasTagName(h6Tag))
         return 6;
 
     return 0;
@@ -954,7 +961,7 @@ float AXNodeObject::valueForRange() const
 
     if (isHTMLInputElement(node())) {
         HTMLInputElement& input = toHTMLInputElement(*node());
-        if (input.isRangeControl())
+        if (input.type() == InputTypeNames::range)
             return input.valueAsNumber();
     }
 
@@ -968,7 +975,7 @@ float AXNodeObject::maxValueForRange() const
 
     if (isHTMLInputElement(node())) {
         HTMLInputElement& input = toHTMLInputElement(*node());
-        if (input.isRangeControl())
+        if (input.type() == InputTypeNames::range)
             return input.maximum();
     }
 
@@ -982,7 +989,7 @@ float AXNodeObject::minValueForRange() const
 
     if (isHTMLInputElement(node())) {
         HTMLInputElement& input = toHTMLInputElement(*node());
-        if (input.isRangeControl())
+        if (input.type() == InputTypeNames::range)
             return input.minimum();
     }
 
@@ -1036,7 +1043,7 @@ String AXNodeObject::stringValue() const
 
 String AXNodeObject::ariaDescribedByAttribute() const
 {
-    Vector<Element*> elements;
+    WillBeHeapVector<RawPtrWillBeMember<Element> > elements;
     elementsFromAttribute(elements, aria_describedbyAttr);
 
     return accessibilityDescriptionForElements(elements);
@@ -1045,7 +1052,7 @@ String AXNodeObject::ariaDescribedByAttribute() const
 
 String AXNodeObject::ariaLabeledByAttribute() const
 {
-    Vector<Element*> elements;
+    WillBeHeapVector<RawPtrWillBeMember<Element> > elements;
     ariaLabeledByElements(elements);
 
     return accessibilityDescriptionForElements(elements);
@@ -1247,8 +1254,28 @@ LayoutRect AXNodeObject::elementRect() const
     if (!m_explicitElementRect.isEmpty())
         return m_explicitElementRect;
 
-    // AXNodeObjects have no mechanism yet to return a size or position.
-    // For now, let's return the position of the ancestor that does have a position,
+    // FIXME: If there are a lot of elements in the canvas, it will be inefficient.
+    // We can avoid the inefficient calculations by using AXComputedObjectAttributeCache.
+    if (node()->parentElement()->isInCanvasSubtree()) {
+        LayoutRect rect;
+
+        for (Node* child = node()->firstChild(); child; child = child->nextSibling()) {
+            if (child->isHTMLElement()) {
+                if (AXObject* obj = axObjectCache()->get(child)) {
+                    if (rect.isEmpty())
+                        rect = obj->elementRect();
+                    else
+                        rect.unite(obj->elementRect());
+                }
+            }
+        }
+
+        if (!rect.isEmpty())
+            return rect;
+    }
+
+    // If this object doesn't have an explicit element rect or computable from its children,
+    // for now, let's return the position of the ancestor that does have a position,
     // and make it the width of that parent, and about the height of a line of text, so that it's clear the object is a child of the parent.
 
     LayoutRect boundingBox;
@@ -1373,7 +1400,7 @@ bool AXNodeObject::canHaveChildren() const
     case ScrollBarRole:
         return false;
     case StaticTextRole:
-        if (!axObjectCache()->inlineTextBoxAccessibility())
+        if (!axObjectCache()->inlineTextBoxAccessibilityEnabled())
             return false;
     default:
         return true;
@@ -1614,25 +1641,21 @@ String AXNodeObject::alternativeTextForWebArea() const
             return ariaLabel;
     }
 
-    Node* owner = document->ownerElement();
-    if (owner) {
+    if (HTMLFrameOwnerElement* owner = document->ownerElement()) {
         if (isHTMLFrameElementBase(*owner)) {
-            const AtomicString& title = toElement(owner)->getAttribute(titleAttr);
+            const AtomicString& title = owner->getAttribute(titleAttr);
             if (!title.isEmpty())
                 return title;
-            return toElement(owner)->getNameAttribute();
         }
-        if (owner->isHTMLElement())
-            return toHTMLElement(owner)->getNameAttribute();
+        return owner->getNameAttribute();
     }
 
     String documentTitle = document->title();
     if (!documentTitle.isEmpty())
         return documentTitle;
 
-    owner = document->body();
-    if (owner && owner->isHTMLElement())
-        return toHTMLElement(owner)->getNameAttribute();
+    if (HTMLElement* body = document->body())
+        return body->getNameAttribute();
 
     return String();
 }
@@ -1665,7 +1688,7 @@ void AXNodeObject::ariaLabeledByText(Vector<AccessibilityText>& textOrder) const
 {
     String ariaLabeledBy = ariaLabeledByAttribute();
     if (!ariaLabeledBy.isEmpty()) {
-        Vector<Element*> elements;
+        WillBeHeapVector<RawPtrWillBeMember<Element> > elements;
         ariaLabeledByElements(elements);
 
         unsigned length = elements.size();
@@ -1687,4 +1710,4 @@ void AXNodeObject::changeValueByPercent(float percentChange)
     axObjectCache()->postNotification(node(), AXObjectCache::AXValueChanged, true);
 }
 
-} // namespace WebCore
+} // namespace blink

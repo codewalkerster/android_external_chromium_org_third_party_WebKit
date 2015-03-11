@@ -41,7 +41,7 @@
 #include "wtf/RefPtr.h"
 #include <gtest/gtest.h>
 
-namespace WebCore {
+namespace blink {
 
 namespace {
 
@@ -79,7 +79,7 @@ public:
         m_actualDecoder->setSize(1, 1);
         m_lazyDecoder = DeferredImageDecoder::createForTesting(decoder.release());
         m_canvas.reset(SkCanvas::NewRasterN32(100, 100));
-        ASSERT_TRUE(m_canvas);
+        ASSERT_TRUE(m_canvas.get());
         m_frameBufferRequestCount = 0;
         m_frameCount = 1;
         m_repetitionCount = cAnimationNone;
@@ -166,7 +166,7 @@ TEST_F(DeferredImageDecoderTest, drawIntoSkPicture)
     EXPECT_EQ(0, m_frameBufferRequestCount);
 
     SkBitmap canvasBitmap;
-    ASSERT_TRUE(canvasBitmap.allocN32Pixels(100, 100));
+    canvasBitmap.allocN32Pixels(100, 100);
     ASSERT_TRUE(m_canvas->readPixels(&canvasBitmap, 0, 0));
     SkAutoLockPixels autoLock(canvasBitmap);
     EXPECT_EQ(SkColorSetARGB(255, 255, 255, 255), canvasBitmap.getColor(0, 0));
@@ -194,7 +194,7 @@ TEST_F(DeferredImageDecoderTest, drawIntoSkPictureProgressive)
     m_canvas->drawPicture(picture.get());
 
     SkBitmap canvasBitmap;
-    ASSERT_TRUE(canvasBitmap.allocN32Pixels(100, 100));
+    canvasBitmap.allocN32Pixels(100, 100);
     ASSERT_TRUE(m_canvas->readPixels(&canvasBitmap, 0, 0));
     SkAutoLockPixels autoLock(canvasBitmap);
     EXPECT_EQ(SkColorSetARGB(255, 255, 255, 255), canvasBitmap.getColor(0, 0));
@@ -221,13 +221,13 @@ TEST_F(DeferredImageDecoderTest, decodeOnOtherThread)
     EXPECT_EQ(0, m_frameBufferRequestCount);
 
     // Create a thread to rasterize SkPicture.
-    OwnPtr<blink::WebThread> thread = adoptPtr(blink::Platform::current()->createThread("RasterThread"));
+    OwnPtr<WebThread> thread = adoptPtr(Platform::current()->createThread("RasterThread"));
     thread->postTask(new Task(WTF::bind(&rasterizeMain, m_canvas.get(), picture.get())));
     thread.clear();
     EXPECT_EQ(0, m_frameBufferRequestCount);
 
     SkBitmap canvasBitmap;
-    ASSERT_TRUE(canvasBitmap.allocN32Pixels(100, 100));
+    canvasBitmap.allocN32Pixels(100, 100);
     ASSERT_TRUE(m_canvas->readPixels(&canvasBitmap, 0, 0));
     SkAutoLockPixels autoLock(canvasBitmap);
     EXPECT_EQ(SkColorSetARGB(255, 255, 255, 255), canvasBitmap.getColor(0, 0));
@@ -342,4 +342,4 @@ TEST_F(DeferredImageDecoderTest, smallerFrameCount)
     EXPECT_EQ(m_frameCount, m_lazyDecoder->frameCount());
 }
 
-} // namespace WebCore
+} // namespace blink

@@ -27,12 +27,13 @@
 #include "core/html/HTMLElement.h"
 #include "platform/Timer.h"
 
-namespace WebCore {
+namespace blink {
 
 class ExceptionState;
 class RenderMarquee;
 
 class HTMLMarqueeElement FINAL : public HTMLElement, private ActiveDOMObject {
+    DEFINE_WRAPPERTYPEINFO();
 public:
     static PassRefPtrWillBeRawPtr<HTMLMarqueeElement> create(Document&);
 
@@ -42,15 +43,6 @@ public:
 
     void start();
     virtual void stop() OVERRIDE;
-
-    int scrollAmount() const;
-    void setScrollAmount(int, ExceptionState&);
-
-    int scrollDelay() const;
-    void setScrollDelay(int, ExceptionState&);
-
-    int loop() const;
-    void setLoop(int, ExceptionState&);
 
     void timerFired(Timer<HTMLMarqueeElement>*);
 
@@ -71,6 +63,6 @@ private:
     RenderMarquee* renderMarquee() const;
 };
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // HTMLMarqueeElement_h

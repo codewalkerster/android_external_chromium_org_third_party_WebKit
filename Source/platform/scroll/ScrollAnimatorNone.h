@@ -37,11 +37,7 @@
 
 class ScrollAnimatorNoneTest;
 
-namespace WebCore {
-
-class IntPoint;
-class ActivePlatformGestureAnimation;
-struct ScrollAnimatorParameters;
+namespace blink {
 
 class PLATFORM_EXPORT ScrollAnimatorNone : public ScrollAnimator {
 public:
@@ -151,6 +147,6 @@ protected:
     bool m_animationActive;
 };
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // ScrollAnimatorNone_h

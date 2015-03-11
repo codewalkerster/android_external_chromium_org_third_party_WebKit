@@ -30,7 +30,7 @@
 #include "core/svg/SVGPointTearOff.h"
 #include "core/svg/SVGZoomAndPan.h"
 
-namespace WebCore {
+namespace blink {
 
 class SVGMatrixTearOff;
 class SVGAngleTearOff;
@@ -43,6 +43,7 @@ class SMILTimeContainer;
 class SVGSVGElement FINAL : public SVGGraphicsElement,
                             public SVGFitToViewBox,
                             public SVGZoomAndPan {
+    DEFINE_WRAPPERTYPEINFO();
 public:
     DECLARE_NODE_FACTORY(SVGSVGElement);
 
@@ -165,6 +166,6 @@ private:
     friend class SVGCurrentTranslateTearOff;
 };
 
-} // namespace WebCore
+} // namespace blink
 
-#endif
+#endif // SVGSVGElement_h

@@ -24,9 +24,10 @@
 #include "core/svg/SVGAnimationElement.h"
 #include "platform/graphics/Path.h"
 
-namespace WebCore {
+namespace blink {
 
 class SVGAnimateMotionElement FINAL : public SVGAnimationElement {
+    DEFINE_WRAPPERTYPEINFO();
 public:
     virtual ~SVGAnimateMotionElement();
 
@@ -39,7 +40,6 @@ private:
     virtual bool hasValidAttributeType() OVERRIDE;
     virtual bool hasValidAttributeName() OVERRIDE;
 
-    bool isSupportedAttribute(const QualifiedName&);
     virtual void parseAttribute(const QualifiedName&, const AtomicString&) OVERRIDE;
 
     virtual void resetAnimatedType() OVERRIDE;
@@ -71,6 +71,6 @@ private:
     Path m_animationPath;
 };
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // SVGAnimateMotionElement_h

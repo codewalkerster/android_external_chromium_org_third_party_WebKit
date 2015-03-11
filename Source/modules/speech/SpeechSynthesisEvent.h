@@ -28,9 +28,10 @@
 
 #include "modules/EventModules.h"
 
-namespace WebCore {
+namespace blink {
 
 class SpeechSynthesisEvent FINAL : public Event {
+    DEFINE_WRAPPERTYPEINFO();
 public:
     static PassRefPtrWillBeRawPtr<SpeechSynthesisEvent> create();
     static PassRefPtrWillBeRawPtr<SpeechSynthesisEvent> create(const AtomicString& type, unsigned long charIndex, float elapsedTime, const String& name);
@@ -55,6 +56,6 @@ private:
     String m_name;
 };
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // SpeechSynthesisEvent_h

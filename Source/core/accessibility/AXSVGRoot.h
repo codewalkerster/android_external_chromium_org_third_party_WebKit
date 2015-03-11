@@ -31,7 +31,7 @@
 
 #include "core/accessibility/AXRenderObject.h"
 
-namespace WebCore {
+namespace blink {
 
 class AXSVGRoot FINAL : public AXRenderObject {
 
@@ -41,7 +41,7 @@ public:
     static PassRefPtr<AXSVGRoot> create(RenderObject*);
     virtual ~AXSVGRoot();
 
-    void setParent(AXObject* parent) { m_parent = parent; }
+    void setParent(AXObject*);
 
 private:
     AXObject* m_parent;
@@ -52,6 +52,6 @@ private:
 
 DEFINE_AX_OBJECT_TYPE_CASTS(AXSVGRoot, isAXSVGRoot());
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // AXSVGRoot_h

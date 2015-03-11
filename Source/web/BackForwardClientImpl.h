@@ -34,15 +34,16 @@
 #include "core/page/BackForwardClient.h"
 
 namespace blink {
+
 class WebViewImpl;
 
-class BackForwardClientImpl FINAL : public WebCore::BackForwardClient {
+class BackForwardClientImpl FINAL : public BackForwardClient {
 public:
     explicit BackForwardClientImpl(WebViewImpl*);
     virtual ~BackForwardClientImpl();
 
 private:
-    // WebCore::BackForwardList methods:
+    // BackForwardList methods:
     virtual int backListCount() OVERRIDE;
     virtual int forwardListCount() OVERRIDE;
     virtual int backForwardListCount() OVERRIDE;

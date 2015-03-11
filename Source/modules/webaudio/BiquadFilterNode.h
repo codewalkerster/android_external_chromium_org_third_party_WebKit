@@ -28,11 +28,12 @@
 #include "modules/webaudio/AudioBasicProcessorNode.h"
 #include "modules/webaudio/BiquadProcessor.h"
 
-namespace WebCore {
+namespace blink {
 
 class AudioParam;
 
 class BiquadFilterNode FINAL : public AudioBasicProcessorNode {
+    DEFINE_WRAPPERTYPEINFO();
 public:
     // These must be defined as in the .idl file and must match those in the BiquadProcessor class.
     enum {
@@ -46,9 +47,9 @@ public:
         ALLPASS = 7
     };
 
-    static PassRefPtrWillBeRawPtr<BiquadFilterNode> create(AudioContext* context, float sampleRate)
+    static BiquadFilterNode* create(AudioContext* context, float sampleRate)
     {
-        return adoptRefWillBeNoop(new BiquadFilterNode(context, sampleRate));
+        return adoptRefCountedGarbageCollectedWillBeNoop(new BiquadFilterNode(context, sampleRate));
     }
 
     String type() const;
@@ -72,6 +73,6 @@ private:
     bool setType(unsigned); // Returns true on success.
 };
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // BiquadFilterNode_h

@@ -33,12 +33,12 @@
 #include "core/rendering/style/RenderStyleConstants.h"
 #include "platform/Length.h"
 #include "platform/LengthSize.h"
-#include "platform/graphics/WindRule.h"
+#include "platform/graphics/GraphicsTypes.h"
 #include "wtf/RefCounted.h"
 #include "wtf/RefPtr.h"
 #include "wtf/Vector.h"
 
-namespace WebCore {
+namespace blink {
 
 class FloatRect;
 class FloatSize;
@@ -81,18 +81,12 @@ public:
         TopLeft,
         BottomRight
     };
-    BasicShapeCenterCoordinate()
-        : m_direction(TopLeft)
-        , m_length(Undefined)
-    {
-        updateComputedLength();
-    }
 
-    BasicShapeCenterCoordinate(Direction direction, const Length& length)
+    BasicShapeCenterCoordinate(Direction direction = TopLeft, const Length& length = Length(0, Fixed))
         : m_direction(direction)
         , m_length(length)
+        , m_computedLength(direction == TopLeft ? length : length.subtractFromOneHundredPercent())
     {
-        updateComputedLength();
     }
 
     BasicShapeCenterCoordinate(const BasicShapeCenterCoordinate& other)
@@ -117,8 +111,6 @@ private:
     Direction m_direction;
     Length m_length;
     Length m_computedLength;
-
-    void updateComputedLength();
 };
 
 class BasicShapeRadius {
@@ -128,9 +120,9 @@ public:
         ClosestSide,
         FarthestSide
     };
-    BasicShapeRadius() : m_value(Undefined), m_type(ClosestSide) { }
+    BasicShapeRadius() : m_type(ClosestSide) { }
     explicit BasicShapeRadius(const Length& v) : m_value(v), m_type(Value) { }
-    explicit BasicShapeRadius(Type t) : m_value(Undefined), m_type(t) { }
+    explicit BasicShapeRadius(Type t) : m_type(t) { }
     BasicShapeRadius(const BasicShapeRadius& other) : m_value(other.value()), m_type(other.type()) { }
     bool operator==(const BasicShapeRadius& other) const { return m_type == other.m_type && m_value == other.m_value; }
 

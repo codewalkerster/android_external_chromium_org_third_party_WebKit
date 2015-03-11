@@ -5,23 +5,24 @@
 #ifndef WebRemoteFrameImpl_h
 #define WebRemoteFrameImpl_h
 
+#include "platform/heap/Handle.h"
 #include "public/web/WebRemoteFrame.h"
+#include "public/web/WebRemoteFrameClient.h"
 #include "web/RemoteFrameClient.h"
 #include "wtf/HashMap.h"
 #include "wtf/OwnPtr.h"
 #include "wtf/RefCounted.h"
 
-namespace WebCore {
-class FrameOwner;
-class Page;
-class RemoteFrame;
-}
-
 namespace blink {
 
-class WebRemoteFrameImpl : public WebRemoteFrame, public RefCounted<WebRemoteFrameImpl> {
+class FrameHost;
+class FrameOwner;
+class RemoteFrame;
+class WebViewImpl;
+
+class WebRemoteFrameImpl FINAL : public RefCountedWillBeGarbageCollectedFinalized<WebRemoteFrameImpl>, public WebRemoteFrame {
 public:
-    WebRemoteFrameImpl();
+    explicit WebRemoteFrameImpl(WebRemoteFrameClient*);
     virtual ~WebRemoteFrameImpl();
 
     // WebRemoteFrame methods.
@@ -87,7 +88,6 @@ public:
     virtual void loadHTMLString(
         const WebData& html, const WebURL& baseURL, const WebURL& unreachableURL,
         bool replace) OVERRIDE;
-    virtual bool isLoading() const OVERRIDE;
     virtual void stopLoading() OVERRIDE;
     virtual WebDataSource* provisionalDataSource() const OVERRIDE;
     virtual WebDataSource* dataSource() const OVERRIDE;
@@ -131,6 +131,7 @@ public:
     virtual float getPrintPageShrink(int page) OVERRIDE;
     virtual void printEnd() OVERRIDE;
     virtual bool isPrintScalingDisabledForPlugin(const WebNode&) OVERRIDE;
+    virtual int getPrintCopiesForPlugin(const WebNode&) OVERRIDE;
     virtual bool hasCustomPageSizeStyle(int pageIndex) OVERRIDE;
     virtual bool isPageBoxVisible(int pageIndex) OVERRIDE;
     virtual void pageSizeAndMarginsInPixels(
@@ -157,9 +158,6 @@ public:
     virtual void findMatchRects(WebVector<WebFloatRect>&) OVERRIDE;
     virtual int selectNearestFindMatch(const WebFloatPoint&, WebRect* selectionRect) OVERRIDE;
     virtual void setTickmarks(const WebVector<WebRect>&) OVERRIDE;
-
-    virtual void sendOrientationChangeEvent() OVERRIDE;
-
     virtual void dispatchMessageEventWithOriginCheck(
         const WebSecurityOrigin& intendedTargetOrigin,
         const WebDOMEvent&) OVERRIDE;
@@ -174,20 +172,40 @@ public:
     virtual WebString layerTreeAsText(bool showDebugInfo = false) const OVERRIDE;
 
     virtual WebLocalFrame* createLocalChild(const WebString& name, WebFrameClient*) OVERRIDE;
-    virtual WebRemoteFrame* createRemoteChild(const WebString& name, WebFrameClient*) OVERRIDE;
+    virtual WebRemoteFrame* createRemoteChild(const WebString& name, WebRemoteFrameClient*) OVERRIDE;
 
-    void initializeAsMainFrame(WebCore::Page*);
+    void initializeCoreFrame(FrameHost*, FrameOwner*, const AtomicString& name);
 
-    void setWebCoreFrame(PassRefPtr<WebCore::RemoteFrame>);
-    WebCore::RemoteFrame* frame() const { return m_frame.get(); }
+    void setCoreFrame(PassRefPtrWillBeRawPtr<RemoteFrame>);
+    RemoteFrame* frame() const { return m_frame.get(); }
 
-    static WebRemoteFrameImpl* fromFrame(WebCore::RemoteFrame&);
+    WebRemoteFrameClient* client() const { return m_client; }
+
+    static WebRemoteFrameImpl* fromFrame(RemoteFrame&);
+
+    virtual void initializeFromFrame(WebLocalFrame*) const OVERRIDE;
+
+    virtual void trace(Visitor*);
 
 private:
     RemoteFrameClient m_frameClient;
-    RefPtr<WebCore::RemoteFrame> m_frame;
+    RefPtrWillBeMember<RemoteFrame> m_frame;
+    WebRemoteFrameClient* m_client;
 
-    HashMap<WebFrame*, OwnPtr<WebCore::FrameOwner> > m_ownersForChildren;
+    WebViewImpl* viewImpl() const;
+
+    WillBeHeapHashMap<WebFrame*, OwnPtrWillBeMember<FrameOwner> > m_ownersForChildren;
+
+#if ENABLE(OILPAN)
+    // Oilpan: to provide the guarantee of having the frame live until
+    // close() is called, an instance keep a self-persistent. It is
+    // cleared upon calling close(). This avoids having to assume that
+    // an embedder's WebFrame references are all discovered via thread
+    // state (stack, registers) should an Oilpan GC strike while we're
+    // in the process of detaching.
+    GC_PLUGIN_IGNORE("340522")
+    Persistent<WebRemoteFrameImpl> m_selfKeepAlive;
+#endif
 };
 
 DEFINE_TYPE_CASTS(WebRemoteFrameImpl, WebFrame, frame, frame->isWebRemoteFrame(), frame.isWebRemoteFrame());

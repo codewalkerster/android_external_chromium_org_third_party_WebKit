@@ -35,13 +35,13 @@
 #include "SkTypeface.h"
 #include "platform/fonts/FontCache.h"
 
-namespace WebCore {
+namespace blink {
 
 #if !OS(MACOSX)
 unsigned FontPlatformData::hash() const
 {
     unsigned h = SkTypeface::UniqueID(m_typeface.get());
-    h ^= 0x01010101 * ((static_cast<int>(m_orientation) << 2) | (static_cast<int>(m_syntheticBold) << 1) | static_cast<int>(m_syntheticItalic));
+    h ^= 0x01010101 * ((static_cast<int>(m_isHashTableDeletedValue) << 3) | (static_cast<int>(m_orientation) << 2) | (static_cast<int>(m_syntheticBold) << 1) | static_cast<int>(m_syntheticItalic));
 
     // This memcpy is to avoid a reinterpret_cast that breaks strict-aliasing
     // rules. Memcpy is generally optimized enough so that performance doesn't
@@ -51,6 +51,17 @@ unsigned FontPlatformData::hash() const
     h ^= textSizeBytes;
 
     return h;
+}
+
+bool FontPlatformData::fontContainsCharacter(UChar32 character)
+{
+    SkPaint paint;
+    setupPaint(&paint);
+    paint.setTextEncoding(SkPaint::kUTF32_TextEncoding);
+
+    uint16_t glyph;
+    paint.textToGlyphs(&character, sizeof(character), &glyph);
+    return glyph;
 }
 
 #endif
@@ -76,4 +87,4 @@ PassRefPtr<SharedBuffer> FontPlatformData::openTypeTable(uint32_t table) const
 }
 #endif
 
-} // namespace WebCore
+} // namespace blink

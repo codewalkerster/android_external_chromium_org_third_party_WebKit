@@ -25,11 +25,12 @@
 #include "core/svg/SVGFilterPrimitiveStandardAttributes.h"
 #include "platform/graphics/filters/FEDisplacementMap.h"
 
-namespace WebCore {
+namespace blink {
 
 template<> const SVGEnumerationStringEntries& getStaticStringEntries<ChannelSelectorType>();
 
 class SVGFEDisplacementMapElement FINAL : public SVGFilterPrimitiveStandardAttributes {
+    DEFINE_WRAPPERTYPEINFO();
 public:
     DECLARE_NODE_FACTORY(SVGFEDisplacementMapElement);
 
@@ -57,6 +58,6 @@ private:
     RefPtr<SVGAnimatedEnumeration<ChannelSelectorType> > m_yChannelSelector;
 };
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // SVGFEDisplacementMapElement_h

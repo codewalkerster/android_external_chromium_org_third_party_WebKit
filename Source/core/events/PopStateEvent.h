@@ -30,7 +30,7 @@
 #include "core/events/Event.h"
 #include "platform/heap/Handle.h"
 
-namespace WebCore {
+namespace blink {
 
 class History;
 class SerializedScriptValue;
@@ -38,6 +38,7 @@ class SerializedScriptValue;
 typedef EventInit PopStateEventInit;
 
 class PopStateEvent FINAL : public Event {
+    DEFINE_WRAPPERTYPEINFO();
 public:
     virtual ~PopStateEvent();
     static PassRefPtrWillBeRawPtr<PopStateEvent> create();
@@ -65,6 +66,6 @@ private:
     RefPtrWillBeMember<History> m_history;
 };
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // PopStateEvent_h

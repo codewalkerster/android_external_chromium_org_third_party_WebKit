@@ -7,8 +7,9 @@
 
 #include "platform/Widget.h"
 #include "platform/geometry/IntRect.h"
+#include "platform/heap/Handle.h"
 
-namespace WebCore {
+namespace blink {
 
 class RemoteFrame;
 
@@ -20,7 +21,11 @@ public:
 
     virtual bool isRemoteFrameView() const OVERRIDE { return true; }
 
-    RemoteFrame& frame() const { return *m_remoteFrame; }
+    RemoteFrame& frame() const
+    {
+        ASSERT(m_remoteFrame);
+        return *m_remoteFrame;
+    }
 
     // Override to notify remote frame that its viewport size has changed.
     virtual void frameRectsChanged() OVERRIDE;
@@ -32,11 +37,14 @@ public:
 private:
     explicit RemoteFrameView(RemoteFrame*);
 
-    RefPtr<RemoteFrame> m_remoteFrame;
+    // The RefPtrWillBePersistent-cycle between RemoteFrame and its RemoteFrameView
+    // is broken in the same manner as FrameView::m_frame and LocalFrame::m_view is.
+    // See the FrameView::m_frame comment.
+    RefPtrWillBePersistent<RemoteFrame> m_remoteFrame;
 };
 
 DEFINE_TYPE_CASTS(RemoteFrameView, Widget, widget, widget->isRemoteFrameView(), widget.isRemoteFrameView());
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // RemoteFrameView_h

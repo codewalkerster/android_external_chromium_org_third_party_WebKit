@@ -29,21 +29,22 @@
 #include "modules/webaudio/AudioDestinationNode.h"
 #include "wtf/OwnPtr.h"
 
-namespace WebCore {
+namespace blink {
 
 class AudioContext;
 class ExceptionState;
 
 class DefaultAudioDestinationNode FINAL : public AudioDestinationNode {
 public:
-    static PassRefPtrWillBeRawPtr<DefaultAudioDestinationNode> create(AudioContext* context)
+    static DefaultAudioDestinationNode* create(AudioContext* context)
     {
-        return adoptRefWillBeNoop(new DefaultAudioDestinationNode(context));
+        return adoptRefCountedGarbageCollectedWillBeNoop(new DefaultAudioDestinationNode(context));
     }
 
     virtual ~DefaultAudioDestinationNode();
 
     // AudioNode
+    virtual void dispose() OVERRIDE;
     virtual void initialize() OVERRIDE;
     virtual void uninitialize() OVERRIDE;
     virtual void setChannelCount(unsigned long, ExceptionState&) OVERRIDE;
@@ -61,6 +62,6 @@ private:
     unsigned m_numberOfInputChannels;
 };
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // DefaultAudioDestinationNode_h

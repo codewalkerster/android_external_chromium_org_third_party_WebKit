@@ -29,20 +29,22 @@
 #include "modules/webaudio/RealtimeAnalyser.h"
 #include "wtf/Forward.h"
 
-namespace WebCore {
+namespace blink {
 
 class ExceptionState;
 
 class AnalyserNode FINAL : public AudioBasicInspectorNode {
+    DEFINE_WRAPPERTYPEINFO();
 public:
-    static PassRefPtrWillBeRawPtr<AnalyserNode> create(AudioContext* context, float sampleRate)
+    static AnalyserNode* create(AudioContext* context, float sampleRate)
     {
-        return adoptRefWillBeNoop(new AnalyserNode(context, sampleRate));
+        return adoptRefCountedGarbageCollectedWillBeNoop(new AnalyserNode(context, sampleRate));
     }
 
     virtual ~AnalyserNode();
 
     // AudioNode
+    virtual void dispose() OVERRIDE;
     virtual void process(size_t framesToProcess) OVERRIDE;
 
     // Javascript bindings
@@ -73,6 +75,6 @@ private:
     RealtimeAnalyser m_analyser;
 };
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // AnalyserNode_h

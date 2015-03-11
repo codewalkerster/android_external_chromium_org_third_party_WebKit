@@ -25,14 +25,12 @@
 #include "core/rendering/svg/RenderSVGGradientStop.h"
 #include "core/rendering/svg/RenderSVGResource.h"
 
-namespace WebCore {
+namespace blink {
 
 inline SVGStopElement::SVGStopElement(Document& document)
     : SVGElement(SVGNames::stopTag, document)
     , m_offset(SVGAnimatedNumber::create(this, SVGNames::offsetAttr, SVGNumberAcceptPercentage::create()))
 {
-    ScriptWrappable::init(this);
-
     addToPropertyMap(m_offset);
 }
 
@@ -99,11 +97,11 @@ Color SVGStopElement::stopColorIncludingOpacity() const
     // FIXME: This check for null style exists to address Bug WK 90814, a rare crash condition in
     // which the renderer or style is null. This entire class is scheduled for removal (Bug WK 86941)
     // and we will tolerate this null check until then.
-    if (!style || !style->svgStyle())
+    if (!style)
         return Color(Color::transparent); // Transparent black.
 
-    const SVGRenderStyle* svgStyle = style->svgStyle();
-    return svgStyle->stopColor().combineWithAlpha(svgStyle->stopOpacity());
+    const SVGRenderStyle& svgStyle = style->svgStyle();
+    return svgStyle.stopColor().combineWithAlpha(svgStyle.stopOpacity());
 }
 
-}
+} // namespace blink

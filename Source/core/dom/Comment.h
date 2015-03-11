@@ -25,11 +25,10 @@
 
 #include "core/dom/CharacterData.h"
 
-namespace WebCore {
-
-class ExecutionContext;
+namespace blink {
 
 class Comment FINAL : public CharacterData {
+    DEFINE_WRAPPERTYPEINFO();
 public:
     static PassRefPtrWillBeRawPtr<Comment> create(Document&, const String&);
 
@@ -43,6 +42,6 @@ private:
 
 DEFINE_NODE_TYPE_CASTS(Comment, nodeType() == Node::COMMENT_NODE);
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // Comment_h

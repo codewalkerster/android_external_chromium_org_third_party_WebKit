@@ -9,16 +9,16 @@
 #include "platform/Supplementable.h"
 #include "platform/heap/Handle.h"
 
-namespace WebCore {
+namespace blink {
 
 class Document;
 class Navigator;
 class ServiceWorkerContainer;
 
-class NavigatorServiceWorker FINAL : public NoBaseWillBeGarbageCollectedFinalized<NavigatorServiceWorker>, public WillBeHeapSupplement<Navigator>, DOMWindowProperty {
+class NavigatorServiceWorker FINAL : public NoBaseWillBeGarbageCollected<NavigatorServiceWorker>, public WillBeHeapSupplement<Navigator>, DOMWindowProperty {
     WILL_BE_USING_GARBAGE_COLLECTED_MIXIN(NavigatorServiceWorker);
+    DECLARE_EMPTY_VIRTUAL_DESTRUCTOR_WILL_BE_REMOVED(NavigatorServiceWorker);
 public:
-    virtual ~NavigatorServiceWorker();
     static NavigatorServiceWorker* from(Document&);
     static NavigatorServiceWorker& from(Navigator&);
     static NavigatorServiceWorker* toNavigatorServiceWorker(Navigator&);
@@ -26,7 +26,7 @@ public:
 
     static ServiceWorkerContainer* serviceWorker(Navigator&);
 
-    virtual void trace(Visitor* visitor) OVERRIDE { WillBeHeapSupplement<Navigator>::trace(visitor); }
+    virtual void trace(Visitor*) OVERRIDE;
 
 private:
     explicit NavigatorServiceWorker(Navigator&);
@@ -35,9 +35,9 @@ private:
     // DOMWindowProperty override.
     virtual void willDetachGlobalObjectFromFrame() OVERRIDE;
 
-    RefPtr<ServiceWorkerContainer> m_serviceWorker;
+    PersistentWillBeMember<ServiceWorkerContainer> m_serviceWorker;
 };
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // NavigatorServiceWorker_h

@@ -23,7 +23,7 @@
 
 #include "core/rendering/RenderBlockFlow.h"
 
-namespace WebCore {
+namespace blink {
 
 class HTMLProgressElement;
 
@@ -31,6 +31,7 @@ class RenderProgress FINAL : public RenderBlockFlow {
 public:
     explicit RenderProgress(HTMLElement*);
     virtual ~RenderProgress();
+    virtual void destroy() OVERRIDE;
 
     double position() const { return m_position; }
     double animationProgress() const;
@@ -58,6 +59,6 @@ private:
 
 DEFINE_RENDER_OBJECT_TYPE_CASTS(RenderProgress, isProgress());
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // RenderProgress_h

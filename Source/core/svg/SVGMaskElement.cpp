@@ -27,7 +27,7 @@
 
 #include "core/rendering/svg/RenderSVGResourceMasker.h"
 
-namespace WebCore {
+namespace blink {
 
 inline SVGMaskElement::SVGMaskElement(Document& document)
     : SVGElement(SVGNames::maskTag, document)
@@ -39,8 +39,6 @@ inline SVGMaskElement::SVGMaskElement(Document& document)
     , m_maskUnits(SVGAnimatedEnumeration<SVGUnitTypes::SVGUnitType>::create(this, SVGNames::maskUnitsAttr, SVGUnitTypes::SVG_UNIT_TYPE_OBJECTBOUNDINGBOX))
     , m_maskContentUnits(SVGAnimatedEnumeration<SVGUnitTypes::SVGUnitType>::create(this, SVGNames::maskContentUnitsAttr, SVGUnitTypes::SVG_UNIT_TYPE_USERSPACEONUSE))
 {
-    ScriptWrappable::init(this);
-
     // Spec: If the x/y attribute is not specified, the effect is as if a value of "-10%" were specified.
     m_x->setDefaultValueAsString("-10%");
     m_y->setDefaultValueAsString("-10%");
@@ -119,11 +117,11 @@ void SVGMaskElement::svgAttributeChanged(const QualifiedName& attrName)
         renderer->invalidateCacheAndMarkForLayout();
 }
 
-void SVGMaskElement::childrenChanged(bool changedByParser, Node* beforeChange, Node* afterChange, int childCountDelta)
+void SVGMaskElement::childrenChanged(const ChildrenChange& change)
 {
-    SVGElement::childrenChanged(changedByParser, beforeChange, afterChange, childCountDelta);
+    SVGElement::childrenChanged(change);
 
-    if (changedByParser)
+    if (change.byParser)
         return;
 
     if (RenderObject* object = renderer())
@@ -143,4 +141,4 @@ bool SVGMaskElement::selfHasRelativeLengths() const
         || m_height->currentValue()->isRelative();
 }
 
-}
+} // namespace blink

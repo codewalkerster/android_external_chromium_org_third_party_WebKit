@@ -40,6 +40,7 @@
 #include "core/editing/TextIterator.h"
 #include "core/editing/VisibleSelection.h"
 #include "core/frame/FrameView.h"
+#include "core/page/Page.h"
 #include "platform/Timer.h"
 #include "public/platform/WebVector.h"
 #include "public/web/WebFindOptions.h"
@@ -50,8 +51,6 @@
 #include "web/WebViewImpl.h"
 #include "wtf/CurrentTime.h"
 
-using namespace WebCore;
-
 namespace blink {
 
 TextFinder::FindMatch::FindMatch(PassRefPtrWillBeRawPtr<Range> range, int ordinal)
@@ -60,7 +59,7 @@ TextFinder::FindMatch::FindMatch(PassRefPtrWillBeRawPtr<Range> range, int ordina
 {
 }
 
-void TextFinder::FindMatch::trace(WebCore::Visitor* visitor)
+void TextFinder::FindMatch::trace(Visitor* visitor)
 {
     visitor->trace(m_range);
 }
@@ -241,7 +240,7 @@ void TextFinder::scopeStringMatches(int identifier, const WebString& searchText,
         // This is a continuation of a scoping operation that timed out and didn't
         // complete last time around, so we should start from where we left off.
         ASSERT(m_resumeScopingFromRange->collapsed());
-        searchStart = m_resumeScopingFromRange->startPosition().next();
+        searchStart = m_resumeScopingFromRange->endPosition();
         if (searchStart.document() != searchEnd.document())
             return;
     }
@@ -272,7 +271,7 @@ void TextFinder::scopeStringMatches(int identifier, const WebString& searchText,
         if (resultRange->collapsed()) {
             // resultRange will be collapsed if the matched text spans over multiple TreeScopes.
             // FIXME: Show such matches to users.
-            searchStart = resultStart.next();
+            searchStart = resultEnd;
             continue;
         }
 
@@ -317,9 +316,9 @@ void TextFinder::scopeStringMatches(int identifier, const WebString& searchText,
         // result range. There is no need to use a VisiblePosition here,
         // since findPlainText will use a TextIterator to go over the visible
         // text nodes.
-        searchStart = resultStart.next();
+        searchStart = resultEnd;
 
-        m_resumeScopingFromRange = Range::create(*resultStart.document(), resultStart, resultStart);
+        m_resumeScopingFromRange = Range::create(*resultStart.document(), resultEnd, resultEnd);
         timedOut = (currentTime() - startTime) >= maxScopingDuration;
     } while (!timedOut);
 

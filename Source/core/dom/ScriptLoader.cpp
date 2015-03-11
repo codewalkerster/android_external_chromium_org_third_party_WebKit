@@ -24,8 +24,8 @@
 #include "config.h"
 #include "core/dom/ScriptLoader.h"
 
-#include "bindings/v8/ScriptController.h"
-#include "bindings/v8/ScriptSourceCode.h"
+#include "bindings/core/v8/ScriptController.h"
+#include "bindings/core/v8/ScriptSourceCode.h"
 #include "core/HTMLNames.h"
 #include "core/SVGNames.h"
 #include "core/dom/Document.h"
@@ -42,7 +42,9 @@
 #include "core/html/imports/HTMLImport.h"
 #include "core/html/parser/HTMLParserIdioms.h"
 #include "core/frame/LocalFrame.h"
+#include "core/frame/SubresourceIntegrity.h"
 #include "core/frame/csp/ContentSecurityPolicy.h"
+#include "core/inspector/ConsoleMessage.h"
 #include "core/svg/SVGScriptElement.h"
 #include "platform/MIMETypeRegistry.h"
 #include "platform/weborigin/SecurityOrigin.h"
@@ -50,7 +52,7 @@
 #include "wtf/text/StringBuilder.h"
 #include "wtf/text/StringHash.h"
 
-namespace WebCore {
+namespace blink {
 
 ScriptLoader::ScriptLoader(Element* element, bool parserInserted, bool alreadyStarted)
     : m_element(element)
@@ -184,7 +186,7 @@ bool ScriptLoader::prepareScript(const TextPosition& scriptStartPosition, Legacy
         m_forceAsync = true;
 
     // FIXME: HTML5 spec says we should check that all children are either comments or empty text nodes.
-    if (!client->hasSourceAttribute() && !m_element->firstChild())
+    if (!client->hasSourceAttribute() && !m_element->hasChildren())
         return false;
 
     if (!m_element->inDocument())
@@ -216,7 +218,10 @@ bool ScriptLoader::prepareScript(const TextPosition& scriptStartPosition, Legacy
         m_characterEncoding = elementDocument.charset();
 
     if (client->hasSourceAttribute()) {
-        if (!fetchScript(client->sourceAttributeValue()))
+        FetchRequest::DeferOption defer = FetchRequest::NoDefer;
+        if (!m_parserInserted || client->asyncAttributeValue() || client->deferAttributeValue())
+            defer = FetchRequest::LazyLoad;
+        if (!fetchScript(client->sourceAttributeValue(), defer))
             return false;
     }
 
@@ -245,7 +250,7 @@ bool ScriptLoader::prepareScript(const TextPosition& scriptStartPosition, Legacy
     return true;
 }
 
-bool ScriptLoader::fetchScript(const String& sourceUrl)
+bool ScriptLoader::fetchScript(const String& sourceUrl, FetchRequest::DeferOption defer)
 {
     ASSERT(m_element);
 
@@ -262,9 +267,10 @@ bool ScriptLoader::fetchScript(const String& sourceUrl)
             request.setCrossOriginAccessControl(elementDocument->securityOrigin(), crossOriginMode);
         request.setCharset(scriptCharset());
 
-        bool isValidScriptNonce = elementDocument->contentSecurityPolicy()->allowScriptNonce(m_element->fastGetAttribute(HTMLNames::nonceAttr));
-        if (isValidScriptNonce)
+        bool scriptPassesCSP = elementDocument->contentSecurityPolicy()->allowScriptWithNonce(m_element->fastGetAttribute(HTMLNames::nonceAttr));
+        if (scriptPassesCSP)
             request.setContentSecurityCheck(DoNotCheckContentSecurityPolicy);
+        request.setDefer(defer);
 
         m_resource = elementDocument->fetcher()->fetchScript(request);
         m_isExternalScript = true;
@@ -289,7 +295,7 @@ bool isSVGScriptLoader(Element* element)
     return isSVGScriptElement(*element);
 }
 
-void ScriptLoader::executeScript(const ScriptSourceCode& sourceCode)
+void ScriptLoader::executeScript(const ScriptSourceCode& sourceCode, double* compilationFinishTime)
 {
     ASSERT(m_alreadyStarted);
 
@@ -303,41 +309,51 @@ void ScriptLoader::executeScript(const ScriptSourceCode& sourceCode)
 
     LocalFrame* frame = contextDocument->frame();
 
-    bool shouldBypassMainWorldContentSecurityPolicy = (frame && frame->script().shouldBypassMainWorldContentSecurityPolicy()) || elementDocument->contentSecurityPolicy()->allowScriptNonce(m_element->fastGetAttribute(HTMLNames::nonceAttr)) || elementDocument->contentSecurityPolicy()->allowScriptHash(sourceCode.source());
+    const ContentSecurityPolicy* csp = elementDocument->contentSecurityPolicy();
+    bool shouldBypassMainWorldCSP = (frame && frame->script().shouldBypassMainWorldCSP())
+        || csp->allowScriptWithNonce(m_element->fastGetAttribute(HTMLNames::nonceAttr))
+        || csp->allowScriptWithHash(sourceCode.source());
 
-    if (!m_isExternalScript && (!shouldBypassMainWorldContentSecurityPolicy && !elementDocument->contentSecurityPolicy()->allowInlineScript(elementDocument->url(), m_startLineNumber)))
+    if (!m_isExternalScript && (!shouldBypassMainWorldCSP && !csp->allowInlineScript(elementDocument->url(), m_startLineNumber)))
         return;
 
     if (m_isExternalScript) {
         ScriptResource* resource = m_resource ? m_resource.get() : sourceCode.resource();
         if (resource && !resource->mimeTypeAllowedByNosniff()) {
-            contextDocument->addConsoleMessage(SecurityMessageSource, ErrorMessageLevel, "Refused to execute script from '" + resource->url().elidedString() + "' because its MIME type ('" + resource->mimeType() + "') is not executable, and strict MIME type checking is enabled.");
+            contextDocument->addConsoleMessage(ConsoleMessage::create(SecurityMessageSource, ErrorMessageLevel, "Refused to execute script from '" + resource->url().elidedString() + "' because its MIME type ('" + resource->mimeType() + "') is not executable, and strict MIME type checking is enabled."));
             return;
         }
+
+        // FIXME: On failure, SRI should probably provide an error message for the console.
+        if (!SubresourceIntegrity::CheckSubresourceIntegrity(*m_element, sourceCode.source(), sourceCode.resource()->url()))
+            return;
     }
 
-    if (frame) {
-        const bool isImportedScript = contextDocument != elementDocument;
-        // http://www.whatwg.org/specs/web-apps/current-work/#execute-the-script-block step 2.3
-        // with additional support for HTML imports.
-        IgnoreDestructiveWriteCountIncrementer ignoreDestructiveWriteCountIncrementer(m_isExternalScript || isImportedScript ? contextDocument.get() : 0);
+    // FIXME: Can this be moved earlier in the function?
+    // Why are we ever attempting to execute scripts without a frame?
+    if (!frame)
+        return;
 
-        if (isHTMLScriptLoader(m_element))
-            contextDocument->pushCurrentScript(toHTMLScriptElement(m_element));
+    const bool isImportedScript = contextDocument != elementDocument;
+    // http://www.whatwg.org/specs/web-apps/current-work/#execute-the-script-block step 2.3
+    // with additional support for HTML imports.
+    IgnoreDestructiveWriteCountIncrementer ignoreDestructiveWriteCountIncrementer(m_isExternalScript || isImportedScript ? contextDocument.get() : 0);
 
-        AccessControlStatus corsCheck = NotSharableCrossOrigin;
-        if (!m_isExternalScript || (sourceCode.resource() && sourceCode.resource()->passesAccessControlCheck(m_element->document().securityOrigin())))
-            corsCheck = SharableCrossOrigin;
+    if (isHTMLScriptLoader(m_element))
+        contextDocument->pushCurrentScript(toHTMLScriptElement(m_element));
 
-        // Create a script from the script element node, using the script
-        // block's source and the script block's type.
-        // Note: This is where the script is compiled and actually executed.
-        frame->script().executeScriptInMainWorld(sourceCode, corsCheck);
+    AccessControlStatus corsCheck = NotSharableCrossOrigin;
+    if (!m_isExternalScript || (sourceCode.resource() && sourceCode.resource()->passesAccessControlCheck(m_element->document().securityOrigin())))
+        corsCheck = SharableCrossOrigin;
 
-        if (isHTMLScriptLoader(m_element)) {
-            ASSERT(contextDocument->currentScript() == m_element);
-            contextDocument->popCurrentScript();
-        }
+    // Create a script from the script element node, using the script
+    // block's source and the script block's type.
+    // Note: This is where the script is compiled and actually executed.
+    frame->script().executeScriptInMainWorld(sourceCode, corsCheck, compilationFinishTime);
+
+    if (isHTMLScriptLoader(m_element)) {
+        ASSERT(contextDocument->currentScript() == m_element);
+        contextDocument->popCurrentScript();
     }
 }
 

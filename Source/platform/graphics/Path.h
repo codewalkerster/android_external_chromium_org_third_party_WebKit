@@ -31,7 +31,7 @@
 
 #include "platform/PlatformExport.h"
 #include "platform/geometry/RoundedRect.h"
-#include "platform/graphics/WindRule.h"
+#include "platform/graphics/GraphicsTypes.h"
 #include "third_party/skia/include/core/SkPath.h"
 #include "third_party/skia/include/core/SkPathMeasure.h"
 #include "wtf/FastAllocBase.h"
@@ -39,13 +39,12 @@
 
 class SkPath;
 
-namespace WebCore {
+namespace blink {
 
 class AffineTransform;
 class FloatPoint;
 class FloatRect;
 class FloatSize;
-class GraphicsContext;
 class StrokeData;
 
 enum PathElementType {
@@ -56,7 +55,7 @@ enum PathElementType {
     PathElementCloseSubpath // The points member will contain no values.
 };
 
-// The points in the sturcture are the same as those that would be used with the
+// The points in the structure are the same as those that would be used with the
 // add... method. For example, a line returns the endpoint, while a cubic returns
 // two tangent points and the endpoint.
 struct PathElement {
@@ -143,6 +142,9 @@ public:
     void addPathForRoundedRect(const FloatRect&, const FloatSize& topLeftRadius, const FloatSize& topRightRadius, const FloatSize& bottomLeftRadius, const FloatSize& bottomRightRadius);
     void addBeziersForRoundedRect(const FloatRect&, const FloatSize& topLeftRadius, const FloatSize& topRightRadius, const FloatSize& bottomLeftRadius, const FloatSize& bottomRightRadius);
 
+    bool subtractPath(const Path&);
+    bool intersectPath(const Path&);
+
     // Updates the path to the union (inclusive-or) of itself with the given argument.
     bool unionPath(const Path& other);
 
@@ -152,10 +154,10 @@ private:
     SkPath m_path;
 };
 
-#if ASSERT_ENABLED
+#if ENABLE(ASSERT)
 PLATFORM_EXPORT bool ellipseIsRenderable(float startAngle, float endAngle);
 #endif
 
-}
+} // namespace blink
 
 #endif

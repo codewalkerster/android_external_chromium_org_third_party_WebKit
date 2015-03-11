@@ -43,7 +43,10 @@
 #include "wtf/RefCounted.h"
 #include "wtf/text/WTFString.h"
 
-namespace WebCore {
+namespace blink {
+
+class ChromePrintContext;
+class GeolocationClientProxy;
 class GraphicsContext;
 class HTMLInputElement;
 class HistoryItem;
@@ -51,15 +54,8 @@ class IntSize;
 class KURL;
 class Node;
 class Range;
-class SubstituteData;
-struct FrameLoadRequest;
-struct WindowFeatures;
-}
-
-namespace blink {
-class ChromePrintContext;
-class GeolocationClientProxy;
 class SharedWorkerRepositoryClientImpl;
+class SubstituteData;
 class TextFinder;
 class WebDataSourceImpl;
 class WebInputElement;
@@ -69,14 +65,14 @@ class WebPlugin;
 class WebPluginContainerImpl;
 class WebView;
 class WebViewImpl;
+struct FrameLoadRequest;
 struct WebPrintParams;
+struct WindowFeatures;
 
 template <typename T> class WebVector;
 
 // Implementation of WebFrame, note that this is a reference counted object.
-class WebLocalFrameImpl FINAL
-    : public WebLocalFrame
-    , public RefCounted<WebLocalFrameImpl> {
+class WebLocalFrameImpl FINAL : public RefCountedWillBeGarbageCollectedFinalized<WebLocalFrameImpl>, public WebLocalFrame {
 public:
     // WebFrame methods:
     virtual bool isWebLocalFrame() const OVERRIDE;
@@ -116,6 +112,7 @@ public:
         int extensionGroup) OVERRIDE;
     virtual void setIsolatedWorldSecurityOrigin(int worldID, const WebSecurityOrigin&) OVERRIDE;
     virtual void setIsolatedWorldContentSecurityPolicy(int worldID, const WebString&) OVERRIDE;
+    virtual void setIsolatedWorldHumanReadableName(int worldID, const WebString&) OVERRIDE;
     virtual void addMessageToConsole(const WebConsoleMessage&) OVERRIDE;
     virtual void collectGarbage() OVERRIDE;
     virtual bool checkIfRunInsecureContent(const WebURL&) const OVERRIDE;
@@ -140,7 +137,6 @@ public:
     virtual void loadHTMLString(
         const WebData& html, const WebURL& baseURL, const WebURL& unreachableURL,
         bool replace) OVERRIDE;
-    virtual bool isLoading() const OVERRIDE;
     virtual void stopLoading() OVERRIDE;
     virtual WebDataSource* provisionalDataSource() const OVERRIDE;
     virtual WebDataSource* dataSource() const OVERRIDE;
@@ -184,6 +180,7 @@ public:
     virtual float getPrintPageShrink(int page) OVERRIDE;
     virtual void printEnd() OVERRIDE;
     virtual bool isPrintScalingDisabledForPlugin(const WebNode&) OVERRIDE;
+    virtual int getPrintCopiesForPlugin(const WebNode&) OVERRIDE;
     virtual bool hasCustomPageSizeStyle(int pageIndex) OVERRIDE;
     virtual bool isPageBoxVisible(int pageIndex) OVERRIDE;
     virtual void pageSizeAndMarginsInPixels(
@@ -211,8 +208,6 @@ public:
     virtual int selectNearestFindMatch(const WebFloatPoint&, WebRect* selectionRect) OVERRIDE;
     virtual void setTickmarks(const WebVector<WebRect>&) OVERRIDE;
 
-    virtual void sendOrientationChangeEvent() OVERRIDE;
-
     virtual void dispatchMessageEventWithOriginCheck(
         const WebSecurityOrigin& intendedTargetOrigin,
         const WebDOMEvent&) OVERRIDE;
@@ -227,39 +222,44 @@ public:
     virtual WebString layerTreeAsText(bool showDebugInfo = false) const OVERRIDE;
 
     // WebLocalFrame methods:
+    virtual void sendPings(const WebNode& linkNode, const WebURL& destinationURL) OVERRIDE;
+    virtual bool isLoading() const OVERRIDE;
+    virtual bool isResourceLoadInProgress() const OVERRIDE;
     virtual void addStyleSheetByURL(const WebString& url) OVERRIDE;
+    virtual void navigateToSandboxedMarkup(const WebData& markup) OVERRIDE;
+    virtual void sendOrientationChangeEvent() OVERRIDE;
+    virtual v8::Handle<v8::Value> executeScriptAndReturnValueForTests(
+        const WebScriptSource&) OVERRIDE;
 
     void willDetachParent();
 
     static WebLocalFrameImpl* create(WebFrameClient*);
     virtual ~WebLocalFrameImpl();
 
-    // Called by the WebViewImpl to initialize the main frame for the page.
-    void initializeAsMainFrame(WebCore::Page*);
+    PassRefPtrWillBeRawPtr<LocalFrame> initializeCoreFrame(FrameHost*, FrameOwner*, const AtomicString& name, const AtomicString& fallbackName);
 
-    PassRefPtr<WebCore::LocalFrame> createChildFrame(
-        const WebCore::FrameLoadRequest&, WebCore::HTMLFrameOwnerElement*);
+    PassRefPtrWillBeRawPtr<LocalFrame> createChildFrame(const FrameLoadRequest&, HTMLFrameOwnerElement*);
 
-    void didChangeContentsSize(const WebCore::IntSize&);
+    void didChangeContentsSize(const IntSize&);
 
     void createFrameView();
 
-    static WebLocalFrameImpl* fromFrame(WebCore::LocalFrame*);
-    static WebLocalFrameImpl* fromFrame(WebCore::LocalFrame&);
-    static WebLocalFrameImpl* fromFrameOwnerElement(WebCore::Element*);
+    static WebLocalFrameImpl* fromFrame(LocalFrame*);
+    static WebLocalFrameImpl* fromFrame(LocalFrame&);
+    static WebLocalFrameImpl* fromFrameOwnerElement(Element*);
 
     // If the frame hosts a PluginDocument, this method returns the WebPluginContainerImpl
     // that hosts the plugin.
-    static WebPluginContainerImpl* pluginContainerFromFrame(WebCore::LocalFrame*);
+    static WebPluginContainerImpl* pluginContainerFromFrame(LocalFrame*);
 
     // If the frame hosts a PluginDocument, this method returns the WebPluginContainerImpl
     // that hosts the plugin. If the provided node is a plugin, then it runs its
     // WebPluginContainerImpl.
-    static WebPluginContainerImpl* pluginContainerFromNode(WebCore::LocalFrame*, const WebNode&);
+    static WebPluginContainerImpl* pluginContainerFromNode(LocalFrame*, const WebNode&);
 
     WebViewImpl* viewImpl() const;
 
-    WebCore::FrameView* frameView() const { return frame() ? frame()->view() : 0; }
+    FrameView* frameView() const { return frame() ? frame()->view() : 0; }
 
     // Getters for the impls corresponding to Get(Provisional)DataSource. They
     // may return 0 if there is no corresponding data source.
@@ -273,7 +273,7 @@ public:
 
     // Returns the active match in the current frame. Could be a null range if
     // the local frame has no active match.
-    WebCore::Range* activeMatch() const;
+    Range* activeMatch() const;
 
     // When a Find operation ends, we want to set the selection to what was active
     // and set focus to the first focusable node we find (starting with the first
@@ -283,23 +283,23 @@ public:
     // allows us to navigate by pressing Enter after closing the Find box.
     void setFindEndstateFocusAndSelection();
 
-    void didFail(const WebCore::ResourceError&, bool wasProvisional);
+    void didFail(const ResourceError&, bool wasProvisional);
 
     // Sets whether the WebLocalFrameImpl allows its document to be scrolled.
     // If the parameter is true, allow the document to be scrolled.
     // Otherwise, disallow scrolling.
     virtual void setCanHaveScrollbars(bool) OVERRIDE;
 
-    WebCore::LocalFrame* frame() const { return m_frame.get(); }
+    LocalFrame* frame() const { return m_frame.get(); }
     WebFrameClient* client() const { return m_client; }
     void setClient(WebFrameClient* client) { m_client = client; }
 
     WebPermissionClient* permissionClient() { return m_permissionClient; }
     SharedWorkerRepositoryClientImpl* sharedWorkerRepositoryClient() const { return m_sharedWorkerRepositoryClient.get(); }
 
-    void setInputEventsTransformForEmulation(const WebCore::IntSize&, float);
+    void setInputEventsTransformForEmulation(const IntSize&, float);
 
-    static void selectWordAroundPosition(WebCore::LocalFrame*, WebCore::VisiblePosition);
+    static void selectWordAroundPosition(LocalFrame*, VisiblePosition);
 
     // Returns the text finder object if it already exists.
     // Otherwise creates it and then returns.
@@ -311,20 +311,20 @@ public:
     // Invalidates both content area and the scrollbar.
     void invalidateAll() const;
 
-    PassRefPtr<WebCore::LocalFrame> initializeAsChildFrame(WebCore::FrameHost*, WebCore::FrameOwner*, const AtomicString& name, const AtomicString& fallbackName);
-
     // Returns a hit-tested VisiblePosition for the given point
-    WebCore::VisiblePosition visiblePositionForWindowPoint(const WebPoint&);
+    VisiblePosition visiblePositionForWindowPoint(const WebPoint&);
+
+    void trace(Visitor*);
 
 private:
     friend class FrameLoaderClientImpl;
 
     explicit WebLocalFrameImpl(WebFrameClient*);
 
-    // Sets the local WebCore frame and registers destruction observers.
-    void setWebCoreFrame(PassRefPtr<WebCore::LocalFrame>);
+    // Sets the local core frame and registers destruction observers.
+    void setCoreFrame(PassRefPtrWillBeRawPtr<LocalFrame>);
 
-    void loadJavaScriptURL(const WebCore::KURL&);
+    void loadJavaScriptURL(const KURL&);
 
     WebPlugin* focusedPluginIfInputMethodSupported();
 
@@ -333,7 +333,7 @@ private:
     // The embedder retains a reference to the WebCore LocalFrame while it is active in the DOM. This
     // reference is released when the frame is removed from the DOM or the entire page is closed.
     // FIXME: These will need to change to WebFrame when we introduce WebFrameProxy.
-    RefPtr<WebCore::LocalFrame> m_frame;
+    RefPtrWillBeMember<LocalFrame> m_frame;
 
     // Indicate whether the current LocalFrame is local or remote. Remote frames are
     // rendered in a different process from their parent frames.
@@ -348,15 +348,26 @@ private:
 
     // Valid between calls to BeginPrint() and EndPrint(). Containts the print
     // information. Is used by PrintPage().
-    OwnPtr<ChromePrintContext> m_printContext;
+    OwnPtrWillBeMember<ChromePrintContext> m_printContext;
 
     // Stores the additional input events offset and scale when device metrics emulation is enabled.
-    WebCore::IntSize m_inputEventsOffsetForEmulation;
+    IntSize m_inputEventsOffsetForEmulation;
     float m_inputEventsScaleFactorForEmulation;
 
     UserMediaClientImpl m_userMediaClientImpl;
 
-    OwnPtr<GeolocationClientProxy> m_geolocationClientProxy;
+    OwnPtrWillBeMember<GeolocationClientProxy> m_geolocationClientProxy;
+
+#if ENABLE(OILPAN)
+    // Oilpan: to provide the guarantee of having the frame live until
+    // close() is called, an instance keep a self-persistent. It is
+    // cleared upon calling close(). This avoids having to assume that
+    // an embedder's WebFrame references are all discovered via thread
+    // state (stack, registers) should an Oilpan GC strike while we're
+    // in the process of detaching.
+    GC_PLUGIN_IGNORE("340522")
+    Persistent<WebLocalFrameImpl> m_selfKeepAlive;
+#endif
 };
 
 DEFINE_TYPE_CASTS(WebLocalFrameImpl, WebFrame, frame, frame->isWebLocalFrame(), frame.isWebLocalFrame());

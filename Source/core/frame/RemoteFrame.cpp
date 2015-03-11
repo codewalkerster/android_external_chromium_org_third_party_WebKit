@@ -8,22 +8,27 @@
 #include "core/frame/RemoteFrameView.h"
 #include "core/html/HTMLFrameOwnerElement.h"
 
-namespace WebCore {
+namespace blink {
 
 inline RemoteFrame::RemoteFrame(FrameClient* client, FrameHost* host, FrameOwner* owner)
     : Frame(client, host, owner)
 {
 }
 
-PassRefPtr<RemoteFrame> RemoteFrame::create(FrameClient* client, FrameHost* host, FrameOwner* owner)
+PassRefPtrWillBeRawPtr<RemoteFrame> RemoteFrame::create(FrameClient* client, FrameHost* host, FrameOwner* owner)
 {
-    RefPtr<RemoteFrame> frame = adoptRef(new RemoteFrame(client, host, owner));
-    return frame.release();
+    return adoptRefWillBeNoop(new RemoteFrame(client, host, owner));
 }
 
 RemoteFrame::~RemoteFrame()
 {
     setView(nullptr);
+}
+
+void RemoteFrame::detach()
+{
+    detachChildren();
+    m_host = nullptr;
 }
 
 void RemoteFrame::setView(PassRefPtr<RemoteFrameView> view)
@@ -43,4 +48,4 @@ void RemoteFrame::createView()
     }
 }
 
-} // namespace WebCore
+} // namespace blink

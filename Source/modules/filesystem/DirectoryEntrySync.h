@@ -35,13 +35,14 @@
 #include "modules/filesystem/FileSystemFlags.h"
 #include "wtf/text/WTFString.h"
 
-namespace WebCore {
+namespace blink {
 
 class DirectoryReaderSync;
 class ExceptionState;
 class FileEntrySync;
 
 class DirectoryEntrySync FINAL : public EntrySync {
+    DEFINE_WRAPPERTYPEINFO();
 public:
     static DirectoryEntrySync* create(DOMFileSystemBase* fileSystem, const String& fullPath)
     {
@@ -62,6 +63,6 @@ private:
 
 DEFINE_TYPE_CASTS(DirectoryEntrySync, EntrySync, entry, entry->isDirectory(), entry.isDirectory());
 
-}
+} // namespace blink
 
 #endif // DirectoryEntrySync_h

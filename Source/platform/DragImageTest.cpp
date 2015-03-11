@@ -46,7 +46,7 @@
 
 #include <gtest/gtest.h>
 
-using namespace WebCore;
+using namespace blink;
 
 namespace {
 
@@ -63,7 +63,7 @@ public:
         , m_size(size)
     {
         SkBitmap bitmap;
-        EXPECT_TRUE(bitmap.allocN32Pixels(size.width(), size.height()));
+        bitmap.allocN32Pixels(size.width(), size.height());
         m_nativeImage = NativeImageSkia::create(bitmap);
     }
 

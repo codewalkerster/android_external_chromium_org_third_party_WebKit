@@ -5,24 +5,24 @@
 #ifndef BatteryManager_h
 #define BatteryManager_h
 
-#include "bindings/v8/ScriptPromise.h"
-#include "bindings/v8/ScriptPromiseResolverWithContext.h"
+#include "bindings/core/v8/ScriptPromise.h"
+#include "bindings/core/v8/ScriptPromiseResolver.h"
 #include "core/dom/ContextLifecycleObserver.h"
-#include "core/dom/Document.h"
-#include "core/frame/DeviceEventControllerBase.h"
+#include "core/frame/PlatformEventController.h"
 #include "modules/EventTargetModules.h"
 #include "platform/heap/Handle.h"
 
-namespace WebCore {
+namespace blink {
 
 class BatteryStatus;
 
-class BatteryManager FINAL : public RefCountedWillBeRefCountedGarbageCollected<BatteryManager>, public ActiveDOMObject, public DeviceEventControllerBase, public EventTargetWithInlineData {
-    REFCOUNTED_EVENT_TARGET(BatteryManager);
+class BatteryManager FINAL : public RefCountedGarbageCollectedWillBeGarbageCollectedFinalized<BatteryManager>, public ActiveDOMObject, public PlatformEventController, public EventTargetWithInlineData {
+    DEFINE_EVENT_TARGET_REFCOUNTING_WILL_BE_REMOVED(RefCountedGarbageCollected<BatteryManager>);
+    DEFINE_WRAPPERTYPEINFO();
     WILL_BE_USING_GARBAGE_COLLECTED_MIXIN(BatteryManager);
 public:
     virtual ~BatteryManager();
-    static PassRefPtrWillBeRawPtr<BatteryManager> create(ExecutionContext*);
+    static BatteryManager* create(ExecutionContext*);
 
     // Returns a promise object that will be resolved with this BatteryManager.
     ScriptPromise startRequest(ScriptState*);
@@ -41,7 +41,7 @@ public:
     DEFINE_ATTRIBUTE_EVENT_LISTENER(dischargingtimechange);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(levelchange);
 
-    // Inherited from DeviceEventControllerBase.
+    // Inherited from PlatformEventController.
     virtual void didUpdateData() OVERRIDE;
     virtual void registerWithDispatcher() OVERRIDE;
     virtual void unregisterWithDispatcher() OVERRIDE;
@@ -52,6 +52,7 @@ public:
     virtual void suspend() OVERRIDE;
     virtual void resume() OVERRIDE;
     virtual void stop() OVERRIDE;
+    virtual bool hasPendingActivity() const OVERRIDE;
 
     virtual void trace(Visitor*) OVERRIDE;
 
@@ -64,11 +65,11 @@ private:
 
     explicit BatteryManager(ExecutionContext*);
 
-    RefPtr<ScriptPromiseResolverWithContext> m_resolver;
-    RefPtrWillBeMember<BatteryStatus> m_batteryStatus;
+    RefPtr<ScriptPromiseResolver> m_resolver;
+    Member<BatteryStatus> m_batteryStatus;
     State m_state;
 };
 
-}
+} // namespace blink
 
 #endif // BatteryManager_h

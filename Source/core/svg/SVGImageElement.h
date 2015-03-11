@@ -29,10 +29,11 @@
 #include "core/svg/SVGImageLoader.h"
 #include "core/svg/SVGURIReference.h"
 
-namespace WebCore {
+namespace blink {
 
 class SVGImageElement FINAL : public SVGGraphicsElement,
                               public SVGURIReference {
+    DEFINE_WRAPPERTYPEINFO();
 public:
     DECLARE_NODE_FACTORY(SVGImageElement);
     virtual void trace(Visitor*) OVERRIDE;
@@ -79,6 +80,6 @@ private:
     bool m_needsLoaderURIUpdate : 1;
 };
 
-} // namespace WebCore
+} // namespace blink
 
-#endif
+#endif // SVGImageElement_h

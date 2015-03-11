@@ -6,7 +6,6 @@ LOCAL_MODULE_CLASS := GYP
 LOCAL_MODULE := third_party_WebKit_Source_devtools_build_elements_module_gyp
 LOCAL_MODULE_STEM := build_elements_module
 LOCAL_MODULE_SUFFIX := .stamp
-LOCAL_MODULE_TAGS := optional
 LOCAL_MODULE_TARGET_ARCH := $(TARGET_$(GYP_VAR_PREFIX)ARCH)
 gyp_intermediate_dir := $(call local-intermediates-dir,,$(GYP_VAR_PREFIX))
 gyp_shared_intermediate_dir := $(call intermediates-dir-for,GYP,shared,,,$(GYP_VAR_PREFIX))
@@ -15,19 +14,19 @@ gyp_shared_intermediate_dir := $(call intermediates-dir-for,GYP,shared,,,$(GYP_V
 GYP_TARGET_DEPENDENCIES :=
 
 ### Rules for action "build_elements_module":
-$(gyp_shared_intermediate_dir)/resources/inspector/elements/ElementsPanel.js: gyp_local_path := $(LOCAL_PATH)
-$(gyp_shared_intermediate_dir)/resources/inspector/elements/ElementsPanel.js: gyp_var_prefix := $(GYP_VAR_PREFIX)
-$(gyp_shared_intermediate_dir)/resources/inspector/elements/ElementsPanel.js: gyp_intermediate_dir := $(abspath $(gyp_intermediate_dir))
-$(gyp_shared_intermediate_dir)/resources/inspector/elements/ElementsPanel.js: gyp_shared_intermediate_dir := $(abspath $(gyp_shared_intermediate_dir))
-$(gyp_shared_intermediate_dir)/resources/inspector/elements/ElementsPanel.js: export PATH := $(subst $(ANDROID_BUILD_PATHS),,$(PATH))
-$(gyp_shared_intermediate_dir)/resources/inspector/elements/ElementsPanel.js: $(LOCAL_PATH)/third_party/WebKit/Source/devtools/scripts/inline_js_imports.py $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/elements/DOMSyntaxHighlighter.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/elements/ElementsTreeOutline.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/elements/ElementsPanel.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/elements/EventListenersSidebarPane.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/elements/MetricsSidebarPane.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/elements/OverridesView.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/elements/PlatformFontsSidebarPane.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/elements/PropertiesSidebarPane.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/elements/RenderingOptionsView.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/elements/Spectrum.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/elements/StylesSidebarPane.js $(GYP_TARGET_DEPENDENCIES)
+$(gyp_shared_intermediate_dir)/resources/inspector/elements_module.js: gyp_local_path := $(LOCAL_PATH)
+$(gyp_shared_intermediate_dir)/resources/inspector/elements_module.js: gyp_var_prefix := $(GYP_VAR_PREFIX)
+$(gyp_shared_intermediate_dir)/resources/inspector/elements_module.js: gyp_intermediate_dir := $(abspath $(gyp_intermediate_dir))
+$(gyp_shared_intermediate_dir)/resources/inspector/elements_module.js: gyp_shared_intermediate_dir := $(abspath $(gyp_shared_intermediate_dir))
+$(gyp_shared_intermediate_dir)/resources/inspector/elements_module.js: export PATH := $(subst $(ANDROID_BUILD_PATHS),,$(PATH))
+$(gyp_shared_intermediate_dir)/resources/inspector/elements_module.js: $(LOCAL_PATH)/third_party/WebKit/Source/devtools/scripts/concatenate_module_scripts.py $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/elements/module.json $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/elements/ElementsPanel.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/elements/ElementsTreeOutline.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/elements/EventListenersSidebarPane.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/elements/MetricsSidebarPane.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/elements/PlatformFontsSidebarPane.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/elements/PropertiesSidebarPane.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/elements/Spectrum.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/elements/StylesSidebarPane.js $(GYP_TARGET_DEPENDENCIES)
 	@echo "Gyp action: third_party_WebKit_Source_devtools_devtools_gyp_build_elements_module_target_build_elements_module ($@)"
-	$(hide)cd $(gyp_local_path)/third_party/WebKit/Source/devtools; mkdir -p $(gyp_shared_intermediate_dir)/resources/inspector/elements; python scripts/inline_js_imports.py front_end/elements/ElementsPanel.js "$(gyp_shared_intermediate_dir)/resources/inspector/elements/ElementsPanel.js"
+	$(hide)cd $(gyp_local_path)/third_party/WebKit/Source/devtools; mkdir -p $(gyp_shared_intermediate_dir)/resources/inspector; python scripts/concatenate_module_scripts.py front_end/elements/module.json "$(gyp_shared_intermediate_dir)/resources/inspector/elements_module.js"
 
 
 
 GYP_GENERATED_OUTPUTS := \
-	$(gyp_shared_intermediate_dir)/resources/inspector/elements/ElementsPanel.js
+	$(gyp_shared_intermediate_dir)/resources/inspector/elements_module.js
 
 # Make sure our deps and generated files are built first.
 LOCAL_ADDITIONAL_DEPENDENCIES := $(GYP_TARGET_DEPENDENCIES) $(GYP_GENERATED_OUTPUTS)

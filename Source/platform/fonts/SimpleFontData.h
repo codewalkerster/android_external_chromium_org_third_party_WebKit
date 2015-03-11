@@ -43,12 +43,9 @@
 #include "wtf/RetainPtr.h"
 #endif
 
-namespace WebCore {
+namespace blink {
 
-class CSSFontFaceSource;
 class FontDescription;
-class SharedBuffer;
-struct WidthIterator;
 
 enum FontDataVariant { AutoVariant, NormalVariant, SmallCapsVariant, EmphasisMarkVariant, BrokenIdeographVariant };
 enum Pitch { UnknownPitch, FixedPitch, VariablePitch };
@@ -119,7 +116,6 @@ public:
     float platformWidthForGlyph(Glyph) const;
 
     float spaceWidth() const { return m_spaceWidth; }
-    float adjustedSpaceWidth() const { return m_adjustedSpaceWidth; }
     void setSpaceWidth(float spaceWidth) { m_spaceWidth = spaceWidth; }
 
 #if OS(MACOSX)
@@ -150,10 +146,6 @@ public:
 
     const GlyphData& missingGlyphData() const { return m_missingGlyphData; }
     void setMissingGlyphData(const GlyphData& glyphData) { m_missingGlyphData = glyphData; }
-
-#ifndef NDEBUG
-    virtual String description() const OVERRIDE;
-#endif
 
 #if OS(MACOSX)
     const SimpleFontData* getCompositeFontReferenceFontData(NSFont *key) const;
@@ -208,7 +200,6 @@ private:
     Glyph m_spaceGlyph;
     float m_spaceWidth;
     Glyph m_zeroGlyph;
-    float m_adjustedSpaceWidth;
 
     Glyph m_zeroWidthSpaceGlyph;
 
@@ -293,5 +284,7 @@ ALWAYS_INLINE float SimpleFontData::widthForGlyph(Glyph glyph) const
     return width;
 }
 
-} // namespace WebCore
+DEFINE_FONT_DATA_TYPE_CASTS(SimpleFontData, false);
+
+} // namespace blink
 #endif // SimpleFontData_h

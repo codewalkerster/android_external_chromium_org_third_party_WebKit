@@ -34,14 +34,11 @@
 #include "wtf/PassRefPtr.h"
 #include "wtf/Vector.h"
 
-namespace WebCore {
+namespace blink {
 
-class CSSFontSelector;
-class Document;
 class FontDescription;
 class RemoteFontFaceSource;
 class SimpleFontData;
-class StyleRuleFontFace;
 
 class CSSFontFace FINAL : public NoBaseWillBeGarbageCollectedFinalized<CSSFontFace> {
 public:

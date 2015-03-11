@@ -27,7 +27,7 @@
 
 #include "platform/transforms/TransformOperation.h"
 
-namespace WebCore {
+namespace blink {
 
 class PLATFORM_EXPORT IdentityTransformOperation : public TransformOperation {
 public:
@@ -42,7 +42,6 @@ public:
     }
 
 private:
-    virtual bool isIdentity() const OVERRIDE FINAL { return true; }
     virtual OperationType type() const OVERRIDE { return Identity; }
 
     virtual bool operator==(const TransformOperation& o) const OVERRIDE
@@ -63,6 +62,6 @@ private:
 
 };
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // IdentityTransformOperation_h

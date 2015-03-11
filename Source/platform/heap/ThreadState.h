@@ -33,6 +33,7 @@
 
 #include "platform/PlatformExport.h"
 #include "platform/heap/AddressSanitizer.h"
+#include "public/platform/WebThread.h"
 #include "wtf/HashSet.h"
 #include "wtf/OwnPtr.h"
 #include "wtf/PassOwnPtr.h"
@@ -41,7 +42,11 @@
 #include "wtf/ThreadingPrimitives.h"
 #include "wtf/Vector.h"
 
-namespace WebCore {
+#if ENABLE(GC_PROFILE_HEAP)
+#include "wtf/HashMap.h"
+#endif
+
+namespace blink {
 
 class BaseHeap;
 class BaseHeapPage;
@@ -49,7 +54,9 @@ class FinalizedHeapObjectHeader;
 struct GCInfo;
 class HeapContainsCache;
 class HeapObjectHeader;
+class PageMemory;
 class PersistentNode;
+class WrapperPersistentRegion;
 class Visitor;
 class SafePointBarrier;
 class SafePointAwareMutexLocker;
@@ -62,6 +69,7 @@ typedef void (*FinalizationCallback)(void*);
 typedef void (*VisitorCallback)(Visitor*, void* self);
 typedef VisitorCallback TraceCallback;
 typedef VisitorCallback WeakPointerCallback;
+typedef VisitorCallback EphemeronCallback;
 
 // ThreadAffinity indicates which threads objects can be used on. We
 // distinguish between objects that can be used on the main thread
@@ -115,7 +123,7 @@ struct ThreadingTrait {
     namespace Namespace {                                               \
         class Class;                                                    \
     }                                                                   \
-    namespace WebCore {                                                 \
+    namespace blink {                                                 \
         template<> struct ThreadingTrait<Namespace::Class> {            \
             static const ThreadAffinity Affinity = AnyThread;           \
         };                                                              \
@@ -128,39 +136,80 @@ template<typename U> class ThreadingTrait<const U> : public ThreadingTrait<U> { 
 //
 // To create a new typed heap add a H(<ClassName>) to the
 // FOR_EACH_TYPED_HEAP macro below.
-// FIXME: When the Node hierarchy has been moved use Node in our
-// tests instead of TestTypedHeapClass.
 #define FOR_EACH_TYPED_HEAP(H)  \
-    H(TestTypedHeapClass)
-//    H(Node)
+    H(Node)
 
 #define TypedHeapEnumName(Type) Type##Heap,
+#define TypedHeapEnumNameNonFinalized(Type) Type##HeapNonFinalized,
 
 enum TypedHeaps {
-    GeneralHeap,
+    GeneralHeap = 0,
+    CollectionBackingHeap,
     FOR_EACH_TYPED_HEAP(TypedHeapEnumName)
-    NumberOfHeaps
+    GeneralHeapNonFinalized,
+    CollectionBackingHeapNonFinalized,
+    FOR_EACH_TYPED_HEAP(TypedHeapEnumNameNonFinalized)
+    // Values used for iteration of heap segments.
+    NumberOfHeaps,
+    FirstFinalizedHeap = GeneralHeap,
+    FirstNonFinalizedHeap = GeneralHeapNonFinalized,
+    NumberOfFinalizedHeaps = GeneralHeapNonFinalized,
+    NumberOfNonFinalizedHeaps = NumberOfHeaps - NumberOfFinalizedHeaps,
+    NonFinalizedHeapOffset = FirstNonFinalizedHeap
 };
 
-// Trait to give an index in the thread state to all the
-// type-specialized heaps. The general heap is at index 0 in the
-// thread state. The index for other type-specialized heaps are given
-// by the TypedHeaps enum above.
+// Base implementation for HeapIndexTrait found below.
+template<int heapIndex>
+struct HeapIndexTraitBase {
+    typedef FinalizedHeapObjectHeader HeaderType;
+    typedef ThreadHeap<HeaderType> HeapType;
+    static const int finalizedIndex = heapIndex;
+    static const int nonFinalizedIndex = heapIndex + static_cast<int>(NonFinalizedHeapOffset);
+    static int index(bool isFinalized)
+    {
+        return isFinalized ? finalizedIndex : nonFinalizedIndex;
+    }
+};
+
+// HeapIndexTrait defines properties for each heap in the TypesHeaps enum.
+template<int index>
+struct HeapIndexTrait;
+
+template<>
+struct HeapIndexTrait<GeneralHeap> : public HeapIndexTraitBase<GeneralHeap> { };
+template<>
+struct HeapIndexTrait<GeneralHeapNonFinalized> : public HeapIndexTrait<GeneralHeap> { };
+
+template<>
+struct HeapIndexTrait<CollectionBackingHeap> : public HeapIndexTraitBase<CollectionBackingHeap> { };
+template<>
+struct HeapIndexTrait<CollectionBackingHeapNonFinalized> : public HeapIndexTrait<CollectionBackingHeap> { };
+
+#define DEFINE_TYPED_HEAP_INDEX_TRAIT(Type)                                     \
+    template<>                                                                  \
+    struct HeapIndexTrait<Type##Heap> : public HeapIndexTraitBase<Type##Heap> { \
+        typedef HeapObjectHeader HeaderType;                                    \
+        typedef ThreadHeap<HeaderType> HeapType;                                \
+    };                                                                          \
+    template<>                                                                  \
+    struct HeapIndexTrait<Type##HeapNonFinalized> : public HeapIndexTrait<Type##Heap> { };
+FOR_EACH_TYPED_HEAP(DEFINE_TYPED_HEAP_INDEX_TRAIT)
+#undef DEFINE_TYPED_HEAP_INDEX_TRAIT
+
+// HeapTypeTrait defines which heap to use for particular types.
+// By default objects are allocated in the GeneralHeap.
 template<typename T>
-struct HeapTrait {
-    static const int index = GeneralHeap;
-    typedef ThreadHeap<FinalizedHeapObjectHeader> HeapType;
-};
+struct HeapTypeTrait : public HeapIndexTrait<GeneralHeap> { };
 
-#define DEFINE_HEAP_INDEX_TRAIT(Type)                  \
-    class Type;                                        \
-    template<>                                         \
-    struct HeapTrait<class Type> {                     \
-        static const int index = Type##Heap;           \
-        typedef ThreadHeap<HeapObjectHeader> HeapType; \
-    };
+// We don't have any type-based mappings to the CollectionBackingHeap.
 
-FOR_EACH_TYPED_HEAP(DEFINE_HEAP_INDEX_TRAIT)
+// Each typed-heap maps the respective type to its heap.
+#define DEFINE_TYPED_HEAP_TRAIT(Type)                                   \
+    class Type;                                                         \
+    template<>                                                          \
+    struct HeapTypeTrait<class Type> : public HeapIndexTrait<Type##Heap> { };
+FOR_EACH_TYPED_HEAP(DEFINE_TYPED_HEAP_TRAIT)
+#undef DEFINE_TYPED_HEAP_TRAIT
 
 // A HeapStats structure keeps track of the amount of memory allocated
 // for a Blink heap and how much of that memory is used for actual
@@ -168,6 +217,8 @@ FOR_EACH_TYPED_HEAP(DEFINE_HEAP_INDEX_TRAIT)
 // when to perform garbage collections.
 class HeapStats {
 public:
+    HeapStats() : m_totalObjectSpace(0), m_totalAllocatedSpace(0) { }
+
     size_t totalObjectSpace() const { return m_totalObjectSpace; }
     size_t totalAllocatedSpace() const { return m_totalAllocatedSpace; }
 
@@ -228,6 +279,28 @@ public:
         HeapPointersOnStack
     };
 
+    // When profiling we would like to identify forced GC requests.
+    enum CauseOfGC {
+        NormalGC,
+        ForcedGC
+    };
+
+    class NoSweepScope {
+    public:
+        explicit NoSweepScope(ThreadState* state) : m_state(state)
+        {
+            ASSERT(!m_state->m_sweepInProgress);
+            m_state->m_sweepInProgress = true;
+        }
+        ~NoSweepScope()
+        {
+            ASSERT(m_state->m_sweepInProgress);
+            m_state->m_sweepInProgress = false;
+        }
+    private:
+        ThreadState* m_state;
+    };
+
     // The set of ThreadStates for all threads attached to the Blink
     // garbage collector.
     typedef HashSet<ThreadState*> AttachedThreadStateSet;
@@ -238,12 +311,16 @@ public:
     static void init();
     static void shutdown();
     static void shutdownHeapIfNecessary();
+    bool isTerminating() { return m_isTerminating; }
 
     static void attachMainThread();
     static void detachMainThread();
 
-    // Trace all GC roots, called when marking the managed heap objects.
-    static void visitRoots(Visitor*);
+    // Trace all persistent roots, called when marking the managed heap objects.
+    static void visitPersistentRoots(Visitor*);
+
+    // Trace all objects found on the stack, used when doing conservative GCs.
+    static void visitStackRoots(Visitor*);
 
     // Associate ThreadState object with the current thread. After this
     // call thread can start using the garbage collected heap infrastructure.
@@ -276,6 +353,8 @@ public:
     // collect garbage at this point.
     bool shouldGC();
     bool shouldForceConservativeGC();
+    bool increasedEnoughToGC(size_t, size_t);
+    bool increasedEnoughToForceConservativeGC(size_t, size_t);
 
     // If gcRequested returns true when a thread returns to its event
     // loop the thread will initiate a garbage collection.
@@ -304,16 +383,18 @@ public:
     void leaveNoAllocationScope() { m_noAllocationCount--; }
 
     // Before performing GC the thread-specific heap state should be
-    // made consistent for garbage collection.
-    bool isConsistentForGC();
-    void makeConsistentForGC();
+    // made consistent for sweeping.
+    void makeConsistentForSweeping();
+#if ENABLE(ASSERT)
+    bool isConsistentForSweeping();
+#endif
 
     // Is the thread corresponding to this thread state currently
     // performing GC?
     bool isInGC() const { return m_inGC; }
 
     // Is any of the threads registered with the blink garbage collection
-    // infrastructure currently perform GC?
+    // infrastructure currently performing GC?
     static bool isAnyThreadInGC() { return s_inGC; }
 
     void enterGC()
@@ -461,7 +542,7 @@ public:
     //
     // The heap is split into multiple heap parts based on object
     // types. To get the index for a given type, use
-    // HeapTrait<Type>::index.
+    // HeapTypeTrait<Type>::index.
     BaseHeap* heap(int index) const { return m_heaps[index]; }
 
     // Infrastructure to determine if an address is within one of the
@@ -471,6 +552,14 @@ public:
     BaseHeapPage* contains(Address address) { return heapPageFromAddress(address); }
     BaseHeapPage* contains(void* pointer) { return contains(reinterpret_cast<Address>(pointer)); }
     BaseHeapPage* contains(const void* pointer) { return contains(const_cast<void*>(pointer)); }
+
+    WrapperPersistentRegion* wrapperRoots() const
+    {
+        ASSERT(m_liveWrapperPersistents);
+        return m_liveWrapperPersistents;
+    }
+    WrapperPersistentRegion* takeWrapperPersistentRegion();
+    void freeWrapperPersistentRegion(WrapperPersistentRegion*);
 
     // List of persistent roots allocated on the given thread.
     PersistentNode* roots() const { return m_persistents.get(); }
@@ -494,9 +583,38 @@ public:
     // the object to which it points.
     bool checkAndMarkPointer(Visitor*, Address);
 
-#if ENABLE(GC_TRACING)
+#if ENABLE(GC_PROFILE_MARKING)
     const GCInfo* findGCInfo(Address);
     static const GCInfo* findGCInfoFromAllThreads(Address);
+#endif
+
+#if ENABLE(GC_PROFILE_HEAP)
+    struct SnapshotInfo {
+        ThreadState* state;
+
+        size_t freeSize;
+        size_t pageCount;
+
+        // Map from base-classes to a snapshot class-ids (used as index below).
+        HashMap<const GCInfo*, size_t> classTags;
+
+        // Map from class-id (index) to count/size.
+        Vector<int> liveCount;
+        Vector<int> deadCount;
+        Vector<size_t> liveSize;
+        Vector<size_t> deadSize;
+
+        // Map from class-id (index) to a vector of generation counts.
+        // For i < 7, the count is the number of objects that died after surviving |i| GCs.
+        // For i == 7, the count is the number of objects that survived at least 7 GCs.
+        Vector<Vector<int, 8> > generations;
+
+        explicit SnapshotInfo(ThreadState* state) : state(state), freeSize(0), pageCount(0) { }
+
+        size_t getClassTag(const GCInfo*);
+    };
+
+    void snapshot();
 #endif
 
     void pushWeakObjectPointerCallback(void*, WeakPointerCallback);
@@ -505,6 +623,13 @@ public:
     void getStats(HeapStats&);
     HeapStats& stats() { return m_stats; }
     HeapStats& statsAfterLastGC() { return m_statsAfterLastGC; }
+
+    void setupHeapsForTermination();
+
+    void registerSweepingTask();
+    void unregisterSweepingTask();
+
+    Mutex& sweepMutex() { return m_sweepMutex; }
 
 private:
     explicit ThreadState();
@@ -537,8 +662,11 @@ private:
     // If assertion does not hold we crash as we are potentially
     // in the dangling pointer situation.
     void cleanup();
-    void preCleanup();
-    void postCleanup();
+    void cleanupPages();
+
+    void setLowCollectionRate(bool value) { m_lowCollectionRate = value; }
+
+    void waitUntilSweepersDone();
 
     static WTF::ThreadSpecific<ThreadState*>* s_threadSpecific;
     static SafePointBarrier* s_safePointBarrier;
@@ -556,9 +684,10 @@ private:
     // and lazily construct ThreadState in it using placement new.
     static uint8_t s_mainThreadStateStorage[];
 
-    void trace(Visitor*);
-
     ThreadIdentifier m_thread;
+    WrapperPersistentRegion* m_liveWrapperPersistents;
+    WrapperPersistentRegion* m_pooledWrapperPersistents;
+    size_t m_pooledWrapperPersistentRegionCount;
     OwnPtr<PersistentNode> m_persistents;
     StackState m_stackState;
     intptr_t* m_startOfStack;
@@ -579,7 +708,14 @@ private:
     HeapStats m_statsAfterLastGC;
 
     Vector<OwnPtr<CleanupTask> > m_cleanupTasks;
-    bool m_isCleaningUp;
+    bool m_isTerminating;
+
+    bool m_lowCollectionRate;
+
+    OwnPtr<blink::WebThread> m_sweeperThread;
+    int m_numberOfSweeperTasks;
+    Mutex m_sweepMutex;
+    ThreadCondition m_sweepThreadCondition;
 
     CallbackStack* m_weakCallbackStack;
 
@@ -613,13 +749,19 @@ public:
 class SafePointAwareMutexLocker {
     WTF_MAKE_NONCOPYABLE(SafePointAwareMutexLocker);
 public:
-    explicit SafePointAwareMutexLocker(Mutex& mutex) : m_mutex(mutex), m_locked(false)
+    explicit SafePointAwareMutexLocker(MutexBase& mutex, ThreadState::StackState stackState = ThreadState::HeapPointersOnStack)
+        : m_mutex(mutex)
+        , m_locked(false)
     {
         ThreadState* state = ThreadState::current();
         do {
             bool leaveSafePoint = false;
-            if (!state->isAtSafePoint()) {
-                state->enterSafePoint(ThreadState::HeapPointersOnStack, this);
+            // We cannot enter a safepoint if we are currently sweeping. In that
+            // case we just try to acquire the lock without being at a safepoint.
+            // If another thread tries to do a GC at that time it might time out
+            // due to this thread not being at a safepoint and waiting on the lock.
+            if (!state->isSweepInProgress() && !state->isAtSafePoint()) {
+                state->enterSafePoint(stackState, this);
                 leaveSafePoint = true;
             }
             m_mutex.lock();
@@ -650,8 +792,63 @@ private:
         m_locked = false;
     }
 
-    Mutex& m_mutex;
+    MutexBase& m_mutex;
     bool m_locked;
+};
+
+// Common header for heap pages. Needs to be defined before class Visitor.
+class BaseHeapPage {
+public:
+    BaseHeapPage(PageMemory*, const GCInfo*, ThreadState*);
+    virtual ~BaseHeapPage() { }
+
+    // Check if the given address points to an object in this
+    // heap page. If so, find the start of that object and mark it
+    // using the given Visitor. Otherwise do nothing. The pointer must
+    // be within the same aligned blinkPageSize as the this-pointer.
+    //
+    // This is used during conservative stack scanning to
+    // conservatively mark all objects that could be referenced from
+    // the stack.
+    virtual void checkAndMarkPointer(Visitor*, Address) = 0;
+    virtual bool contains(Address) = 0;
+
+#if ENABLE(GC_PROFILE_MARKING)
+    virtual const GCInfo* findGCInfo(Address) = 0;
+#endif
+
+    Address address() { return reinterpret_cast<Address>(this); }
+    PageMemory* storage() const { return m_storage; }
+    ThreadState* threadState() const { return m_threadState; }
+    const GCInfo* gcInfo() { return m_gcInfo; }
+    virtual bool isLargeObject() { return false; }
+    virtual void markOrphaned()
+    {
+        m_threadState = 0;
+        m_gcInfo = 0;
+        m_terminating = false;
+        m_tracedAfterOrphaned = false;
+    }
+    bool orphaned() { return !m_threadState; }
+    bool terminating() { return m_terminating; }
+    void setTerminating() { m_terminating = true; }
+    bool tracedAfterOrphaned() { return m_tracedAfterOrphaned; }
+    void setTracedAfterOrphaned() { m_tracedAfterOrphaned = true; }
+    size_t promptlyFreedSize() { return m_promptlyFreedSize; }
+    void resetPromptlyFreedSize() { m_promptlyFreedSize = 0; }
+    void addToPromptlyFreedSize(size_t size) { m_promptlyFreedSize += size; }
+
+private:
+    PageMemory* m_storage;
+    const GCInfo* m_gcInfo;
+    ThreadState* m_threadState;
+    // Pointer sized integer to ensure proper alignment of the
+    // HeapPage header. We use some of the bits to determine
+    // whether the page is part of a terminting thread or
+    // if the page is traced after being terminated (orphaned).
+    uintptr_t m_terminating : 1;
+    uintptr_t m_tracedAfterOrphaned : 1;
+    uintptr_t m_promptlyFreedSize : 17; // == blinkPageSizeLog2
 };
 
 }

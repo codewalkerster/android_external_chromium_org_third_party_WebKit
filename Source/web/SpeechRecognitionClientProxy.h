@@ -37,7 +37,7 @@ namespace blink {
 class WebSpeechRecognizer;
 class WebString;
 
-class SpeechRecognitionClientProxy FINAL : public WebCore::SpeechRecognitionClient, public WebSpeechRecognizerClient {
+class SpeechRecognitionClientProxy FINAL : public SpeechRecognitionClient, public WebSpeechRecognizerClient {
 public:
     virtual ~SpeechRecognitionClientProxy();
 
@@ -45,10 +45,10 @@ public:
     // itself, but attempting to call start/stop/abort on it will crash.
     static PassOwnPtr<SpeechRecognitionClientProxy> create(WebSpeechRecognizer*);
 
-    // WebCore::SpeechRecognitionClient:
-    virtual void start(WebCore::SpeechRecognition*, const WebCore::SpeechGrammarList*, const String& lang, bool continuous, bool interimResults, unsigned long maxAlternatives) OVERRIDE;
-    virtual void stop(WebCore::SpeechRecognition*) OVERRIDE;
-    virtual void abort(WebCore::SpeechRecognition*) OVERRIDE;
+    // SpeechRecognitionClient:
+    virtual void start(SpeechRecognition*, const SpeechGrammarList*, const String& lang, bool continuous, bool interimResults, unsigned long maxAlternatives) OVERRIDE;
+    virtual void stop(SpeechRecognition*) OVERRIDE;
+    virtual void abort(SpeechRecognition*) OVERRIDE;
 
     // WebSpeechRecognizerClient:
     virtual void didStartAudio(const WebSpeechRecognitionHandle&) OVERRIDE;

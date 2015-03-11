@@ -34,7 +34,7 @@
 #include "wtf/Forward.h"
 #include "wtf/RefCounted.h"
 
-namespace WebCore {
+namespace blink {
 
 class Event;
 class GraphicsContext;
@@ -98,12 +98,6 @@ public:
 
     virtual void handleEvent(Event*) { }
 
-    IntRect convertToRootView(const IntRect&) const;
-    IntRect convertFromRootView(const IntRect&) const;
-
-    IntPoint convertToRootView(const IntPoint&) const;
-    IntPoint convertFromRootView(const IntPoint&) const;
-
     // It is important for cross-platform code to realize that Mac has flipped coordinates. Therefore any code
     // that tries to convert the location of a rect using the point-based convertFromContainingWindow will end
     // up with an inaccurate rect. Always make sure to use the rect-based convertFromContainingWindow method
@@ -133,6 +127,10 @@ public:
     // Notifies this widget that it will no longer be receiving events.
     virtual void eventListenersRemoved() { }
 
+#if ENABLE(OILPAN)
+    virtual void detach() { }
+#endif
+
 private:
     Widget* m_parent;
     IntRect m_frame;
@@ -140,6 +138,6 @@ private:
     bool m_parentVisible;
 };
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // Widget_h

@@ -20,10 +20,12 @@
 #include "config.h"
 
 #include "platform/graphics/GraphicsLayerDebugInfo.h"
+#include "public/platform/WebGraphicsLayerDebugInfo.h"
+#include "public/platform/WebVector.h"
 
 #include "wtf/text/CString.h"
 
-namespace WebCore {
+namespace blink {
 
 GraphicsLayerDebugInfo::GraphicsLayerDebugInfo()
     : m_compositingReasons(CompositingReasonNone)
@@ -32,7 +34,7 @@ GraphicsLayerDebugInfo::GraphicsLayerDebugInfo()
 
 GraphicsLayerDebugInfo::~GraphicsLayerDebugInfo() { }
 
-void GraphicsLayerDebugInfo::appendAsTraceFormat(blink::WebString* out) const
+void GraphicsLayerDebugInfo::appendAsTraceFormat(WebString* out) const
 {
     RefPtr<JSONObject> jsonObject = JSONObject::create();
     appendLayoutRects(jsonObject.get());
@@ -42,6 +44,11 @@ void GraphicsLayerDebugInfo::appendAsTraceFormat(blink::WebString* out) const
     *out = jsonObject->toJSONString();
 }
 
+void GraphicsLayerDebugInfo::getAnnotatedInvalidationRects(WebVector<WebAnnotatedInvalidationRect>& result) const
+{
+    result.assign(m_invalidations.data(), m_invalidations.size());
+}
+
 GraphicsLayerDebugInfo* GraphicsLayerDebugInfo::clone() const
 {
     GraphicsLayerDebugInfo* toReturn = new GraphicsLayerDebugInfo();
@@ -49,6 +56,7 @@ GraphicsLayerDebugInfo* GraphicsLayerDebugInfo::clone() const
         toReturn->currentLayoutRects().append(m_currentLayoutRects[i]);
     toReturn->setCompositingReasons(m_compositingReasons);
     toReturn->setOwnerNodeId(m_ownerNodeId);
+    toReturn->m_invalidations = m_invalidations;
     return toReturn;
 }
 
@@ -72,10 +80,10 @@ void GraphicsLayerDebugInfo::appendLayoutRects(JSONObject* jsonObject) const
 void GraphicsLayerDebugInfo::appendCompositingReasons(JSONObject* jsonObject) const
 {
     RefPtr<JSONArray> jsonArray = JSONArray::create();
-    for (size_t i = 0; i < WTF_ARRAY_LENGTH(compositingReasonStringMap); ++i) {
-        if (!(m_compositingReasons & compositingReasonStringMap[i].reason))
+    for (size_t i = 0; i < kNumberOfCompositingReasons; ++i) {
+        if (!(m_compositingReasons & kCompositingReasonStringMap[i].reason))
             continue;
-        jsonArray->pushString(compositingReasonStringMap[i].description);
+        jsonArray->pushString(kCompositingReasonStringMap[i].description);
     }
     jsonObject->setArray("compositing_reasons", jsonArray);
 }
@@ -96,4 +104,18 @@ void GraphicsLayerDebugInfo::appendOwnerNodeId(JSONObject* jsonObject) const
     jsonObject->setNumber("owner_node", m_ownerNodeId);
 }
 
-} // namespace WebCore
+void GraphicsLayerDebugInfo::appendAnnotatedInvalidateRect(const FloatRect& rect, WebInvalidationDebugAnnotations annotations)
+{
+    WebAnnotatedInvalidationRect annotatedRect = {
+        WebFloatRect(rect),
+        annotations
+    };
+    m_invalidations.append(annotatedRect);
+}
+
+void GraphicsLayerDebugInfo::clearAnnotatedInvalidateRects()
+{
+    m_invalidations.clear();
+}
+
+} // namespace blink

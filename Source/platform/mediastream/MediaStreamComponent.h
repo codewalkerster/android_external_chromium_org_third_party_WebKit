@@ -40,13 +40,9 @@
 #include "wtf/text/WTFString.h"
 
 namespace blink {
-class WebAudioSourceProvider;
-}
 
-namespace WebCore {
-
-class MediaStreamDescriptor;
 class MediaStreamSource;
+class WebAudioSourceProvider;
 
 class PLATFORM_EXPORT MediaStreamComponent : public RefCounted<MediaStreamComponent> {
 public:
@@ -63,10 +59,11 @@ public:
     String id() const { return m_id; }
     bool enabled() const { return m_enabled; }
     void setEnabled(bool enabled) { m_enabled = enabled; }
+    bool muted() const { return m_muted; }
 
 #if ENABLE(WEB_AUDIO)
     AudioSourceProvider* audioSourceProvider() { return &m_sourceProvider; }
-    void setSourceProvider(blink::WebAudioSourceProvider* provider) { m_sourceProvider.wrap(provider); }
+    void setSourceProvider(WebAudioSourceProvider* provider) { m_sourceProvider.wrap(provider); }
 #endif // ENABLE(WEB_AUDIO)
 
     ExtraData* extraData() const { return m_extraData.get(); }
@@ -88,14 +85,14 @@ private:
 
         virtual ~AudioSourceProviderImpl() { }
 
-        // Wraps the given blink::WebAudioSourceProvider to WebCore::AudioSourceProvider.
-        void wrap(blink::WebAudioSourceProvider*);
+        // Wraps the given blink::WebAudioSourceProvider to blink::AudioSourceProvider.
+        void wrap(WebAudioSourceProvider*);
 
-        // WebCore::AudioSourceProvider
-        virtual void provideInput(WebCore::AudioBus*, size_t framesToProcess) OVERRIDE;
+        // blink::AudioSourceProvider
+        virtual void provideInput(blink::AudioBus*, size_t framesToProcess) OVERRIDE;
 
     private:
-        blink::WebAudioSourceProvider* m_webAudioSourceProvider;
+        WebAudioSourceProvider* m_webAudioSourceProvider;
         Mutex m_provideInputLock;
     };
 
@@ -105,11 +102,12 @@ private:
     RefPtr<MediaStreamSource> m_source;
     String m_id;
     bool m_enabled;
+    bool m_muted;
     OwnPtr<ExtraData> m_extraData;
 };
 
 typedef Vector<RefPtr<MediaStreamComponent> > MediaStreamComponentVector;
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // MediaStreamComponent_h

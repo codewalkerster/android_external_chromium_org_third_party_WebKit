@@ -39,7 +39,7 @@
 #include "wtf/Vector.h"
 #include "wtf/text/AtomicString.h"
 
-namespace WebCore {
+namespace blink {
 
 class CustomElementMicrotaskImportStep;
 class Document;
@@ -58,6 +58,7 @@ public:
 
     // API to notify of document-level changes
     static CustomElementMicrotaskImportStep* didCreateImport(HTMLImportChild*);
+    static void didFinishLoadingImport(Document& master);
 
     // API for registration contexts
     static void define(Element*, PassRefPtr<CustomElementDefinition>);
@@ -65,8 +66,8 @@ public:
     // API for Element to kick off changes
 
     static void attributeDidChange(Element*, const AtomicString& name, const AtomicString& oldValue, const AtomicString& newValue);
-    static void didEnterDocument(Element*, const Document&);
-    static void didLeaveDocument(Element*, const Document&);
+    static void didAttach(Element*, const Document&);
+    static void didDetach(Element*, const Document&);
     static void wasDestroyed(Element*);
 
 private:

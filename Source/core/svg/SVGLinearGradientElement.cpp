@@ -30,7 +30,7 @@
 #include "core/svg/SVGLength.h"
 #include "core/svg/SVGTransformList.h"
 
-namespace WebCore {
+namespace blink {
 
 inline SVGLinearGradientElement::SVGLinearGradientElement(Document& document)
     : SVGGradientElement(SVGNames::linearGradientTag, document)
@@ -39,8 +39,6 @@ inline SVGLinearGradientElement::SVGLinearGradientElement(Document& document)
     , m_x2(SVGAnimatedLength::create(this, SVGNames::x2Attr, SVGLength::create(LengthModeWidth), AllowNegativeLengths))
     , m_y2(SVGAnimatedLength::create(this, SVGNames::y2Attr, SVGLength::create(LengthModeHeight), AllowNegativeLengths))
 {
-    ScriptWrappable::init(this);
-
     // Spec: If the x2 attribute is not specified, the effect is as if a value of "100%" were specified.
     m_x2->setDefaultValueAsString("100%");
 
@@ -147,7 +145,7 @@ bool SVGLinearGradientElement::collectGradientAttributes(LinearGradientAttribute
     if (!renderer())
         return false;
 
-    HashSet<SVGGradientElement*> processedGradients;
+    WillBeHeapHashSet<RawPtrWillBeMember<SVGGradientElement> > processedGradients;
     SVGGradientElement* current = this;
 
     setGradientAttributes(current, attributes);
@@ -185,4 +183,4 @@ bool SVGLinearGradientElement::selfHasRelativeLengths() const
         || m_y2->currentValue()->isRelative();
 }
 
-}
+} // namespace blink

@@ -58,8 +58,8 @@ WebInspector.HAREntry.prototype = {
             timings: this._buildTimings()
         };
 
-        if (this._request.connectionId)
-            entry.connection = String(this._request.connectionId);
+        if (this._request.connectionId !== "0")
+            entry.connection = this._request.connectionId;
         var page = this._request.target().networkLog.pageLoadForRequest(this._request);
         if (page)
             entry.pageref = "page_" + page.id;
@@ -97,7 +97,7 @@ WebInspector.HAREntry.prototype = {
         return {
             status: this._request.statusCode,
             statusText: this._request.statusText,
-            httpVersion: this._request.responseHttpVersion,
+            httpVersion: this._request.responseHttpVersion(),
             headers: this._request.responseHeaders,
             cookies: this._buildCookies(this._request.responseCookies || []),
             content: this._buildContent(),

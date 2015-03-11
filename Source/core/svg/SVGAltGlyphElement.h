@@ -28,12 +28,13 @@
 #include "core/svg/SVGURIReference.h"
 #include "wtf/Vector.h"
 
-namespace WebCore {
+namespace blink {
 
 class ExceptionState;
 
 class SVGAltGlyphElement FINAL : public SVGTextPositioningElement,
                                  public SVGURIReference {
+    DEFINE_WRAPPERTYPEINFO();
 public:
     DECLARE_NODE_FACTORY(SVGAltGlyphElement);
 
@@ -50,7 +51,7 @@ private:
     virtual RenderObject* createRenderer(RenderStyle*) OVERRIDE;
 };
 
-} // namespace WebCore
+} // namespace blink
 
-#endif
-#endif
+#endif // ENABLE(SVG_FONTS)
+#endif // SVGAltGlyphElement_h

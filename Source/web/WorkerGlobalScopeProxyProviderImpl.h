@@ -35,14 +35,12 @@
 #include "wtf/Noncopyable.h"
 #include "wtf/PassOwnPtr.h"
 
-namespace WebCore {
-class Worker;
-class WorkerGlobalScopeProxy;
-}
-
 namespace blink {
 
-class WorkerGlobalScopeProxyProviderImpl FINAL : public NoBaseWillBeGarbageCollectedFinalized<WorkerGlobalScopeProxyProviderImpl>, public WebCore::WorkerGlobalScopeProxyProvider {
+class Worker;
+class WorkerGlobalScopeProxy;
+
+class WorkerGlobalScopeProxyProviderImpl FINAL : public NoBaseWillBeGarbageCollectedFinalized<WorkerGlobalScopeProxyProviderImpl>, public WorkerGlobalScopeProxyProvider {
     WILL_BE_USING_GARBAGE_COLLECTED_MIXIN(WorkerGlobalScopeProxyProviderImpl);
     WTF_MAKE_NONCOPYABLE(WorkerGlobalScopeProxyProviderImpl);
 public:
@@ -52,9 +50,9 @@ public:
     }
 
     virtual ~WorkerGlobalScopeProxyProviderImpl() { }
-    virtual WebCore::WorkerGlobalScopeProxy* createWorkerGlobalScopeProxy(WebCore::Worker*) OVERRIDE;
+    virtual WorkerGlobalScopeProxy* createWorkerGlobalScopeProxy(Worker*) OVERRIDE;
 
-    virtual void trace(WebCore::Visitor* visitor) OVERRIDE { WebCore::WorkerGlobalScopeProxyProvider::trace(visitor); }
+    virtual void trace(Visitor* visitor) OVERRIDE { WorkerGlobalScopeProxyProvider::trace(visitor); }
 
 private:
     WorkerGlobalScopeProxyProviderImpl() { }

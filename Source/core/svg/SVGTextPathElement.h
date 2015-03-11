@@ -24,7 +24,7 @@
 #include "core/svg/SVGTextContentElement.h"
 #include "core/svg/SVGURIReference.h"
 
-namespace WebCore {
+namespace blink {
 
 enum SVGTextPathMethodType {
     SVGTextPathMethodUnknown = 0,
@@ -43,6 +43,7 @@ template<> const SVGEnumerationStringEntries& getStaticStringEntries<SVGTextPath
 
 class SVGTextPathElement FINAL : public SVGTextContentElement,
                                  public SVGURIReference {
+    DEFINE_WRAPPERTYPEINFO();
 public:
     // Forward declare enumerations in the W3C naming scheme, for IDL generation.
     enum {
@@ -85,6 +86,6 @@ private:
     RefPtr<SVGAnimatedEnumeration<SVGTextPathSpacingType> > m_spacing;
 };
 
-} // namespace WebCore
+} // namespace blink
 
-#endif
+#endif // SVGTextPathElement_h

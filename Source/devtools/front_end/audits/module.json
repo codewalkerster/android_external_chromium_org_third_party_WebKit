@@ -8,5 +8,17 @@
             "className": "WebInspector.AuditsPanel"
         }
     ],
-    "scripts": [ "AuditsPanel.js" ]
+    "dependencies": [
+        "components"
+    ],
+    "scripts": [
+        "AuditsPanel.js",
+        "AuditCategory.js",
+        "AuditCategories.js",
+        "AuditController.js",
+        "AuditFormatters.js",
+        "AuditLauncherView.js",
+        "AuditResultView.js",
+        "AuditRules.js"
+    ]
 }

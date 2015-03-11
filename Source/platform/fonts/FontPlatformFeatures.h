@@ -33,17 +33,16 @@
 
 #include "platform/PlatformExport.h"
 
-namespace WebCore {
+namespace blink {
 
 class FontPlatformFeatures {
 public:
-    static bool canReturnFallbackFontsForComplexText();
     static bool canExpandAroundIdeographsInComplexText();
 
 private:
     FontPlatformFeatures();
 };
 
-}
+} // namespace blink
 
 #endif

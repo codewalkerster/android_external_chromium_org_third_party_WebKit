@@ -27,7 +27,7 @@
  * The whole class here is a hack to get <br> working, as long as we don't have support for
  * CSS2 :before and :after pseudo elements
  */
-namespace WebCore {
+namespace blink {
 
 class RenderBR FINAL : public RenderText {
 public:
@@ -36,7 +36,7 @@ public:
 
     virtual const char* renderName() const OVERRIDE { return "RenderBR"; }
 
-    virtual LayoutRect selectionRectForPaintInvalidation(const RenderLayerModelObject* /*paintInvalidationContainer*/, bool /*clipToVisibleContent*/) OVERRIDE { return LayoutRect(); }
+    virtual LayoutRect selectionRectForPaintInvalidation(const RenderLayerModelObject* /*paintInvalidationContainer*/) const OVERRIDE { return LayoutRect(); }
 
     virtual float width(unsigned /*from*/, unsigned /*len*/, const Font&, float /*xPos*/, TextDirection, HashSet<const SimpleFontData*>* = 0 /*fallbackFonts*/ , GlyphOverflow* = 0) const OVERRIDE { return 0; }
     virtual float width(unsigned /*from*/, unsigned /*len*/, float /*xpos*/, TextDirection, bool = false /*firstLine*/, HashSet<const SimpleFontData*>* = 0 /*fallbackFonts*/, GlyphOverflow* = 0) const OVERRIDE { return 0; }
@@ -57,6 +57,6 @@ protected:
 
 DEFINE_RENDER_OBJECT_TYPE_CASTS(RenderBR, isBR());
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // RenderBR_h

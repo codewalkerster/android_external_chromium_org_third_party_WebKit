@@ -35,13 +35,12 @@
 #include "platform/graphics/Path.h"
 #include "platform/graphics/Pattern.h"
 #include "platform/graphics/StrokeData.h"
-#include "platform/graphics/skia/SkiaUtils.h"
 #include "third_party/skia/include/core/SkColorFilter.h"
 #include "third_party/skia/include/core/SkPaint.h"
 #include "wtf/PassOwnPtr.h"
 #include "wtf/RefPtr.h"
 
-namespace WebCore {
+namespace blink {
 
 // Encapsulates the state information we store for each pushed graphics state.
 // Only GraphicsContext can use this class.
@@ -69,27 +68,24 @@ public:
     void decrementSaveCount() { --m_saveCount; }
 
     // Stroke data
-    const StrokeData& strokeData() const { return m_strokeData; }
-
-    void setStrokeStyle(StrokeStyle);
-
-    void setStrokeThickness(float);
-
-    SkColor effectiveStrokeColor() const { return applyAlpha(m_strokeData.color().rgb()); }
+    Color strokeColor() const { return m_strokeColor; }
+    SkColor effectiveStrokeColor() const { return applyAlpha(m_strokeColor.rgb()); }
     void setStrokeColor(const Color&);
 
+    Gradient* strokeGradient() const { return m_strokeGradient.get(); }
     void setStrokeGradient(const PassRefPtr<Gradient>);
     void clearStrokeGradient();
 
+    Pattern* strokePattern() const { return m_strokePattern.get(); }
     void setStrokePattern(const PassRefPtr<Pattern>);
     void clearStrokePattern();
 
+    const StrokeData& strokeData() const { return m_strokeData; }
+    void setStrokeStyle(StrokeStyle);
+    void setStrokeThickness(float);
     void setLineCap(LineCap);
-
     void setLineJoin(LineJoin);
-
     void setMiterLimit(float);
-
     void setLineDash(const DashArray&, float);
 
     // Fill data
@@ -126,10 +122,9 @@ public:
     void setColorFilter(PassRefPtr<SkColorFilter>);
 
     // Compositing control, for the CSS and Canvas compositing spec.
-    void setCompositeOperation(CompositeOperator, blink::WebBlendMode);
+    void setCompositeOperation(CompositeOperator, WebBlendMode);
     CompositeOperator compositeOperator() const { return m_compositeOperator; }
-    blink::WebBlendMode blendMode() const { return m_blendMode; }
-    SkXfermode* xferMode() const { return m_xferMode.get(); }
+    WebBlendMode blendMode() const { return m_blendMode; }
 
     // Image interpolation control.
     InterpolationQuality interpolationQuality() const { return m_interpolationQuality; }
@@ -137,9 +132,6 @@ public:
 
     bool shouldAntialias() const { return m_shouldAntialias; }
     void setShouldAntialias(bool);
-
-    bool shouldSmoothFonts() const { return m_shouldSmoothFonts; }
-    void setShouldSmoothFonts(bool shouldSmoothFonts) { m_shouldSmoothFonts = shouldSmoothFonts; }
 
     bool shouldClampToSourceRect() const { return m_shouldClampToSourceRect; }
     void setShouldClampToSourceRect(bool shouldClampToSourceRect) { m_shouldClampToSourceRect = shouldClampToSourceRect; }
@@ -163,6 +155,10 @@ private:
 
     StrokeData m_strokeData;
 
+    Color m_strokeColor;
+    RefPtr<Gradient> m_strokeGradient;
+    RefPtr<Pattern> m_strokePattern;
+
     Color m_fillColor;
     WindRule m_fillRule;
     RefPtr<Gradient> m_fillGradient;
@@ -173,21 +169,19 @@ private:
     TextDrawingModeFlags m_textDrawingMode;
 
     int m_alpha;
-    RefPtr<SkXfermode> m_xferMode;
     RefPtr<SkColorFilter> m_colorFilter;
 
     CompositeOperator m_compositeOperator;
-    blink::WebBlendMode m_blendMode;
+    WebBlendMode m_blendMode;
 
     InterpolationQuality m_interpolationQuality;
 
     uint16_t m_saveCount;
 
     bool m_shouldAntialias : 1;
-    bool m_shouldSmoothFonts : 1;
     bool m_shouldClampToSourceRect : 1;
 };
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // GraphicsContextState_h

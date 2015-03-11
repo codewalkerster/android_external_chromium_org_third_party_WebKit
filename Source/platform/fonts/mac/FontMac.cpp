@@ -42,12 +42,7 @@
 #include "third_party/skia/include/core/SkPaint.h"
 #include "third_party/skia/include/core/SkTypeface.h"
 
-namespace WebCore {
-
-bool FontPlatformFeatures::canReturnFallbackFontsForComplexText()
-{
-    return true;
-}
+namespace blink {
 
 bool FontPlatformFeatures::canExpandAroundIdeographsInComplexText()
 {
@@ -57,7 +52,7 @@ bool FontPlatformFeatures::canExpandAroundIdeographsInComplexText()
 static void setupPaint(SkPaint* paint, const SimpleFontData* fontData, const Font* font, bool shouldAntialias, bool shouldSmoothFonts)
 {
     const FontPlatformData& platformData = fontData->platformData();
-    const float textSize = platformData.m_size >= 0 ? platformData.m_size : 12;
+    const float textSize = platformData.m_textSize >= 0 ? platformData.m_textSize : 12;
 
     paint->setAntiAlias(shouldAntialias);
     paint->setEmbeddedBitmapText(false);
@@ -65,7 +60,7 @@ static void setupPaint(SkPaint* paint, const SimpleFontData* fontData, const Fon
     paint->setVerticalText(platformData.orientation() == Vertical);
     paint->setTypeface(platformData.typeface());
     paint->setFakeBoldText(platformData.m_syntheticBold);
-    paint->setTextSkewX(platformData.m_syntheticOblique ? -SK_Scalar1 / 4 : 0);
+    paint->setTextSkewX(platformData.m_syntheticItalic ? -SK_Scalar1 / 4 : 0);
     paint->setAutohinted(false); // freetype specific
     paint->setLCDRenderText(shouldSmoothFonts);
     paint->setSubpixelText(true);
@@ -101,9 +96,9 @@ void Font::drawGlyphs(GraphicsContext* gc, const SimpleFontData* font,
         break;
     }
 
-    if (isRunningLayoutTest()) {
+    if (LayoutTestSupport::isRunningLayoutTest()) {
         shouldSmoothFonts = false;
-        shouldAntialias = shouldAntialias && isFontAntialiasingEnabledForTest();
+        shouldAntialias = shouldAntialias && LayoutTestSupport::isFontAntialiasingEnabledForTest();
     }
 
     const Glyph* glyphs = glyphBuffer.glyphs(from);
@@ -112,6 +107,9 @@ void Font::drawGlyphs(GraphicsContext* gc, const SimpleFontData* font,
 
     if (font->platformData().orientation() == Vertical)
         y += SkFloatToScalar(font->fontMetrics().floatAscent(IdeographicBaseline) - font->fontMetrics().floatAscent());
+
+    // FIXME: implement a no-vertical-advances fast path like FontHarfBuzz has.
+
     // FIXME: text rendering speed:
     // Android has code in their WebCore fork to special case when the
     // GlyphBuffer has no advances other than the defaults. In that case the
@@ -169,4 +167,16 @@ void Font::drawGlyphs(GraphicsContext* gc, const SimpleFontData* font,
         gc->restore();
 }
 
-} // namespace WebCore
+void Font::drawTextBlob(GraphicsContext*, const SkTextBlob*, const SkPoint&) const
+{
+    // FIXME: Add text blob support to FontMac.
+}
+
+PassTextBlobPtr Font::buildTextBlob(const GlyphBuffer& glyphBuffer, float initialAdvance,
+    const FloatRect& bounds, float& advance, bool couldUseLCD) const
+{
+    // FIXME: Add text blob support to FontMac.
+    return nullptr;
+}
+
+} // namespace blink

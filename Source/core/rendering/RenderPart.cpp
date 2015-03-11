@@ -34,9 +34,7 @@
 #include "core/rendering/RenderView.h"
 #include "core/rendering/svg/RenderSVGRoot.h"
 
-using namespace std;
-
-namespace WebCore {
+namespace blink {
 
 RenderPart::RenderPart(Element* node)
     : RenderWidget(node)
@@ -115,21 +113,12 @@ bool RenderPart::nodeAtPoint(const HitTestRequest& request, HitTestResult& resul
 
         if (isInsideChildFrame)
             return true;
-
-        if (request.allowsFrameScrollbars()) {
-            // ScrollView scrollbars are not the same as RenderLayer scrollbars tested by RenderLayer::hitTestOverflowControls,
-            // so we need to test ScrollView scrollbars separately here.
-            // FIXME: Consider if this test could be done unconditionally.
-            Scrollbar* frameScrollbar = childFrameView->scrollbarAtPoint(newHitTestLocation.roundedPoint());
-            if (frameScrollbar)
-                result.setScrollbar(frameScrollbar);
-        }
     }
 
     return RenderWidget::nodeAtPoint(request, result, locationInContainer, accumulatedOffset, action);
 }
 
-CompositingReasons RenderPart::additionalCompositingReasons(CompositingTriggerFlags) const
+CompositingReasons RenderPart::additionalCompositingReasons() const
 {
     if (requiresAcceleratedCompositing())
         return CompositingReasonIFrame;

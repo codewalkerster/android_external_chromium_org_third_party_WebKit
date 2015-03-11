@@ -26,13 +26,14 @@
 
 #include "core/html/HTMLFormControlElement.h"
 
-namespace WebCore {
+namespace blink {
 
 class FormAssociatedElement;
 class HTMLCollection;
 class HTMLFormControlsCollection;
 
 class HTMLFieldSetElement FINAL : public HTMLFormControlElement {
+    DEFINE_WRAPPERTYPEINFO();
 public:
     static PassRefPtrWillBeRawPtr<HTMLFieldSetElement> create(Document&, HTMLFormElement*);
     virtual void trace(Visitor*) OVERRIDE;
@@ -53,7 +54,7 @@ private:
     virtual RenderObject* createRenderer(RenderStyle*) OVERRIDE;
     virtual const AtomicString& formControlType() const OVERRIDE;
     virtual bool recalcWillValidate() const OVERRIDE { return false; }
-    virtual void childrenChanged(bool changedByParser, Node* beforeChange, Node* afterChange, int childCountDelta) OVERRIDE;
+    virtual void childrenChanged(const ChildrenChange&) OVERRIDE;
     virtual bool areAuthorShadowsAllowed() const OVERRIDE { return false; }
 
     static void invalidateDisabledStateUnder(Element&);
@@ -64,6 +65,6 @@ private:
     mutable uint64_t m_documentVersion;
 };
 
-} // namespace
+} // namespace blink
 
-#endif
+#endif // HTMLFieldSetElement_h

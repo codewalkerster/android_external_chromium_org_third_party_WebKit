@@ -11,20 +11,22 @@ namespace blink {
 
 class WebRemoteFrameImpl;
 
-class RemoteFrameClient : public WebCore::FrameClient {
+class RemoteFrameClient : public FrameClient {
 public:
     explicit RemoteFrameClient(WebRemoteFrameImpl*);
 
     // FrameClient overrides:
-    virtual WebCore::Frame* opener() const OVERRIDE;
-    virtual void setOpener(WebCore::Frame*) OVERRIDE;
+    virtual Frame* opener() const OVERRIDE;
+    virtual void setOpener(Frame*) OVERRIDE;
 
-    virtual WebCore::Frame* parent() const OVERRIDE;
-    virtual WebCore::Frame* top() const OVERRIDE;
-    virtual WebCore::Frame* previousSibling() const OVERRIDE;
-    virtual WebCore::Frame* nextSibling() const OVERRIDE;
-    virtual WebCore::Frame* firstChild() const OVERRIDE;
-    virtual WebCore::Frame* lastChild() const OVERRIDE;
+    virtual Frame* parent() const OVERRIDE;
+    virtual Frame* top() const OVERRIDE;
+    virtual Frame* previousSibling() const OVERRIDE;
+    virtual Frame* nextSibling() const OVERRIDE;
+    virtual Frame* firstChild() const OVERRIDE;
+    virtual Frame* lastChild() const OVERRIDE;
+
+    virtual bool willCheckAndDispatchMessageEvent(SecurityOrigin*, MessageEvent*, LocalFrame*) const OVERRIDE;
 
     WebRemoteFrameImpl* webFrame() const { return m_webFrame; }
 

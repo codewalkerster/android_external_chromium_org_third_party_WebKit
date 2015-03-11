@@ -8,12 +8,12 @@
 #include "core/dom/DocumentSupplementable.h"
 #include "core/frame/DeviceSingleWindowEventController.h"
 
-namespace WebCore {
+namespace blink {
 
 class DeviceOrientationData;
 class Event;
 
-class DeviceOrientationController FINAL : public NoBaseWillBeGarbageCollectedFinalized<DeviceOrientationController>, public DeviceSingleWindowEventController, public DocumentSupplement {
+class DeviceOrientationController FINAL : public DeviceSingleWindowEventController, public DocumentSupplement {
     WILL_BE_USING_GARBAGE_COLLECTED_MIXIN(DeviceOrientationController);
 public:
     virtual ~DeviceOrientationController();
@@ -44,9 +44,9 @@ private:
 
     DeviceOrientationData* lastData() const;
 
-    RefPtrWillBeMember<DeviceOrientationData> m_overrideOrientationData;
+    PersistentWillBeMember<DeviceOrientationData> m_overrideOrientationData;
 };
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // DeviceOrientationController_h

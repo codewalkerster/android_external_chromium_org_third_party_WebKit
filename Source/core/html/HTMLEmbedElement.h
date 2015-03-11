@@ -25,9 +25,10 @@
 
 #include "core/html/HTMLPlugInElement.h"
 
-namespace WebCore {
+namespace blink {
 
 class HTMLEmbedElement FINAL : public HTMLPlugInElement {
+    DEFINE_WRAPPERTYPEINFO();
 public:
     static PassRefPtrWillBeRawPtr<HTMLEmbedElement> create(Document&, bool createdByParser = false);
 
@@ -44,7 +45,6 @@ private:
 
     virtual bool isURLAttribute(const Attribute&) const OVERRIDE;
     virtual const QualifiedName& subResourceAttributeName() const OVERRIDE;
-    virtual const AtomicString imageSourceURL() const OVERRIDE;
 
     virtual RenderWidget* existingRenderWidget() const OVERRIDE;
 
@@ -56,6 +56,6 @@ private:
     virtual bool isInteractiveContent() const OVERRIDE;
 };
 
-}
+} // namespace blink
 
-#endif
+#endif // HTMLEmbedElement_h

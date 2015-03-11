@@ -24,9 +24,7 @@
 
 #include "core/css/CSSRule.h"
 
-namespace WebCore {
-
-class ExceptionState;
+namespace blink {
 
 class CSSCharsetRule FINAL : public CSSRule {
 public:
@@ -54,6 +52,6 @@ private:
 
 DEFINE_CSS_RULE_TYPE_CASTS(CSSCharsetRule, CHARSET_RULE);
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // CSSCharsetRule_h

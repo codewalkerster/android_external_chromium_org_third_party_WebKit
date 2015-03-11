@@ -34,7 +34,7 @@
 #include "core/animation/Animation.h"
 #include "core/animation/AnimationPlayer.h"
 #include "core/animation/InertAnimation.h"
-#include "core/animation/interpolation/Interpolation.h"
+#include "core/animation/Interpolation.h"
 #include "core/css/StylePropertySet.h"
 #include "core/dom/Document.h"
 #include "core/rendering/style/RenderStyleConstants.h"
@@ -42,7 +42,7 @@
 #include "wtf/Vector.h"
 #include "wtf/text/AtomicString.h"
 
-namespace WebCore {
+namespace blink {
 
 class CSSTransitionData;
 class Element;
@@ -56,6 +56,7 @@ class CSSAnimationUpdate FINAL : public NoBaseWillBeGarbageCollectedFinalized<CS
 public:
     void startAnimation(AtomicString& animationName, PassRefPtrWillBeRawPtr<InertAnimation> animation)
     {
+        animation->setName(animationName);
         NewAnimation newAnimation;
         newAnimation.name = animationName;
         newAnimation.animation = animation;
@@ -75,6 +76,7 @@ public:
 
     void startTransition(CSSPropertyID id, CSSPropertyID eventId, const AnimatableValue* from, const AnimatableValue* to, PassRefPtrWillBeRawPtr<InertAnimation> animation)
     {
+        animation->setName(getPropertyName(id));
         NewTransition newTransition;
         newTransition.id = id;
         newTransition.eventId = eventId;
@@ -170,12 +172,10 @@ public:
     // engine is removed.
     static const StyleRuleKeyframes* matchScopedKeyframesRule(StyleResolver*, const Element*, const StringImpl*);
 
-    static bool isAnimatableProperty(CSSPropertyID);
     static const StylePropertyShorthand& animatableProperties();
     static bool isAllowedAnimation(CSSPropertyID);
-    // FIXME: This should take a const ScopedStyleTree instead of a StyleResolver.
-    // We should also change the Element* to a const Element*
-    static PassOwnPtrWillBeRawPtr<CSSAnimationUpdate> calculateUpdate(Element*, const Element& parentElement, const RenderStyle&, RenderStyle* parentStyle, StyleResolver*);
+    // FIXME: We should change the Element* to a const Element*
+    static PassOwnPtrWillBeRawPtr<CSSAnimationUpdate> calculateUpdate(const Element* animatingElement, Element&, const RenderStyle&, RenderStyle* parentStyle, StyleResolver*);
 
     void setPendingUpdate(PassOwnPtrWillBeRawPtr<CSSAnimationUpdate> update) { m_pendingUpdate = update; }
     void maybeApplyPendingUpdate(Element*);
@@ -210,12 +210,12 @@ private:
 
     WillBeHeapHashMap<CSSPropertyID, RefPtrWillBeMember<Interpolation> > m_previousActiveInterpolationsForAnimations;
 
-    static void calculateAnimationUpdate(CSSAnimationUpdate*, Element*, const Element& parentElement, const RenderStyle&, RenderStyle* parentStyle, StyleResolver*);
-    static void calculateTransitionUpdate(CSSAnimationUpdate*, const Element*, const RenderStyle&);
+    static void calculateAnimationUpdate(CSSAnimationUpdate*, const Element* animatingElement, Element&, const RenderStyle&, RenderStyle* parentStyle, StyleResolver*);
+    static void calculateTransitionUpdate(CSSAnimationUpdate*, const Element* animatingElement, const RenderStyle&);
     static void calculateTransitionUpdateForProperty(CSSPropertyID, CSSPropertyID eventId, const CSSTransitionData&, size_t transitionIndex, const RenderStyle& oldStyle, const RenderStyle&, const TransitionMap* activeTransitions, CSSAnimationUpdate*, const Element*);
 
-    static void calculateAnimationActiveInterpolations(CSSAnimationUpdate*, const Element*, double timelineCurrentTime);
-    static void calculateTransitionActiveInterpolations(CSSAnimationUpdate*, const Element*, double timelineCurrentTime);
+    static void calculateAnimationActiveInterpolations(CSSAnimationUpdate*, const Element* animatingElement, double timelineCurrentTime);
+    static void calculateTransitionActiveInterpolations(CSSAnimationUpdate*, const Element* animatingElement, double timelineCurrentTime);
 
     class AnimationEventDelegate FINAL : public AnimationNode::EventDelegate {
     public:
@@ -227,9 +227,11 @@ private:
         {
         }
         virtual void onEventCondition(const AnimationNode*) OVERRIDE;
+        virtual void trace(Visitor*) OVERRIDE;
+
     private:
         void maybeDispatch(Document::ListenerType, const AtomicString& eventName, double elapsedTime);
-        Element* m_target;
+        RawPtrWillBeMember<Element> m_target;
         const AtomicString m_name;
         AnimationNode::Phase m_previousPhase;
         double m_previousIteration;
@@ -244,19 +246,17 @@ private:
         {
         }
         virtual void onEventCondition(const AnimationNode*) OVERRIDE;
+        virtual void trace(Visitor*) OVERRIDE;
+
     private:
-        Element* m_target;
+        RawPtrWillBeMember<Element> m_target;
         const CSSPropertyID m_property;
         AnimationNode::Phase m_previousPhase;
     };
 };
 
-} // namespace WebCore
+} // namespace blink
 
-namespace WTF {
-template<> struct VectorTraits<WebCore::CSSAnimationUpdate::NewAnimation> : VectorTraitsBase<WebCore::CSSAnimationUpdate::NewAnimation> {
-    static const bool canInitializeWithMemset = true;
-};
-}
+WTF_ALLOW_INIT_WITH_MEM_FUNCTIONS(blink::CSSAnimationUpdate::NewAnimation);
 
 #endif

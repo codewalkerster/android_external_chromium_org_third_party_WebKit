@@ -25,14 +25,15 @@
 #include "config.h"
 #include "core/html/HTMLFormElement.h"
 
-#include <limits>
-#include "bindings/v8/ScriptController.h"
-#include "bindings/v8/ScriptEventListener.h"
+#include "bindings/core/v8/ScriptController.h"
+#include "bindings/core/v8/ScriptEventListener.h"
+#include "bindings/core/v8/V8DOMActivityLogger.h"
 #include "core/HTMLNames.h"
 #include "core/dom/Attribute.h"
 #include "core/dom/Document.h"
 #include "core/dom/ElementTraversal.h"
 #include "core/dom/IdTargetObserverRegistry.h"
+#include "core/dom/NodeListsNodeData.h"
 #include "core/events/AutocompleteErrorEvent.h"
 #include "core/events/Event.h"
 #include "core/events/GenericEventQueue.h"
@@ -49,14 +50,16 @@
 #include "core/html/HTMLObjectElement.h"
 #include "core/html/RadioNodeList.h"
 #include "core/html/forms/FormController.h"
+#include "core/inspector/ConsoleMessage.h"
 #include "core/loader/FrameLoader.h"
 #include "core/loader/FrameLoaderClient.h"
 #include "core/loader/MixedContentChecker.h"
 #include "core/rendering/RenderTextControl.h"
 #include "platform/UserGestureIndicator.h"
 #include "wtf/text/AtomicString.h"
+#include <limits>
 
-namespace WebCore {
+namespace blink {
 
 using namespace HTMLNames;
 
@@ -76,7 +79,6 @@ HTMLFormElement::HTMLFormElement(Document& document)
     , m_wasDemoted(false)
     , m_pendingAutocompleteEventsQueue(GenericEventQueue::create(this))
 {
-    ScriptWrappable::init(this);
 }
 
 PassRefPtrWillBeRawPtr<HTMLFormElement> HTMLFormElement::create(Document& document)
@@ -138,6 +140,16 @@ bool HTMLFormElement::rendererIsNeeded(const RenderStyle& style)
 
 Node::InsertionNotificationRequest HTMLFormElement::insertedInto(ContainerNode* insertionPoint)
 {
+    if (insertionPoint->inDocument()) {
+        V8DOMActivityLogger* activityLogger = V8DOMActivityLogger::currentActivityLoggerIfIsolatedWorld();
+        if (activityLogger) {
+            Vector<String> argv;
+            argv.append("form");
+            argv.append(fastGetAttribute(methodAttr));
+            argv.append(fastGetAttribute(actionAttr));
+            activityLogger->logEvent("blinkAddElement", argv.size(), argv.data());
+        }
+    }
     HTMLElement::insertedInto(insertionPoint);
     if (insertionPoint->inDocument())
         this->document().didAssociateFormControl(this);
@@ -158,13 +170,13 @@ void HTMLFormElement::removedFrom(ContainerNode* insertionPoint)
     // We don't need to take care of form association by 'form' content
     // attribute becuse IdTargetObserver handles it.
     if (m_hasElementsAssociatedByParser) {
-        Node& root = highestAncestorOrSelf();
+        Node& root = NodeTraversal::highestAncestorOrSelf(*this);
         if (!m_associatedElementsAreDirty) {
             FormAssociatedElement::List elements(associatedElements());
             notifyFormRemovedFromTree(elements, root);
         } else {
             FormAssociatedElement::List elements;
-            collectAssociatedElements(insertionPoint->highestAncestorOrSelf(), elements);
+            collectAssociatedElements(NodeTraversal::highestAncestorOrSelf(*insertionPoint), elements);
             notifyFormRemovedFromTree(elements, root);
             collectAssociatedElements(root, elements);
             notifyFormRemovedFromTree(elements, root);
@@ -175,7 +187,7 @@ void HTMLFormElement::removedFrom(ContainerNode* insertionPoint)
             notifyFormRemovedFromTree(images, root);
         } else {
             WillBeHeapVector<RawPtrWillBeMember<HTMLImageElement> > images;
-            collectImageElements(insertionPoint->highestAncestorOrSelf(), images);
+            collectImageElements(NodeTraversal::highestAncestorOrSelf(*insertionPoint), images);
             notifyFormRemovedFromTree(images, root);
             collectImageElements(root, images);
             notifyFormRemovedFromTree(images, root);
@@ -208,7 +220,7 @@ unsigned HTMLFormElement::length() const
     return len;
 }
 
-Element* HTMLFormElement::item(unsigned index)
+HTMLElement* HTMLFormElement::item(unsigned index)
 {
     return elements()->item(index);
 }
@@ -299,7 +311,7 @@ bool HTMLFormElement::validateInteractively(Event* event)
                 continue;
             String message("An invalid form control with name='%name' is not focusable.");
             message.replace("%name", unhandledAssociatedElement->name());
-            document().addConsoleMessage(RenderingMessageSource, ErrorMessageLevel, message);
+            document().addConsoleMessage(ConsoleMessage::create(RenderingMessageSource, ErrorMessageLevel, message));
         }
     }
     return false;
@@ -408,7 +420,7 @@ void HTMLFormElement::scheduleFormSubmission(PassRefPtrWillBeRawPtr<FormSubmissi
         return;
     if (document().isSandboxed(SandboxForms)) {
         // FIXME: This message should be moved off the console once a solution to https://bugs.webkit.org/show_bug.cgi?id=103274 exists.
-        document().addConsoleMessage(SecurityMessageSource, ErrorMessageLevel, "Blocked form submission to '" + submission->action().elidedString() + "' because the form's frame is sandboxed and the 'allow-forms' permission is not set.");
+        document().addConsoleMessage(ConsoleMessage::create(SecurityMessageSource, ErrorMessageLevel, "Blocked form submission to '" + submission->action().elidedString() + "' because the form's frame is sandboxed and the 'allow-forms' permission is not set."));
         return;
     }
 
@@ -478,7 +490,7 @@ void HTMLFormElement::requestAutocomplete()
         errorMessage = "requestAutocomplete: must be called in response to a user gesture.";
 
     if (!errorMessage.isEmpty()) {
-        document().addConsoleMessage(RenderingMessageSource, LogMessageLevel, errorMessage);
+        document().addConsoleMessage(ConsoleMessage::create(RenderingMessageSource, LogMessageLevel, errorMessage));
         finishRequestAutocomplete(AutocompleteResultErrorDisabled);
     } else {
         document().frame()->loader().client()->didRequestAutocomplete(this);
@@ -526,6 +538,22 @@ void HTMLFormElement::parseAttribute(const QualifiedName& name, const AtomicStri
         setAttributeEventListener(EventTypeNames::autocompleteerror, createAttributeEventListener(this, name, value, eventParameterName()));
     else
         HTMLElement::parseAttribute(name, value);
+}
+
+void HTMLFormElement::attributeWillChange(const QualifiedName& name, const AtomicString& oldValue, const AtomicString& newValue)
+{
+    if (name == actionAttr && inDocument()) {
+        V8DOMActivityLogger* activityLogger = V8DOMActivityLogger::currentActivityLoggerIfIsolatedWorld();
+        if (activityLogger) {
+            Vector<String> argv;
+            argv.append("form");
+            argv.append(actionAttr.toString());
+            argv.append(oldValue);
+            argv.append(newValue);
+            activityLogger->logEvent("blinkSetAttribute", argv.size(), argv.data());
+        }
+    }
+    HTMLElement::attributeWillChange(name, oldValue, newValue);
 }
 
 void HTMLFormElement::associate(FormAssociatedElement& e)
@@ -581,7 +609,7 @@ void HTMLFormElement::didAssociateByParser()
 
 PassRefPtrWillBeRawPtr<HTMLFormControlsCollection> HTMLFormElement::elements()
 {
-    return toHTMLFormControlsCollection(ensureCachedHTMLCollection(FormControls).get());
+    return ensureCachedCollection<HTMLFormControlsCollection>(FormControls);
 }
 
 void HTMLFormElement::collectAssociatedElements(Node& root, FormAssociatedElement::List& elements) const
@@ -609,7 +637,7 @@ const FormAssociatedElement::List& HTMLFormElement::associatedElements() const
     HTMLFormElement* mutableThis = const_cast<HTMLFormElement*>(this);
     Node* scope = mutableThis;
     if (m_hasElementsAssociatedByParser)
-        scope = &highestAncestorOrSelf();
+        scope = &NodeTraversal::highestAncestorOrSelf(*mutableThis);
     if (inDocument() && treeScope().idTargetObserverRegistry().hasObservers(fastGetAttribute(idAttr)))
         scope = &treeScope().rootNode();
     ASSERT(scope);
@@ -631,7 +659,7 @@ const WillBeHeapVector<RawPtrWillBeMember<HTMLImageElement> >& HTMLFormElement::
 {
     if (!m_imageElementsAreDirty)
         return m_imageElements;
-    collectImageElements(m_hasElementsAssociatedByParser ? highestAncestorOrSelf() : *this, m_imageElements);
+    collectImageElements(m_hasElementsAssociatedByParser ? NodeTraversal::highestAncestorOrSelf(*this) : *this, m_imageElements);
     m_imageElementsAreDirty = false;
     return m_imageElements;
 }
@@ -719,7 +747,7 @@ Element* HTMLFormElement::elementFromPastNamesMap(const AtomicString& pastName)
     if (pastName.isEmpty() || !m_pastNamesMap)
         return 0;
     Element* element = m_pastNamesMap->get(pastName);
-#if ASSERT_ENABLED
+#if ENABLE(ASSERT)
     if (!element)
         return 0;
     ASSERT_WITH_SECURITY_IMPLICATION(toHTMLElement(element)->formOwner() == this);
@@ -788,7 +816,7 @@ void HTMLFormElement::copyNonAttributePropertiesFromElement(const Element& sourc
     HTMLElement::copyNonAttributePropertiesFromElement(source);
 }
 
-void HTMLFormElement::anonymousNamedGetter(const AtomicString& name, bool& returnValue0Enabled, RefPtrWillBeRawPtr<RadioNodeList>& returnValue0, bool& returnValue1Enabled, RefPtrWillBeRawPtr<Element>& returnValue1)
+void HTMLFormElement::anonymousNamedGetter(const AtomicString& name, RefPtrWillBeRawPtr<RadioNodeList>& returnValue0, RefPtrWillBeRawPtr<Element>& returnValue1)
 {
     // Call getNamedElements twice, first time check if it has a value
     // and let HTMLFormElement update its cache.
@@ -807,13 +835,11 @@ void HTMLFormElement::anonymousNamedGetter(const AtomicString& name, bool& retur
     ASSERT(!elements.isEmpty());
 
     if (elements.size() == 1) {
-        returnValue1Enabled = true;
         returnValue1 = elements.at(0);
         return;
     }
 
     bool onlyMatchImg = !elements.isEmpty() && isHTMLImageElement(*elements.first());
-    returnValue0Enabled = true;
     returnValue0 = radioNodeList(name, onlyMatchImg);
 }
 

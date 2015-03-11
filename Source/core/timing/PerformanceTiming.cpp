@@ -40,7 +40,7 @@
 #include "platform/network/ResourceLoadTiming.h"
 #include "platform/network/ResourceResponse.h"
 
-namespace WebCore {
+namespace blink {
 
 static unsigned long long toIntegerMilliseconds(double seconds)
 {
@@ -51,7 +51,6 @@ static unsigned long long toIntegerMilliseconds(double seconds)
 PerformanceTiming::PerformanceTiming(LocalFrame* frame)
     : DOMWindowProperty(frame)
 {
-    ScriptWrappable::init(this);
 }
 
 unsigned long long PerformanceTiming::navigationStart() const
@@ -355,4 +354,9 @@ unsigned long long PerformanceTiming::monotonicTimeToIntegerMilliseconds(double 
     return toIntegerMilliseconds(timing->monotonicTimeToPseudoWallTime(monotonicSeconds));
 }
 
-} // namespace WebCore
+void PerformanceTiming::trace(Visitor* visitor)
+{
+    DOMWindowProperty::trace(visitor);
+}
+
+} // namespace blink

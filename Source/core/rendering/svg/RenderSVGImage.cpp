@@ -27,20 +27,18 @@
 
 #include "core/rendering/svg/RenderSVGImage.h"
 
-#include "core/rendering/GraphicsContextAnnotator.h"
+#include "core/paint/SVGImagePainter.h"
 #include "core/rendering/ImageQualityController.h"
-#include "core/rendering/LayoutRepainter.h"
 #include "core/rendering/PointerEventsHitRules.h"
 #include "core/rendering/RenderImageResource.h"
 #include "core/rendering/svg/RenderSVGResource.h"
 #include "core/rendering/svg/SVGRenderSupport.h"
-#include "core/rendering/svg/SVGRenderingContext.h"
 #include "core/rendering/svg/SVGResources.h"
 #include "core/rendering/svg/SVGResourcesCache.h"
 #include "core/svg/SVGImageElement.h"
-#include "platform/graphics/GraphicsContextStateSaver.h"
+#include "platform/LengthFunctions.h"
 
-namespace WebCore {
+namespace blink {
 
 RenderSVGImage::RenderSVGImage(SVGImageElement* impl)
     : RenderSVGModelObject(impl)
@@ -53,8 +51,39 @@ RenderSVGImage::RenderSVGImage(SVGImageElement* impl)
 
 RenderSVGImage::~RenderSVGImage()
 {
+}
+
+void RenderSVGImage::destroy()
+{
     ImageQualityController::remove(this);
     m_imageResource->shutdown();
+    RenderSVGModelObject::destroy();
+}
+
+bool RenderSVGImage::forceNonUniformScaling(SVGImageElement* image) const
+{
+    // Images with preserveAspectRatio=none should force non-uniform
+    // scaling. This can be achieved by setting the image's container size to
+    // its intrinsic size. If the image does not have an intrinsic size - or
+    // the intrinsic size is degenerate - set the container size to the bounds
+    // as in pAR!=none cases.
+    // See: http://www.w3.org/TR/SVG/single-page.html, 7.8 The ‘preserveAspectRatio’ attribute.
+    if (image->preserveAspectRatio()->currentValue()->align() != SVGPreserveAspectRatio::SVG_PRESERVEASPECTRATIO_NONE)
+        return false;
+    ImageResource* cachedImage = m_imageResource->cachedImage();
+    if (!cachedImage)
+        return false;
+    Length intrinsicWidth;
+    Length intrinsicHeight;
+    FloatSize intrinsicRatio;
+    cachedImage->computeIntrinsicDimensions(intrinsicWidth, intrinsicHeight, intrinsicRatio);
+    if (!intrinsicWidth.isFixed() || !intrinsicHeight.isFixed())
+        return false;
+    // If the viewport defined by the referenced image is zero in either
+    // dimension, then SVGImage will have computed an intrinsic size of 300x150.
+    if (!floatValueForLength(intrinsicWidth, 0) || !floatValueForLength(intrinsicHeight, 0))
+        return false;
+    return true;
 }
 
 bool RenderSVGImage::updateImageViewport()
@@ -66,26 +95,22 @@ bool RenderSVGImage::updateImageViewport()
     SVGLengthContext lengthContext(image);
     m_objectBoundingBox = FloatRect(image->x()->currentValue()->value(lengthContext), image->y()->currentValue()->value(lengthContext), image->width()->currentValue()->value(lengthContext), image->height()->currentValue()->value(lengthContext));
 
-    // Images with preserveAspectRatio=none should force non-uniform scaling. This can be achieved
-    // by setting the image's container size to its intrinsic size.
-    // See: http://www.w3.org/TR/SVG/single-page.html, 7.8 The ‘preserveAspectRatio’ attribute.
-    if (image->preserveAspectRatio()->currentValue()->align() == SVGPreserveAspectRatio::SVG_PRESERVEASPECTRATIO_NONE) {
-        if (ImageResource* cachedImage = m_imageResource->cachedImage()) {
-            LayoutSize intrinsicSize = cachedImage->imageSizeForRenderer(0, style()->effectiveZoom());
-            if (intrinsicSize != m_imageResource->imageSize(style()->effectiveZoom())) {
-                m_imageResource->setContainerSizeForRenderer(roundedIntSize(intrinsicSize));
-                updatedViewport = true;
-            }
+    bool boundsChanged = oldBoundaries != m_objectBoundingBox;
+
+    IntSize newViewportSize;
+    if (forceNonUniformScaling(image)) {
+        LayoutSize intrinsicSize = m_imageResource->intrinsicSize(style()->effectiveZoom());
+        if (intrinsicSize != m_imageResource->imageSize(style()->effectiveZoom())) {
+            newViewportSize = roundedIntSize(intrinsicSize);
+            updatedViewport = true;
         }
-    }
-
-    if (oldBoundaries != m_objectBoundingBox) {
-        if (!updatedViewport)
-            m_imageResource->setContainerSizeForRenderer(enclosingIntRect(m_objectBoundingBox).size());
+    } else if (boundsChanged) {
+        newViewportSize = enclosingIntRect(m_objectBoundingBox).size();
         updatedViewport = true;
-        m_needsBoundariesUpdate = true;
     }
-
+    if (updatedViewport)
+        m_imageResource->setContainerSizeForRenderer(newViewportSize);
+    m_needsBoundariesUpdate |= boundsChanged;
     return updatedViewport;
 }
 
@@ -93,7 +118,6 @@ void RenderSVGImage::layout()
 {
     ASSERT(needsLayout());
 
-    LayoutRepainter repainter(*this, SVGRenderSupport::checkForSVGRepaintDuringLayout(this) && selfNeedsLayout());
     updateImageViewport();
 
     bool transformOrBoundariesUpdate = m_needsTransformUpdate || m_needsBoundariesUpdate;
@@ -103,8 +127,8 @@ void RenderSVGImage::layout()
     }
 
     if (m_needsBoundariesUpdate) {
-        m_repaintBoundingBox = m_objectBoundingBox;
-        SVGRenderSupport::intersectRepaintRectWithResources(this, m_repaintBoundingBox);
+        m_paintInvalidationBoundingBox = m_objectBoundingBox;
+        SVGRenderSupport::intersectPaintInvalidationRectWithResources(this, m_paintInvalidationBoundingBox);
 
         m_needsBoundariesUpdate = false;
     }
@@ -117,65 +141,12 @@ void RenderSVGImage::layout()
     if (transformOrBoundariesUpdate)
         RenderSVGModelObject::setNeedsBoundariesUpdate();
 
-    repainter.repaintAfterLayout();
     clearNeedsLayout();
 }
 
 void RenderSVGImage::paint(PaintInfo& paintInfo, const LayoutPoint&)
 {
-    ANNOTATE_GRAPHICS_CONTEXT(paintInfo, this);
-
-    if (paintInfo.context->paintingDisabled()
-        || paintInfo.phase != PaintPhaseForeground
-        || style()->visibility() == HIDDEN
-        || !m_imageResource->hasImage())
-        return;
-
-    FloatRect boundingBox = paintInvalidationRectInLocalCoordinates();
-    if (!SVGRenderSupport::paintInfoIntersectsRepaintRect(boundingBox, m_localTransform, paintInfo))
-        return;
-
-    PaintInfo childPaintInfo(paintInfo);
-    GraphicsContextStateSaver stateSaver(*childPaintInfo.context, false);
-
-    if (!m_localTransform.isIdentity()) {
-        stateSaver.save();
-        childPaintInfo.applyTransform(m_localTransform, false);
-    }
-    if (!m_objectBoundingBox.isEmpty()) {
-        // SVGRenderingContext may taint the state - make sure we're always saving.
-        SVGRenderingContext renderingContext(this, childPaintInfo, stateSaver.saved() ?
-            SVGRenderingContext::DontSaveGraphicsContext : SVGRenderingContext::SaveGraphicsContext);
-
-        if (renderingContext.isRenderingPrepared()) {
-            if (style()->svgStyle()->bufferedRendering() == BR_STATIC && renderingContext.bufferForeground(m_bufferedForeground))
-                return;
-
-            paintForeground(childPaintInfo);
-        }
-    }
-
-    if (style()->outlineWidth())
-        paintOutline(childPaintInfo, IntRect(boundingBox));
-}
-
-void RenderSVGImage::paintForeground(PaintInfo& paintInfo)
-{
-    RefPtr<Image> image = m_imageResource->image();
-    FloatRect destRect = m_objectBoundingBox;
-    FloatRect srcRect(0, 0, image->width(), image->height());
-
-    SVGImageElement* imageElement = toSVGImageElement(element());
-    imageElement->preserveAspectRatio()->currentValue()->transformRect(destRect, srcRect);
-
-    InterpolationQuality interpolationQuality = InterpolationDefault;
-    if (style()->svgStyle()->bufferedRendering() != BR_STATIC)
-        interpolationQuality = ImageQualityController::imageQualityController()->chooseInterpolationQuality(paintInfo.context, this, image.get(), image.get(), LayoutSize(destRect.size()));
-
-    InterpolationQuality previousInterpolationQuality = paintInfo.context->imageInterpolationQuality();
-    paintInfo.context->setImageInterpolationQuality(interpolationQuality);
-    paintInfo.context->drawImage(image.get(), destRect, srcRect, CompositeSourceOver);
-    paintInfo.context->setImageInterpolationQuality(previousInterpolationQuality);
+    SVGImagePainter(*this).paint(paintInfo);
 }
 
 void RenderSVGImage::invalidateBufferedForeground()
@@ -192,9 +163,8 @@ bool RenderSVGImage::nodeAtFloatPoint(const HitTestRequest& request, HitTestResu
     PointerEventsHitRules hitRules(PointerEventsHitRules::SVG_IMAGE_HITTESTING, request, style()->pointerEvents());
     bool isVisible = (style()->visibility() == VISIBLE);
     if (isVisible || !hitRules.requireVisible) {
-        FloatPoint localPoint = localToParentTransform().inverse().mapPoint(pointInParent);
-
-        if (!SVGRenderSupport::pointInClippingArea(this, localPoint))
+        FloatPoint localPoint;
+        if (!SVGRenderSupport::transformToUserSpaceAndCheckClipping(this, localToParentTransform(), pointInParent, localPoint))
             return false;
 
         if (hitRules.canHitFill || hitRules.canHitBoundingBox) {
@@ -225,15 +195,15 @@ void RenderSVGImage::imageChanged(WrappedImagePtr, const IntRect*)
 
     invalidateBufferedForeground();
 
-    paintInvalidationForWholeRenderer();
+    setShouldDoFullPaintInvalidation(true);
 }
 
-void RenderSVGImage::addFocusRingRects(Vector<IntRect>& rects, const LayoutPoint&, const RenderLayerModelObject*)
+void RenderSVGImage::addFocusRingRects(Vector<LayoutRect>& rects, const LayoutPoint&, const RenderLayerModelObject*) const
 {
     // this is called from paint() after the localTransform has already been applied
-    IntRect contentRect = enclosingIntRect(paintInvalidationRectInLocalCoordinates());
+    LayoutRect contentRect = LayoutRect(paintInvalidationRectInLocalCoordinates());
     if (!contentRect.isEmpty())
         rects.append(contentRect);
 }
 
-} // namespace WebCore
+} // namespace blink

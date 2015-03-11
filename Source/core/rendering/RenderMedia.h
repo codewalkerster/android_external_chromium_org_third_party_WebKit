@@ -28,7 +28,7 @@
 
 #include "core/rendering/RenderImage.h"
 
-namespace WebCore {
+namespace blink {
 
 class HTMLMediaElement;
 
@@ -36,6 +36,7 @@ class RenderMedia : public RenderImage {
 public:
     explicit RenderMedia(HTMLMediaElement*);
     virtual ~RenderMedia();
+    virtual void trace(Visitor*) OVERRIDE;
 
     RenderObject* firstChild() const { ASSERT(children() == virtualChildren()); return children()->firstChild(); }
     RenderObject* lastChild() const { ASSERT(children() == virtualChildren()); return children()->lastChild(); }
@@ -62,6 +63,7 @@ private:
     // so we can't support generated content.
     virtual bool canHaveGeneratedChildren() const OVERRIDE FINAL { return false; }
     virtual bool canHaveChildren() const OVERRIDE FINAL { return true; }
+    virtual bool isChildAllowed(RenderObject*, RenderStyle*) const override final;
 
     virtual const char* renderName() const OVERRIDE { return "RenderMedia"; }
     virtual bool isMedia() const OVERRIDE FINAL { return true; }
@@ -73,6 +75,6 @@ private:
 
 DEFINE_RENDER_OBJECT_TYPE_CASTS(RenderMedia, isMedia());
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // RenderMedia_h

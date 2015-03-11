@@ -29,9 +29,10 @@
 #include "core/svg/SVGFilterPrimitiveStandardAttributes.h"
 #include "platform/graphics/filters/FESpecularLighting.h"
 
-namespace WebCore {
+namespace blink {
 
 class SVGFESpecularLightingElement FINAL : public SVGFilterPrimitiveStandardAttributes {
+    DEFINE_WRAPPERTYPEINFO();
 public:
     DECLARE_NODE_FACTORY(SVGFESpecularLightingElement);
     void lightElementAttributeChanged(const SVGFELightElement*, const QualifiedName&);
@@ -61,6 +62,6 @@ private:
     RefPtr<SVGAnimatedString> m_in1;
 };
 
-} // namespace WebCore
+} // namespace blink
 
-#endif
+#endif // SVGFESpecularLightingElement_h

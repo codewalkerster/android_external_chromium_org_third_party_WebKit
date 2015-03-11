@@ -5,23 +5,22 @@
 #ifndef MIDIAccessInitializer_h
 #define MIDIAccessInitializer_h
 
-#include "bindings/v8/ScriptPromise.h"
-#include "bindings/v8/ScriptPromiseResolverWithContext.h"
+#include "bindings/core/v8/ScriptPromise.h"
+#include "bindings/core/v8/ScriptPromiseResolver.h"
 #include "modules/webmidi/MIDIAccessor.h"
 #include "modules/webmidi/MIDIAccessorClient.h"
-#include "modules/webmidi/MIDIOptions.h"
 #include "modules/webmidi/MIDIPort.h"
 #include "wtf/OwnPtr.h"
-#include "wtf/RawPtr.h"
 #include "wtf/Vector.h"
 
-namespace WebCore {
+namespace blink {
 
 class MIDIAccess;
+class MIDIOptions;
 class Navigator;
 class ScriptState;
 
-class MIDIAccessInitializer : public ScriptPromiseResolverWithContext, public MIDIAccessorClient {
+class MIDIAccessInitializer : public ScriptPromiseResolver, public MIDIAccessorClient {
 public:
     struct PortDescriptor {
         String id;
@@ -54,7 +53,7 @@ public:
     virtual void didStartSession(bool success, const String& error, const String& message) OVERRIDE;
     virtual void didReceiveMIDIData(unsigned portIndex, const unsigned char* data, size_t length, double timeStamp) OVERRIDE { }
 
-    void setSysexEnabled(bool value);
+    void resolveSysexPermission(bool allowed);
     SecurityOrigin* securityOrigin() const;
 
 private:
@@ -65,12 +64,11 @@ private:
     ExecutionContext* executionContext() const;
 
     OwnPtr<MIDIAccessor> m_accessor;
-    MIDIOptions m_options;
-    bool m_sysexEnabled;
+    bool m_requestSysex;
     Vector<PortDescriptor> m_portDescriptors;
 };
 
-} // namespace WebCore
+} // namespace blink
 
 
 #endif // MIDIAccessInitializer_h

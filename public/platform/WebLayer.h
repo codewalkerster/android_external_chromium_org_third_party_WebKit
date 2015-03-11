@@ -26,10 +26,10 @@
 #ifndef WebLayer_h
 #define WebLayer_h
 
-#include "WebAnimation.h"
 #include "WebBlendMode.h"
 #include "WebColor.h"
 #include "WebCommon.h"
+#include "WebCompositorAnimation.h"
 #include "WebFloatPoint3D.h"
 #include "WebPoint.h"
 #include "WebRect.h"
@@ -41,7 +41,7 @@ class SkMatrix44;
 class SkImageFilter;
 
 namespace blink {
-class WebAnimationDelegate;
+class WebCompositorAnimationDelegate;
 class WebFilterOperations;
 class WebLayerClient;
 class WebLayerScrollClient;
@@ -127,29 +127,22 @@ public:
     // WebFilterOperations object.
     virtual void setFilters(const WebFilterOperations&) = 0;
 
-    // Apply filters to pixels that show through the background of this layer.
-    // Note: These filters are only possible on layers that are drawn directly
-    // to a root render surface with an opaque background. This means if an
-    // ancestor of the background-filtered layer sets certain properties
-    // (opacity, transforms), it may conflict and hide the background filters.
-    virtual void setBackgroundFilters(const WebFilterOperations&) = 0;
-
     // An animation delegate is notified when animations are started and
     // stopped. The WebLayer does not take ownership of the delegate, and it is
     // the responsibility of the client to reset the layer's delegate before
     // deleting the delegate.
-    virtual void setAnimationDelegate(WebAnimationDelegate*) = 0;
+    virtual void setAnimationDelegate(WebCompositorAnimationDelegate*) = 0;
 
 
     // Returns false if the animation cannot be added.
-    // Takes ownership of the WebAnimation object.
-    virtual bool addAnimation(WebAnimation*) = 0;
+    // Takes ownership of the WebCompositorAnimation object.
+    virtual bool addAnimation(WebCompositorAnimation*) = 0;
 
     // Removes all animations with the given id.
     virtual void removeAnimation(int animationId) = 0;
 
     // Removes all animations with the given id targeting the given property.
-    virtual void removeAnimation(int animationId, WebAnimation::TargetProperty) = 0;
+    virtual void removeAnimation(int animationId, WebCompositorAnimation::TargetProperty) = 0;
 
     // Pauses all animations with the given id.
     virtual void pauseAnimation(int animationId, double timeOffset) = 0;

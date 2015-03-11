@@ -31,9 +31,10 @@
 #include "wtf/PassRefPtr.h"
 #include "wtf/text/WTFString.h"
 
-namespace WebCore {
+namespace blink {
 
 class PerformanceMeasure FINAL : public PerformanceEntry {
+    DEFINE_WRAPPERTYPEINFO();
 public:
     static PassRefPtrWillBeRawPtr<PerformanceMeasure> create(const String& name, double startTime, double endTime)
     {
@@ -48,13 +49,11 @@ public:
     }
 
 private:
-    PerformanceMeasure(const String& name, double startTime, double endTime) : PerformanceEntry(name, "measure", startTime, endTime)
-    {
-        ScriptWrappable::init(this);
-    }
+    PerformanceMeasure(const String& name, double startTime, double endTime)
+        : PerformanceEntry(name, "measure", startTime, endTime) { }
     virtual ~PerformanceMeasure() { }
 };
 
-}
+} // namespace blink
 
-#endif // !defined(PerformanceMeasure_h)
+#endif // PerformanceMeasure_h

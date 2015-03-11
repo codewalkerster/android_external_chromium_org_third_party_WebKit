@@ -26,17 +26,19 @@
 #ifndef TypeConversions_h
 #define TypeConversions_h
 
+#include "bindings/core/v8/ScriptWrappable.h"
 #include "wtf/FastMalloc.h"
 #include "wtf/PassRefPtr.h"
 #include "wtf/RefCounted.h"
 
-namespace WebCore {
+namespace blink {
 
-class TypeConversions : public RefCountedWillBeGarbageCollectedFinalized<TypeConversions> {
+class TypeConversions FINAL : public GarbageCollectedFinalized<TypeConversions>, public ScriptWrappable {
+    DEFINE_WRAPPERTYPEINFO();
 public:
-    static PassRefPtrWillBeRawPtr<TypeConversions> create()
+    static TypeConversions* create()
     {
-        return adoptRefWillBeNoop(new TypeConversions());
+        return new TypeConversions();
     }
 
     long testLong() { return m_long; }
@@ -69,8 +71,15 @@ public:
 
 private:
     TypeConversions()
-    {
-    }
+        : m_long(0)
+        , m_unsignedLong(0)
+        , m_longLong(0)
+        , m_unsignedLongLong(0)
+        , m_byte(0)
+        , m_octet(0)
+        , m_short(0)
+        , m_unsignedShort(0)
+    { }
 
     long m_long;
     unsigned long m_unsignedLong;
@@ -84,6 +93,6 @@ private:
     String m_scalarValueString;
 };
 
-} // namespace WebCore
+} // namespace blink
 
-#endif
+#endif // TypeConversions_h

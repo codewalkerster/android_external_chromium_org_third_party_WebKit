@@ -38,8 +38,6 @@
 #include "public/web/WebServiceWorkerContextClient.h"
 #include "wtf/PassOwnPtr.h"
 
-using namespace WebCore;
-
 namespace blink {
 
 PassOwnPtrWillBeRawPtr<ServiceWorkerGlobalScopeClient> ServiceWorkerGlobalScopeClientImpl::create(WebServiceWorkerContextClient& client)
@@ -61,6 +59,11 @@ WebURL ServiceWorkerGlobalScopeClientImpl::scope() const
     return m_client.scope();
 }
 
+WebServiceWorkerCacheStorage* ServiceWorkerGlobalScopeClientImpl::cacheStorage() const
+{
+    return m_client.cacheStorage();
+}
+
 void ServiceWorkerGlobalScopeClientImpl::didHandleActivateEvent(int eventID, WebServiceWorkerEventResult result)
 {
     m_client.didHandleActivateEvent(eventID, result);
@@ -71,15 +74,13 @@ void ServiceWorkerGlobalScopeClientImpl::didHandleInstallEvent(int installEventI
     m_client.didHandleInstallEvent(installEventID, result);
 }
 
-void ServiceWorkerGlobalScopeClientImpl::didHandleFetchEvent(int fetchEventID, PassRefPtr<Response> response)
+void ServiceWorkerGlobalScopeClientImpl::didHandleFetchEvent(int fetchEventID)
 {
-    if (!response) {
-        m_client.didHandleFetchEvent(fetchEventID);
-        return;
-    }
+    m_client.didHandleFetchEvent(fetchEventID);
+}
 
-    WebServiceWorkerResponse webResponse;
-    response->populateWebServiceWorkerResponse(webResponse);
+void ServiceWorkerGlobalScopeClientImpl::didHandleFetchEvent(int fetchEventID, const WebServiceWorkerResponse& webResponse)
+{
     m_client.didHandleFetchEvent(fetchEventID, webResponse);
 }
 

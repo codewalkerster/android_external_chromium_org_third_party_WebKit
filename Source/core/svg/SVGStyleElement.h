@@ -25,10 +25,11 @@
 #include "core/dom/StyleElement.h"
 #include "core/svg/SVGElement.h"
 
-namespace WebCore {
+namespace blink {
 
 class SVGStyleElement FINAL : public SVGElement
                             , public StyleElement {
+    DEFINE_WRAPPERTYPEINFO();
     WILL_BE_USING_GARBAGE_COLLECTED_MIXIN(SVGStyleElement);
 public:
     static PassRefPtrWillBeRawPtr<SVGStyleElement> create(Document&, bool createdByParser);
@@ -58,7 +59,7 @@ private:
     virtual InsertionNotificationRequest insertedInto(ContainerNode*) OVERRIDE;
     virtual void didNotifySubtreeInsertionsToDocument() OVERRIDE;
     virtual void removedFrom(ContainerNode*) OVERRIDE;
-    virtual void childrenChanged(bool changedByParser = false, Node* beforeChange = 0, Node* afterChange = 0, int childCountDelta = 0) OVERRIDE;
+    virtual void childrenChanged(const ChildrenChange&) OVERRIDE;
 
     virtual void finishParsingChildren() OVERRIDE;
     virtual bool rendererIsNeeded(const RenderStyle&) OVERRIDE { return false; }
@@ -70,6 +71,6 @@ private:
     Timer<SVGElement> m_svgLoadEventTimer;
 };
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // SVGStyleElement_h

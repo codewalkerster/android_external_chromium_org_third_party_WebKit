@@ -31,18 +31,12 @@
 #include "core/page/FrameTree.h"
 #include "platform/heap/Handle.h"
 #include "wtf/Forward.h"
-#include "wtf/HashSet.h"
 #include "wtf/RefCounted.h"
 
 namespace blink {
-class WebLayer;
-}
-
-namespace WebCore {
 
 class ChromeClient;
 class FrameClient;
-class FrameDestructionObserver;
 class FrameHost;
 class FrameOwner;
 class HTMLFrameOwnerElement;
@@ -50,19 +44,18 @@ class LocalDOMWindow;
 class Page;
 class RenderPart;
 class Settings;
+class WebLayer;
 
-class Frame : public RefCounted<Frame> {
+class Frame : public RefCountedWillBeGarbageCollectedFinalized<Frame> {
 public:
     virtual bool isLocalFrame() const { return false; }
     virtual bool isRemoteFrame() const { return false; }
 
     virtual ~Frame();
+    virtual void trace(Visitor*);
 
-    void addDestructionObserver(FrameDestructionObserver*);
-    void removeDestructionObserver(FrameDestructionObserver*);
-
-    virtual void willDetachFrameHost();
-    virtual void detachFromFrameHost();
+    virtual void detach() = 0;
+    void detachChildren();
 
     FrameClient* client() const;
     void clearClient();
@@ -74,6 +67,7 @@ public:
     FrameHost* host() const; // Null when the frame is detached.
 
     bool isMainFrame() const;
+    bool isLocalRoot() const;
 
     virtual void disconnectOwnerElement();
 
@@ -91,8 +85,8 @@ public:
     RenderPart* ownerRenderer() const; // Renderer for the element that contains this frame.
 
     // FIXME: These should move to RemoteFrame when that is instantiated.
-    void setRemotePlatformLayer(blink::WebLayer* remotePlatformLayer) { m_remotePlatformLayer = remotePlatformLayer; }
-    blink::WebLayer* remotePlatformLayer() const { return m_remotePlatformLayer; }
+    void setRemotePlatformLayer(WebLayer*);
+    WebLayer* remotePlatformLayer() const { return m_remotePlatformLayer; }
 
     Settings* settings() const; // can be null
 
@@ -107,16 +101,14 @@ protected:
 
     mutable FrameTree m_treeNode;
 
-    FrameHost* m_host;
-    FrameOwner* m_owner;
+    RawPtrWillBeMember<FrameHost> m_host;
+    RawPtrWillBeMember<FrameOwner> m_owner;
 
-    RefPtrWillBePersistent<LocalDOMWindow> m_domWindow;
+    RefPtrWillBeMember<LocalDOMWindow> m_domWindow;
 
 private:
     FrameClient* m_client;
-    HashSet<FrameDestructionObserver*> m_destructionObservers;
-
-    blink::WebLayer* m_remotePlatformLayer;
+    WebLayer* m_remotePlatformLayer;
 };
 
 inline FrameClient* Frame::client() const
@@ -147,6 +139,6 @@ inline FrameTree& Frame::tree() const
 // Allow equality comparisons of Frames by reference or pointer, interchangeably.
 DEFINE_COMPARISON_OPERATORS_WITH_REFERENCES_REFCOUNTED(Frame)
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // Frame_h

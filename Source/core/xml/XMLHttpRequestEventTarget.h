@@ -33,9 +33,10 @@
 
 #include "core/events/EventTarget.h"
 
-namespace WebCore {
+namespace blink {
 
 class XMLHttpRequestEventTarget : public EventTargetWithInlineData {
+    DEFINE_WRAPPERTYPEINFO();
 public:
     DEFINE_ATTRIBUTE_EVENT_LISTENER(abort);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(error);
@@ -46,6 +47,6 @@ public:
     DEFINE_ATTRIBUTE_EVENT_LISTENER(timeout);
 };
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // XMLHttpRequestEventTarget_h

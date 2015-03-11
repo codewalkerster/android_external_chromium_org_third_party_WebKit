@@ -33,7 +33,7 @@
 #include "platform/text/TextStream.h"
 #include "wtf/Uint8ClampedArray.h"
 
-namespace WebCore {
+namespace blink {
 
 FEDisplacementMap::FEDisplacementMap(Filter* filter, ChannelSelectorType xChannelSelector, ChannelSelectorType yChannelSelector, float scale)
     : FilterEffect(filter)
@@ -223,4 +223,22 @@ TextStream& FEDisplacementMap::externalRepresentation(TextStream& ts, int indent
     return ts;
 }
 
-} // namespace WebCore
+FloatRect FEDisplacementMap::determineAbsolutePaintRect(const FloatRect& requestedRect)
+{
+    FloatRect rect = requestedRect;
+    if (clipsToBounds())
+        rect.intersect(maxEffectRect());
+
+    if (absolutePaintRect().contains(enclosingIntRect(rect)))
+        return rect;
+
+    rect = mapPaintRect(rect, false);
+    rect = inputEffect(0)->determineAbsolutePaintRect(rect);
+    rect = mapPaintRect(rect, true);
+    rect.intersect(requestedRect);
+
+    addAbsolutePaintRect(rect);
+    return rect;
+}
+
+} // namespace blink

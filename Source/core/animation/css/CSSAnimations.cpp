@@ -36,14 +36,16 @@
 #include "core/animation/AnimationTimeline.h"
 #include "core/animation/CompositorAnimations.h"
 #include "core/animation/KeyframeEffectModel.h"
+#include "core/animation/LegacyStyleInterpolation.h"
 #include "core/animation/css/CSSAnimatableValueFactory.h"
 #include "core/animation/css/CSSPropertyEquality.h"
-#include "core/animation/interpolation/LegacyStyleInterpolation.h"
 #include "core/css/CSSKeyframeRule.h"
+#include "core/css/CSSPropertyMetadata.h"
 #include "core/css/resolver/CSSToStyleMap.h"
 #include "core/css/resolver/StyleResolver.h"
 #include "core/dom/Element.h"
 #include "core/dom/PseudoElement.h"
+#include "core/dom/StyleEngine.h"
 #include "core/events/TransitionEvent.h"
 #include "core/events/WebKitAnimationEvent.h"
 #include "core/frame/UseCounter.h"
@@ -55,7 +57,7 @@
 #include "wtf/BitArray.h"
 #include "wtf/HashSet.h"
 
-namespace WebCore {
+namespace blink {
 
 namespace {
 
@@ -68,26 +70,23 @@ CSSPropertyID propertyForAnimation(CSSPropertyID property)
         return CSSPropertyTransform;
     case CSSPropertyWebkitPerspectiveOriginX:
     case CSSPropertyWebkitPerspectiveOriginY:
-        if (RuntimeEnabledFeatures::cssTransformsUnprefixedEnabled())
-            return CSSPropertyPerspectiveOrigin;
-        break;
+    case CSSPropertyWebkitPerspectiveOrigin:
+        return CSSPropertyPerspectiveOrigin;
     case CSSPropertyWebkitTransformOriginX:
     case CSSPropertyWebkitTransformOriginY:
     case CSSPropertyWebkitTransformOriginZ:
-        if (RuntimeEnabledFeatures::cssTransformsUnprefixedEnabled())
-            return CSSPropertyTransformOrigin;
-        break;
+        return CSSPropertyTransformOrigin;
     default:
         break;
     }
     return property;
 }
 
-static void resolveKeyframes(StyleResolver* resolver, Element* element, const Element& parentElement, const RenderStyle& style, RenderStyle* parentStyle, const AtomicString& name, TimingFunction* defaultTimingFunction,
+static void resolveKeyframes(StyleResolver* resolver, const Element* animatingElement, Element& element, const RenderStyle& style, RenderStyle* parentStyle, const AtomicString& name, TimingFunction* defaultTimingFunction,
     AnimatableValueKeyframeVector& keyframes)
 {
-    // When the element is null, use its parent for scoping purposes.
-    const Element* elementForScoping = element ? element : &parentElement;
+    // When the animating element is null, use its parent for scoping purposes.
+    const Element* elementForScoping = animatingElement ? animatingElement : &element;
     const StyleRuleKeyframes* keyframesRule = CSSAnimations::matchScopedKeyframesRule(resolver, elementForScoping, name.impl());
     if (!keyframesRule)
         return;
@@ -100,7 +99,6 @@ static void resolveKeyframes(StyleResolver* resolver, Element* element, const El
     PropertySet specifiedPropertiesForUseCounter;
     for (size_t i = 0; i < styleKeyframes.size(); ++i) {
         const StyleKeyframe* styleKeyframe = styleKeyframes[i].get();
-        // It's OK to pass a null element here.
         RefPtr<RenderStyle> keyframeStyle = resolver->styleForKeyframe(element, style, parentStyle, styleKeyframe, name);
         RefPtrWillBeRawPtr<AnimatableValueKeyframe> keyframe = AnimatableValueKeyframe::create();
         const Vector<double>& offsets = styleKeyframe->keys();
@@ -121,7 +119,7 @@ static void resolveKeyframes(StyleResolver* resolver, Element* element, const El
                 else
                     timingFunction = CSSToStyleMap::mapAnimationTimingFunction(toCSSValueList(value)->item(0));
                 keyframe->setEasing(timingFunction.release());
-            } else if (CSSAnimations::isAnimatableProperty(property)) {
+            } else if (CSSPropertyMetadata::isAnimatableProperty(property)) {
                 keyframe->setPropertyValue(property, CSSAnimatableValueFactory::create(property, *keyframeStyle).get());
             }
         }
@@ -203,10 +201,11 @@ static void resolveKeyframes(StyleResolver* resolver, Element* element, const El
 
 const StyleRuleKeyframes* CSSAnimations::matchScopedKeyframesRule(StyleResolver* resolver, const Element* element, const StringImpl* animationName)
 {
-    if (resolver->styleTreeHasOnlyScopedResolverForDocument())
-        return resolver->styleTreeScopedStyleResolverForDocument()->keyframeStylesForAnimation(animationName);
+    // FIXME: This is all implementation detail of style resolver, CSSAnimations shouldn't be reaching into any of it.
+    if (resolver->document().styleEngine()->hasOnlyScopedResolverForDocument())
+        return element->document().scopedStyleResolver()->keyframeStylesForAnimation(animationName);
 
-    Vector<ScopedStyleResolver*, 8> stack;
+    WillBeHeapVector<RawPtrWillBeMember<ScopedStyleResolver>, 8> stack;
     resolver->styleTreeResolveScopedKeyframesRules(element, stack);
     if (stack.isEmpty())
         return 0;
@@ -222,21 +221,21 @@ CSSAnimations::CSSAnimations()
 {
 }
 
-PassOwnPtrWillBeRawPtr<CSSAnimationUpdate> CSSAnimations::calculateUpdate(Element* element, const Element& parentElement, const RenderStyle& style, RenderStyle* parentStyle, StyleResolver* resolver)
+PassOwnPtrWillBeRawPtr<CSSAnimationUpdate> CSSAnimations::calculateUpdate(const Element* animatingElement, Element& element, const RenderStyle& style, RenderStyle* parentStyle, StyleResolver* resolver)
 {
     OwnPtrWillBeRawPtr<CSSAnimationUpdate> update = adoptPtrWillBeNoop(new CSSAnimationUpdate());
-    calculateAnimationUpdate(update.get(), element, parentElement, style, parentStyle, resolver);
-    calculateAnimationActiveInterpolations(update.get(), element, parentElement.document().timeline().currentTimeInternal());
-    calculateTransitionUpdate(update.get(), element, style);
-    calculateTransitionActiveInterpolations(update.get(), element, parentElement.document().timeline().currentTimeInternal());
+    calculateAnimationUpdate(update.get(), animatingElement, element, style, parentStyle, resolver);
+    calculateAnimationActiveInterpolations(update.get(), animatingElement, element.document().timeline().currentTimeInternal());
+    calculateTransitionUpdate(update.get(), animatingElement, style);
+    calculateTransitionActiveInterpolations(update.get(), animatingElement, element.document().timeline().currentTimeInternal());
     return update->isEmpty() ? nullptr : update.release();
 }
 
-void CSSAnimations::calculateAnimationUpdate(CSSAnimationUpdate* update, Element* element, const Element& parentElement, const RenderStyle& style, RenderStyle* parentStyle, StyleResolver* resolver)
+void CSSAnimations::calculateAnimationUpdate(CSSAnimationUpdate* update, const Element* animatingElement, Element& element, const RenderStyle& style, RenderStyle* parentStyle, StyleResolver* resolver)
 {
-    const ActiveAnimations* activeAnimations = element ? element->activeAnimations() : 0;
+    const ActiveAnimations* activeAnimations = animatingElement ? animatingElement->activeAnimations() : 0;
 
-#if !ASSERT_ENABLED
+#if !ENABLE(ASSERT)
     // If we're in an animation style change, no animations can have started, been cancelled or changed play state.
     // When ASSERT is enabled, we verify this optimization.
     if (activeAnimations && activeAnimations->isAnimationStyleChange())
@@ -279,7 +278,7 @@ void CSSAnimations::calculateAnimationUpdate(CSSAnimationUpdate* update, Element
             RefPtr<TimingFunction> keyframeTimingFunction = timing.timingFunction;
             timing.timingFunction = Timing::defaults().timingFunction;
             AnimatableValueKeyframeVector resolvedKeyframes;
-            resolveKeyframes(resolver, element, parentElement, style, parentStyle, animationName, keyframeTimingFunction.get(), resolvedKeyframes);
+            resolveKeyframes(resolver, animatingElement, element, style, parentStyle, animationName, keyframeTimingFunction.get(), resolvedKeyframes);
             if (!resolvedKeyframes.isEmpty()) {
                 ASSERT(!activeAnimations || !activeAnimations->isAnimationStyleChange());
                 update->startAnimation(animationName, InertAnimation::create(AnimatableValueKeyframeEffectModel::create(resolvedKeyframes), timing, isPaused));
@@ -311,7 +310,7 @@ void CSSAnimations::maybeApplyPendingUpdate(Element* element)
     DisableCompositingQueryAsserts disabler;
 
     for (Vector<AtomicString>::const_iterator iter = update->cancelledAnimationNames().begin(); iter != update->cancelledAnimationNames().end(); ++iter) {
-        RefPtr<AnimationPlayer> player = m_animations.take(*iter);
+        RefPtrWillBeRawPtr<AnimationPlayer> player = m_animations.take(*iter);
         player->cancel();
         player->update(TimingUpdateOnDemand);
     }
@@ -328,10 +327,10 @@ void CSSAnimations::maybeApplyPendingUpdate(Element* element)
 
     for (WillBeHeapVector<CSSAnimationUpdate::NewAnimation>::const_iterator iter = update->newAnimations().begin(); iter != update->newAnimations().end(); ++iter) {
         const InertAnimation* inertAnimation = iter->animation.get();
-        OwnPtr<AnimationEventDelegate> eventDelegate = adoptPtr(new AnimationEventDelegate(element, iter->name));
+        OwnPtrWillBeRawPtr<AnimationEventDelegate> eventDelegate = adoptPtrWillBeNoop(new AnimationEventDelegate(element, iter->name));
         RefPtrWillBeRawPtr<Animation> animation = Animation::create(element, inertAnimation->effect(), inertAnimation->specifiedTiming(), Animation::DefaultPriority, eventDelegate.release());
+        animation->setName(inertAnimation->name());
         RefPtrWillBeRawPtr<AnimationPlayer> player = element->document().timeline().createAnimationPlayer(animation.get());
-        element->document().compositorPendingAnimations().add(player.get());
         if (inertAnimation->paused())
             player->pause();
         player->update(TimingUpdateOnDemand);
@@ -365,7 +364,7 @@ void CSSAnimations::maybeApplyPendingUpdate(Element* element)
 
         CSSPropertyID id = newTransition.id;
         InertAnimation* inertAnimation = newTransition.animation.get();
-        OwnPtr<TransitionEventDelegate> eventDelegate = adoptPtr(new TransitionEventDelegate(element, newTransition.eventId));
+        OwnPtrWillBeRawPtr<TransitionEventDelegate> eventDelegate = adoptPtrWillBeNoop(new TransitionEventDelegate(element, newTransition.eventId));
 
         RefPtrWillBeRawPtr<AnimationEffect> effect = inertAnimation->effect();
 
@@ -392,8 +391,8 @@ void CSSAnimations::maybeApplyPendingUpdate(Element* element)
         }
 
         RefPtrWillBeRawPtr<Animation> transition = Animation::create(element, effect, inertAnimation->specifiedTiming(), Animation::TransitionPriority, eventDelegate.release());
+        transition->setName(inertAnimation->name());
         RefPtrWillBeRawPtr<AnimationPlayer> player = element->document().timeline().createAnimationPlayer(transition.get());
-        element->document().compositorPendingAnimations().add(player.get());
         player->update(TimingUpdateOnDemand);
         runningTransition.player = player;
         m_transitions.set(id, runningTransition);
@@ -451,16 +450,16 @@ void CSSAnimations::calculateTransitionUpdateForProperty(CSSPropertyID id, CSSPr
     ASSERT(!element->activeAnimations() || !element->activeAnimations()->isAnimationStyleChange());
 }
 
-void CSSAnimations::calculateTransitionUpdate(CSSAnimationUpdate* update, const Element* element, const RenderStyle& style)
+void CSSAnimations::calculateTransitionUpdate(CSSAnimationUpdate* update, const Element* animatingElement, const RenderStyle& style)
 {
-    if (!element)
+    if (!animatingElement)
         return;
 
-    ActiveAnimations* activeAnimations = element->activeAnimations();
+    ActiveAnimations* activeAnimations = animatingElement->activeAnimations();
     const TransitionMap* activeTransitions = activeAnimations ? &activeAnimations->cssAnimations().m_transitions : 0;
     const CSSTransitionData* transitionData = style.transitions();
 
-#if ASSERT_ENABLED
+#if ENABLE(ASSERT)
     // In debug builds we verify that it would have been safe to avoid populating and testing listedProperties if the style recalc is due to animation.
     const bool animationStyleRecalc = false;
 #else
@@ -470,7 +469,7 @@ void CSSAnimations::calculateTransitionUpdate(CSSAnimationUpdate* update, const 
 
     BitArray<numCSSProperties> listedProperties;
     bool anyTransitionHadTransitionAll = false;
-    const RenderObject* renderer = element->renderer();
+    const RenderObject* renderer = animatingElement->renderer();
     if (!animationStyleRecalc && style.display() != NONE && renderer && renderer->style() && transitionData) {
         const RenderStyle& oldStyle = *renderer->style();
 
@@ -493,7 +492,7 @@ void CSSAnimations::calculateTransitionUpdate(CSSAnimationUpdate* update, const 
 
                 if (!animateAll) {
                     id = propertyForAnimation(id);
-                    if (CSSAnimations::isAnimatableProperty(id))
+                    if (CSSPropertyMetadata::isAnimatableProperty(id))
                         listedProperties.set(id);
                     else
                         continue;
@@ -503,7 +502,7 @@ void CSSAnimations::calculateTransitionUpdate(CSSAnimationUpdate* update, const 
                 // but this is a bit hard to do with the current applyMatchedProperties system.
                 if (!update->activeInterpolationsForAnimations().contains(id)
                     && (!activeAnimations || !activeAnimations->cssAnimations().m_previousActiveInterpolationsForAnimations.contains(id))) {
-                    calculateTransitionUpdateForProperty(id, eventId, *transitionData, i, oldStyle, style, activeTransitions, update, element);
+                    calculateTransitionUpdateForProperty(id, eventId, *transitionData, i, oldStyle, style, activeTransitions, update, animatingElement);
                 }
             }
         }
@@ -539,9 +538,9 @@ void CSSAnimations::cancel()
     m_pendingUpdate = nullptr;
 }
 
-void CSSAnimations::calculateAnimationActiveInterpolations(CSSAnimationUpdate* update, const Element* element, double timelineCurrentTime)
+void CSSAnimations::calculateAnimationActiveInterpolations(CSSAnimationUpdate* update, const Element* animatingElement, double timelineCurrentTime)
 {
-    ActiveAnimations* activeAnimations = element ? element->activeAnimations() : 0;
+    ActiveAnimations* activeAnimations = animatingElement ? animatingElement->activeAnimations() : 0;
     AnimationStack* animationStack = activeAnimations ? &activeAnimations->defaultStack() : 0;
 
     if (update->newAnimations().isEmpty() && update->cancelledAnimationAnimationPlayers().isEmpty()) {
@@ -558,9 +557,9 @@ void CSSAnimations::calculateAnimationActiveInterpolations(CSSAnimationUpdate* u
     update->adoptActiveInterpolationsForAnimations(activeInterpolationsForAnimations);
 }
 
-void CSSAnimations::calculateTransitionActiveInterpolations(CSSAnimationUpdate* update, const Element* element, double timelineCurrentTime)
+void CSSAnimations::calculateTransitionActiveInterpolations(CSSAnimationUpdate* update, const Element* animatingElement, double timelineCurrentTime)
 {
-    ActiveAnimations* activeAnimations = element ? element->activeAnimations() : 0;
+    ActiveAnimations* activeAnimations = animatingElement ? animatingElement->activeAnimations() : 0;
     AnimationStack* animationStack = activeAnimations ? &activeAnimations->defaultStack() : 0;
 
     WillBeHeapHashMap<CSSPropertyID, RefPtrWillBeMember<Interpolation> > activeInterpolationsForTransitions;
@@ -632,6 +631,12 @@ void CSSAnimations::AnimationEventDelegate::onEventCondition(const AnimationNode
     m_previousIteration = currentIteration;
 }
 
+void CSSAnimations::AnimationEventDelegate::trace(Visitor* visitor)
+{
+    visitor->trace(m_target);
+    AnimationNode::EventDelegate::trace(visitor);
+}
+
 void CSSAnimations::TransitionEventDelegate::onEventCondition(const AnimationNode* animationNode)
 {
     const AnimationNode::Phase currentPhase = animationNode->phase();
@@ -649,126 +654,10 @@ void CSSAnimations::TransitionEventDelegate::onEventCondition(const AnimationNod
     m_previousPhase = currentPhase;
 }
 
-bool CSSAnimations::isAnimatableProperty(CSSPropertyID property)
+void CSSAnimations::TransitionEventDelegate::trace(Visitor* visitor)
 {
-    switch (property) {
-    case CSSPropertyBackgroundColor:
-    case CSSPropertyBackgroundImage:
-    case CSSPropertyBackgroundPositionX:
-    case CSSPropertyBackgroundPositionY:
-    case CSSPropertyBackgroundSize:
-    case CSSPropertyBaselineShift:
-    case CSSPropertyBorderBottomColor:
-    case CSSPropertyBorderBottomLeftRadius:
-    case CSSPropertyBorderBottomRightRadius:
-    case CSSPropertyBorderBottomWidth:
-    case CSSPropertyBorderImageOutset:
-    case CSSPropertyBorderImageSlice:
-    case CSSPropertyBorderImageSource:
-    case CSSPropertyBorderImageWidth:
-    case CSSPropertyBorderLeftColor:
-    case CSSPropertyBorderLeftWidth:
-    case CSSPropertyBorderRightColor:
-    case CSSPropertyBorderRightWidth:
-    case CSSPropertyBorderTopColor:
-    case CSSPropertyBorderTopLeftRadius:
-    case CSSPropertyBorderTopRightRadius:
-    case CSSPropertyBorderTopWidth:
-    case CSSPropertyBottom:
-    case CSSPropertyBoxShadow:
-    case CSSPropertyClip:
-    case CSSPropertyColor:
-    case CSSPropertyFill:
-    case CSSPropertyFillOpacity:
-    case CSSPropertyFlexBasis:
-    case CSSPropertyFlexGrow:
-    case CSSPropertyFlexShrink:
-    case CSSPropertyFloodColor:
-    case CSSPropertyFloodOpacity:
-    case CSSPropertyFontSize:
-    case CSSPropertyFontWeight:
-    case CSSPropertyHeight:
-    case CSSPropertyLeft:
-    case CSSPropertyLetterSpacing:
-    case CSSPropertyLightingColor:
-    case CSSPropertyLineHeight:
-    case CSSPropertyListStyleImage:
-    case CSSPropertyMarginBottom:
-    case CSSPropertyMarginLeft:
-    case CSSPropertyMarginRight:
-    case CSSPropertyMarginTop:
-    case CSSPropertyMaxHeight:
-    case CSSPropertyMaxWidth:
-    case CSSPropertyMinHeight:
-    case CSSPropertyMinWidth:
-    case CSSPropertyObjectPosition:
-    case CSSPropertyOpacity:
-    case CSSPropertyOrphans:
-    case CSSPropertyOutlineColor:
-    case CSSPropertyOutlineOffset:
-    case CSSPropertyOutlineWidth:
-    case CSSPropertyPaddingBottom:
-    case CSSPropertyPaddingLeft:
-    case CSSPropertyPaddingRight:
-    case CSSPropertyPaddingTop:
-    case CSSPropertyRight:
-    case CSSPropertyStopColor:
-    case CSSPropertyStopOpacity:
-    case CSSPropertyStroke:
-    case CSSPropertyStrokeDasharray:
-    case CSSPropertyStrokeDashoffset:
-    case CSSPropertyStrokeMiterlimit:
-    case CSSPropertyStrokeOpacity:
-    case CSSPropertyStrokeWidth:
-    case CSSPropertyTextDecorationColor:
-    case CSSPropertyTextIndent:
-    case CSSPropertyTextShadow:
-    case CSSPropertyTop:
-    case CSSPropertyVerticalAlign:
-    case CSSPropertyVisibility:
-    case CSSPropertyWebkitBackgroundSize:
-    case CSSPropertyWebkitBorderHorizontalSpacing:
-    case CSSPropertyWebkitBorderVerticalSpacing:
-    case CSSPropertyWebkitBoxShadow:
-    case CSSPropertyWebkitClipPath:
-    case CSSPropertyWebkitColumnCount:
-    case CSSPropertyWebkitColumnGap:
-    case CSSPropertyWebkitColumnRuleColor:
-    case CSSPropertyWebkitColumnRuleWidth:
-    case CSSPropertyWebkitColumnWidth:
-    case CSSPropertyWebkitFilter:
-    case CSSPropertyWebkitMaskBoxImageOutset:
-    case CSSPropertyWebkitMaskBoxImageSlice:
-    case CSSPropertyWebkitMaskBoxImageSource:
-    case CSSPropertyWebkitMaskBoxImageWidth:
-    case CSSPropertyWebkitMaskImage:
-    case CSSPropertyWebkitMaskPositionX:
-    case CSSPropertyWebkitMaskPositionY:
-    case CSSPropertyWebkitMaskSize:
-    case CSSPropertyPerspective:
-    case CSSPropertyShapeOutside:
-    case CSSPropertyShapeMargin:
-    case CSSPropertyShapeImageThreshold:
-    case CSSPropertyWebkitTextStrokeColor:
-    case CSSPropertyTransform:
-    case CSSPropertyWidows:
-    case CSSPropertyWidth:
-    case CSSPropertyWordSpacing:
-    case CSSPropertyZIndex:
-    case CSSPropertyZoom:
-        return true;
-    case CSSPropertyPerspectiveOrigin:
-    case CSSPropertyTransformOrigin:
-        return RuntimeEnabledFeatures::cssTransformsUnprefixedEnabled();
-    case CSSPropertyWebkitPerspectiveOriginX:
-    case CSSPropertyWebkitPerspectiveOriginY:
-    case CSSPropertyWebkitTransformOriginX:
-    case CSSPropertyWebkitTransformOriginY:
-    case CSSPropertyWebkitTransformOriginZ:
-        return !RuntimeEnabledFeatures::cssTransformsUnprefixedEnabled();
-    default:
-        return false;
-    }
+    visitor->trace(m_target);
+    AnimationNode::EventDelegate::trace(visitor);
 }
 
 const StylePropertyShorthand& CSSAnimations::animatableProperties()
@@ -778,7 +667,7 @@ const StylePropertyShorthand& CSSAnimations::animatableProperties()
     if (properties.isEmpty()) {
         for (int i = firstCSSProperty; i < lastCSSProperty; ++i) {
             CSSPropertyID id = convertToCSSPropertyID(i);
-            if (isAnimatableProperty(id))
+            if (CSSPropertyMetadata::isAnimatableProperty(id))
                 properties.append(id);
         }
         propertyShorthand = StylePropertyShorthand(CSSPropertyInvalid, properties.begin(), properties.size());
@@ -828,19 +717,23 @@ bool CSSAnimations::isAllowedAnimation(CSSPropertyID property)
 
 void CSSAnimations::trace(Visitor* visitor)
 {
+#if ENABLE(OILPAN)
     visitor->trace(m_transitions);
     visitor->trace(m_pendingUpdate);
     visitor->trace(m_animations);
     visitor->trace(m_previousActiveInterpolationsForAnimations);
+#endif
 }
 
 void CSSAnimationUpdate::trace(Visitor* visitor)
 {
+#if ENABLE(OILPAN)
     visitor->trace(m_newTransitions);
     visitor->trace(m_activeInterpolationsForAnimations);
     visitor->trace(m_activeInterpolationsForTransitions);
     visitor->trace(m_newAnimations);
     visitor->trace(m_cancelledAnimationPlayers);
+#endif
 }
 
-} // namespace WebCore
+} // namespace blink

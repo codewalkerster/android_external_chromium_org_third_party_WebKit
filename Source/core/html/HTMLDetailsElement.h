@@ -23,12 +23,13 @@
 
 #include "core/html/HTMLElement.h"
 
-namespace WebCore {
+namespace blink {
 
 template<typename T> class EventSender;
 typedef EventSender<HTMLDetailsElement> DetailsEventSender;
 
 class HTMLDetailsElement FINAL : public HTMLElement {
+    DEFINE_WRAPPERTYPEINFO();
 public:
     static PassRefPtrWillBeRawPtr<HTMLDetailsElement> create(Document&);
     void toggleOpen();
@@ -49,6 +50,6 @@ private:
     bool m_isOpen;
 };
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // HTMLDetailsElement_h

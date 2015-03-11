@@ -23,17 +23,17 @@
 #include "config.h"
 #include "core/svg/SVGStyleElement.h"
 
+#include "core/MediaTypeNames.h"
 #include "core/css/CSSStyleSheet.h"
 #include "wtf/StdLibExtras.h"
 
-namespace WebCore {
+namespace blink {
 
 inline SVGStyleElement::SVGStyleElement(Document& document, bool createdByParser)
     : SVGElement(SVGNames::styleTag, document)
     , StyleElement(&document, createdByParser)
     , m_svgLoadEventTimer(this, &SVGElement::svgLoadEventTimerFired)
 {
-    ScriptWrappable::init(this);
 }
 
 SVGStyleElement::~SVGStyleElement()
@@ -76,9 +76,8 @@ void SVGStyleElement::setType(const AtomicString& type)
 
 const AtomicString& SVGStyleElement::media() const
 {
-    DEFINE_STATIC_LOCAL(const AtomicString, defaultValue, ("all", AtomicString::ConstructFromLiteral));
     const AtomicString& n = fastGetAttribute(SVGNames::mediaAttr);
-    return n.isNull() ? defaultValue : n;
+    return n.isNull() ? MediaTypeNames::all : n;
 }
 
 void SVGStyleElement::setMedia(const AtomicString& media)
@@ -144,9 +143,9 @@ void SVGStyleElement::removedFrom(ContainerNode* rootParent)
         StyleElement::removedFromDocument(document(), this);
 }
 
-void SVGStyleElement::childrenChanged(bool changedByParser, Node* beforeChange, Node* afterChange, int childCountDelta)
+void SVGStyleElement::childrenChanged(const ChildrenChange& change)
 {
-    SVGElement::childrenChanged(changedByParser, beforeChange, afterChange, childCountDelta);
+    SVGElement::childrenChanged(change);
     StyleElement::childrenChanged(this);
 }
 

@@ -23,13 +23,11 @@
 #ifndef RenderLayerModelObject_h
 #define RenderLayerModelObject_h
 
-#include "core/rendering/compositing/CompositedLayerMappingPtr.h"
 #include "core/rendering/RenderObject.h"
 
-namespace WebCore {
+namespace blink {
 
 class RenderLayer;
-class CompositedLayerMapping;
 class ScrollableArea;
 
 enum LayerType {
@@ -66,9 +64,10 @@ public:
     // This is null for anonymous renderers.
     ContainerNode* node() const { return toContainerNode(RenderObject::node()); }
 
-    CompositedLayerMappingPtr compositedLayerMapping() const;
-    bool hasCompositedLayerMapping() const;
-    CompositedLayerMapping* groupedMapping() const;
+    virtual void invalidateTreeIfNeeded(const PaintInvalidationState&) OVERRIDE;
+
+    // Indicate that the contents of this renderer need to be repainted. Only has an effect if compositing is being used,
+    void setBackingNeedsPaintInvalidationInRect(const LayoutRect&) const; // r is in the coordinate space of this render object
 
 protected:
     void createLayer(LayerType);
@@ -88,6 +87,6 @@ private:
 
 DEFINE_RENDER_OBJECT_TYPE_CASTS(RenderLayerModelObject, isLayerModelObject());
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // RenderLayerModelObject_h

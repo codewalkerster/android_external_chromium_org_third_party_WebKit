@@ -25,12 +25,11 @@
 #include "core/rendering/svg/RenderSVGResource.h"
 #include "core/rendering/svg/RenderSVGText.h"
 
-namespace WebCore {
+namespace blink {
 
 inline SVGTextElement::SVGTextElement(Document& doc)
     : SVGTextPositioningElement(SVGNames::textTag, doc)
 {
-    ScriptWrappable::init(this);
 }
 
 DEFINE_NODE_FACTORY(SVGTextElement)

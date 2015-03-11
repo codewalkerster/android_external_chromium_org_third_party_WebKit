@@ -28,7 +28,7 @@
 
 #include "core/events/Event.h"
 
-namespace WebCore {
+namespace blink {
 
 struct PageTransitionEventInit : public EventInit {
     PageTransitionEventInit();
@@ -37,6 +37,7 @@ struct PageTransitionEventInit : public EventInit {
 };
 
 class PageTransitionEvent FINAL : public Event {
+    DEFINE_WRAPPERTYPEINFO();
 public:
     static PassRefPtrWillBeRawPtr<PageTransitionEvent> create()
     {
@@ -67,6 +68,6 @@ private:
     bool m_persisted;
 };
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // PageTransitionEvent_h

@@ -5,8 +5,8 @@
 #include "config.h"
 #include "modules/webmidi/MIDIAccessInitializer.h"
 
-#include "bindings/v8/ScriptPromise.h"
-#include "bindings/v8/ScriptPromiseResolverWithContext.h"
+#include "bindings/core/v8/ScriptPromise.h"
+#include "bindings/core/v8/ScriptPromiseResolver.h"
 #include "core/dom/DOMError.h"
 #include "core/dom/Document.h"
 #include "core/frame/Navigator.h"
@@ -15,13 +15,14 @@
 #include "modules/webmidi/MIDIOptions.h"
 #include "modules/webmidi/MIDIPort.h"
 
-namespace WebCore {
+namespace blink {
 
 MIDIAccessInitializer::MIDIAccessInitializer(ScriptState* scriptState, const MIDIOptions& options)
-    : ScriptPromiseResolverWithContext(scriptState)
-    , m_options(options)
-    , m_sysexEnabled(false)
+    : ScriptPromiseResolver(scriptState)
+    , m_requestSysex(false)
 {
+    if (options.hasSysex())
+        m_requestSysex = options.sysex();
 }
 
 MIDIAccessInitializer::~MIDIAccessInitializer()
@@ -39,7 +40,7 @@ ScriptPromise MIDIAccessInitializer::start()
     ScriptPromise promise = this->promise();
     m_accessor = MIDIAccessor::create(this);
 
-    if (!m_options.sysex) {
+    if (!m_requestSysex) {
         m_accessor->startSession();
         return promise;
     }
@@ -70,16 +71,15 @@ void MIDIAccessInitializer::didStartSession(bool success, const String& error, c
 {
     ASSERT(m_accessor);
     if (success) {
-        resolve(MIDIAccess::create(m_accessor.release(), m_sysexEnabled, m_portDescriptors, executionContext()));
+        resolve(MIDIAccess::create(m_accessor.release(), m_requestSysex, m_portDescriptors, executionContext()));
     } else {
         reject(DOMError::create(error, message));
     }
 }
 
-void MIDIAccessInitializer::setSysexEnabled(bool enable)
+void MIDIAccessInitializer::resolveSysexPermission(bool allowed)
 {
-    m_sysexEnabled = enable;
-    if (enable)
+    if (allowed)
         m_accessor->startSession();
     else
         reject(DOMError::create("SecurityError"));
@@ -95,4 +95,4 @@ ExecutionContext* MIDIAccessInitializer::executionContext() const
     return scriptState()->executionContext();
 }
 
-} // namespace WebCore
+} // namespace blink

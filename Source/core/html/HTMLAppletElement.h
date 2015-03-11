@@ -25,11 +25,12 @@
 
 #include "core/html/HTMLPlugInElement.h"
 
-namespace WebCore {
+namespace blink {
 
 class KURL;
 
 class HTMLAppletElement FINAL : public HTMLPlugInElement {
+    DEFINE_WRAPPERTYPEINFO();
 public:
     static PassRefPtrWillBeRawPtr<HTMLAppletElement> create(Document&, bool createdByParser);
 
@@ -56,6 +57,6 @@ private:
     virtual bool shouldRegisterAsExtraNamedItem() const OVERRIDE { return true; }
 };
 
-}
+} // namespace blink
 
-#endif
+#endif // HTMLAppletElement_h

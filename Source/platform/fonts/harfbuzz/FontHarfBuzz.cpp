@@ -31,7 +31,7 @@
 #include "config.h"
 #include "platform/fonts/Font.h"
 
-#include "platform/NotImplemented.h"
+#include "platform/RuntimeEnabledFeatures.h"
 #include "platform/fonts/FontPlatformFeatures.h"
 #include "platform/fonts/SimpleFontData.h"
 #include "platform/fonts/harfbuzz/HarfBuzzShaper.h"
@@ -44,57 +44,77 @@
 
 #include "wtf/unicode/Unicode.h"
 
-namespace WebCore {
+#include <algorithm>
 
-bool FontPlatformFeatures::canReturnFallbackFontsForComplexText()
-{
-    return false;
-}
+namespace blink {
 
 bool FontPlatformFeatures::canExpandAroundIdeographsInComplexText()
 {
     return false;
 }
 
+static SkPaint textFillPaint(GraphicsContext* gc, const SimpleFontData* font)
+{
+    SkPaint paint = gc->fillPaint();
+    font->platformData().setupPaint(&paint, gc);
+    gc->adjustTextRenderMode(&paint);
+    paint.setTextEncoding(SkPaint::kGlyphID_TextEncoding);
+    return paint;
+}
+
+static SkPaint textStrokePaint(GraphicsContext* gc, const SimpleFontData* font, bool isFilling)
+{
+    SkPaint paint = gc->strokePaint();
+    font->platformData().setupPaint(&paint, gc);
+    gc->adjustTextRenderMode(&paint);
+    paint.setTextEncoding(SkPaint::kGlyphID_TextEncoding);
+    if (isFilling) {
+        // If there is a shadow and we filled above, there will already be
+        // a shadow. We don't want to draw it again or it will be too dark
+        // and it will go on top of the fill.
+        //
+        // Note that this isn't strictly correct, since the stroke could be
+        // very thick and the shadow wouldn't account for this. The "right"
+        // thing would be to draw to a new layer and then draw that layer
+        // with a shadow. But this is a lot of extra work for something
+        // that isn't normally an issue.
+        paint.setLooper(0);
+    }
+    return paint;
+}
+
 static void paintGlyphs(GraphicsContext* gc, const SimpleFontData* font,
-    const Glyph* glyphs, unsigned numGlyphs,
-    SkPoint* pos, const FloatRect& textRect)
+    const Glyph glyphs[], unsigned numGlyphs,
+    const SkPoint pos[], const FloatRect& textRect)
 {
     TextDrawingModeFlags textMode = gc->textDrawingMode();
 
     // We draw text up to two times (once for fill, once for stroke).
     if (textMode & TextModeFill) {
-        SkPaint paint = gc->fillPaint();
-        font->platformData().setupPaint(&paint, gc);
-        gc->adjustTextRenderMode(&paint);
-        paint.setTextEncoding(SkPaint::kGlyphID_TextEncoding);
-
+        SkPaint paint = textFillPaint(gc, font);
         gc->drawPosText(glyphs, numGlyphs * sizeof(Glyph), pos, textRect, paint);
     }
 
-    if ((textMode & TextModeStroke)
-        && gc->strokeStyle() != NoStroke
-        && gc->strokeThickness() > 0) {
-
-        SkPaint paint = gc->strokePaint();
-        font->platformData().setupPaint(&paint, gc);
-        gc->adjustTextRenderMode(&paint);
-        paint.setTextEncoding(SkPaint::kGlyphID_TextEncoding);
-
-        if (textMode & TextModeFill) {
-            // If there is a shadow and we filled above, there will already be
-            // a shadow. We don't want to draw it again or it will be too dark
-            // and it will go on top of the fill.
-            //
-            // Note that this isn't strictly correct, since the stroke could be
-            // very thick and the shadow wouldn't account for this. The "right"
-            // thing would be to draw to a new layer and then draw that layer
-            // with a shadow. But this is a lot of extra work for something
-            // that isn't normally an issue.
-            paint.setLooper(0);
-        }
-
+    if ((textMode & TextModeStroke) && gc->hasStroke()) {
+        SkPaint paint = textStrokePaint(gc, font, textMode & TextModeFill);
         gc->drawPosText(glyphs, numGlyphs * sizeof(Glyph), pos, textRect, paint);
+    }
+}
+
+static void paintGlyphsHorizontal(GraphicsContext* gc, const SimpleFontData* font,
+    const Glyph glyphs[], unsigned numGlyphs,
+    const SkScalar xpos[], SkScalar constY, const FloatRect& textRect)
+{
+    TextDrawingModeFlags textMode = gc->textDrawingMode();
+
+    if (textMode & TextModeFill) {
+        SkPaint paint = textFillPaint(gc, font);
+        gc->drawPosTextH(glyphs, numGlyphs * sizeof(Glyph), xpos, constY, textRect, paint);
+    }
+
+    if ((textMode & TextModeStroke) && gc->hasStroke()) {
+        SkPaint paint = textStrokePaint(gc, font, textMode & TextModeFill);
+        gc->drawPosTextH(glyphs, numGlyphs * sizeof(Glyph), xpos, constY, textRect, paint);
     }
 }
 
@@ -105,11 +125,11 @@ void Font::drawGlyphs(GraphicsContext* gc, const SimpleFontData* font,
     SkScalar x = SkFloatToScalar(point.x());
     SkScalar y = SkFloatToScalar(point.y());
 
-    SkAutoSTMalloc<32, SkPoint> storage(numGlyphs);
-    SkPoint* pos = storage.get();
-
     const OpenTypeVerticalData* verticalData = font->verticalData();
     if (font->platformData().orientation() == Vertical && verticalData) {
+        SkAutoSTMalloc<32, SkPoint> storage(numGlyphs);
+        SkPoint* pos = storage.get();
+
         AffineTransform savedMatrix = gc->getCTM();
         gc->concatCTM(AffineTransform(0, -1, 1, 0, point.x(), point.y()));
         gc->concatCTM(AffineTransform(1, 0, 0, 1, -point.x(), -point.y()));
@@ -147,12 +167,27 @@ void Font::drawGlyphs(GraphicsContext* gc, const SimpleFontData* font,
         return;
     }
 
+    if (!glyphBuffer.hasVerticalAdvances()) {
+        SkAutoSTMalloc<64, SkScalar> storage(numGlyphs);
+        SkScalar* xpos = storage.get();
+        const FloatSize* adv = glyphBuffer.advances(from);
+        for (unsigned i = 0; i < numGlyphs; i++) {
+            xpos[i] = x;
+            x += SkFloatToScalar(adv[i].width());
+        }
+        const Glyph* glyphs = glyphBuffer.glyphs(from);
+        paintGlyphsHorizontal(gc, font, glyphs, numGlyphs, xpos, SkFloatToScalar(y), textRect);
+        return;
+    }
+
     // FIXME: text rendering speed:
     // Android has code in their WebCore fork to special case when the
     // GlyphBuffer has no advances other than the defaults. In that case the
     // text drawing can proceed faster. However, it's unclear when those
     // patches may be upstreamed to WebKit so we always use the slower path
     // here.
+    SkAutoSTMalloc<32, SkPoint> storage(numGlyphs);
+    SkPoint* pos = storage.get();
     const FloatSize* adv = glyphBuffer.advances(from);
     for (unsigned i = 0; i < numGlyphs; i++) {
         pos[i].set(x, y);
@@ -164,27 +199,45 @@ void Font::drawGlyphs(GraphicsContext* gc, const SimpleFontData* font,
     paintGlyphs(gc, font, glyphs, numGlyphs, pos, textRect);
 }
 
-void Font::drawComplexText(GraphicsContext* gc, const TextRunPaintInfo& runInfo, const FloatPoint& point) const
+void Font::drawTextBlob(GraphicsContext* gc, const SkTextBlob* blob, const SkPoint& origin) const
+{
+    ASSERT(RuntimeEnabledFeatures::textBlobEnabled());
+
+    // FIXME: It would be good to move this to Font.cpp, if we're sure that none
+    // of the things in FontMac's setupPaint need to apply here.
+    // See also paintGlyphs.
+    TextDrawingModeFlags textMode = gc->textDrawingMode();
+
+    if (textMode & TextModeFill)
+        gc->drawTextBlob(blob, origin, gc->fillPaint());
+
+    if ((textMode & TextModeStroke) && gc->hasStroke()) {
+        SkPaint paint = gc->strokePaint();
+        if (textMode & TextModeFill)
+            paint.setLooper(0);
+        gc->drawTextBlob(blob, origin, paint);
+    }
+}
+
+float Font::drawComplexText(GraphicsContext* gc, const TextRunPaintInfo& runInfo, const FloatPoint& point) const
 {
     if (!runInfo.run.length())
-        return;
+        return 0;
 
     TextDrawingModeFlags textMode = gc->textDrawingMode();
     bool fill = textMode & TextModeFill;
-    bool stroke = (textMode & TextModeStroke)
-        && gc->strokeStyle() != NoStroke
-        && gc->strokeThickness() > 0;
+    bool stroke = (textMode & TextModeStroke) && gc->hasStroke();
 
     if (!fill && !stroke)
-        return;
+        return 0;
 
     GlyphBuffer glyphBuffer;
     HarfBuzzShaper shaper(this, runInfo.run);
     shaper.setDrawRange(runInfo.from, runInfo.to);
     if (!shaper.shape(&glyphBuffer) || glyphBuffer.isEmpty())
-        return;
+        return 0;
     FloatPoint adjustedPoint = shaper.adjustStartPoint(point);
-    drawGlyphBuffer(gc, runInfo, glyphBuffer, adjustedPoint);
+    return drawGlyphBuffer(gc, runInfo, glyphBuffer, adjustedPoint);
 }
 
 void Font::drawEmphasisMarksForComplexText(GraphicsContext* context, const TextRunPaintInfo& runInfo, const AtomicString& mark, const FloatPoint& point) const
@@ -207,9 +260,9 @@ float Font::getGlyphsAndAdvancesForComplexText(const TextRunPaintInfo& runInfo, 
     return 0;
 }
 
-float Font::floatWidthForComplexText(const TextRun& run, HashSet<const SimpleFontData*>* /* fallbackFonts */, IntRectExtent* glyphBounds) const
+float Font::floatWidthForComplexText(const TextRun& run, HashSet<const SimpleFontData*>* fallbackFonts, IntRectExtent* glyphBounds) const
 {
-    HarfBuzzShaper shaper(this, run);
+    HarfBuzzShaper shaper(this, run, HarfBuzzShaper::NotForTextEmphasis, fallbackFonts);
     if (!shaper.shape())
         return 0;
 
@@ -242,4 +295,60 @@ FloatRect Font::selectionRectForComplexText(const TextRun& run,
     return shaper.selectionRect(point, height, from, to);
 }
 
-} // namespace WebCore
+PassTextBlobPtr Font::buildTextBlob(const GlyphBuffer& glyphBuffer, float initialAdvance,
+    const FloatRect& bounds, float& advance, bool couldUseLCD) const
+{
+    ASSERT(RuntimeEnabledFeatures::textBlobEnabled());
+
+    // FIXME: Except for setupPaint, this is not specific to FontHarfBuzz.
+    // FIXME: Also implement the more general full-positioning path.
+    ASSERT(!glyphBuffer.hasVerticalAdvances());
+
+    SkTextBlobBuilder builder;
+    SkScalar x = SkFloatToScalar(initialAdvance);
+    SkRect skBounds = bounds;
+
+    unsigned i = 0;
+    while (i < glyphBuffer.size()) {
+        const SimpleFontData* fontData = glyphBuffer.fontDataAt(i);
+
+        // FIXME: Handle vertical text.
+        if (fontData->platformData().orientation() == Vertical)
+            return nullptr;
+
+        // FIXME: Handle SVG fonts.
+        if (fontData->isSVGFont())
+            return nullptr;
+
+        // FIXME: FontPlatformData makes some decisions on the device scale
+        // factor, which is found via the GraphicsContext. This should be fixed
+        // to avoid correctness problems here.
+        SkPaint paint;
+        fontData->platformData().setupPaint(&paint);
+        paint.setTextEncoding(SkPaint::kGlyphID_TextEncoding);
+
+        // FIXME: this should go away after the big LCD cleanup.
+        paint.setLCDRenderText(paint.isLCDRenderText() && couldUseLCD);
+
+        unsigned start = i++;
+        while (i < glyphBuffer.size() && glyphBuffer.fontDataAt(i) == fontData)
+            i++;
+        unsigned count = i - start;
+
+        const SkTextBlobBuilder::RunBuffer& buffer = builder.allocRunPosH(paint, count, 0, &skBounds);
+
+        const uint16_t* glyphs = glyphBuffer.glyphs(start);
+        std::copy(glyphs, glyphs + count, buffer.glyphs);
+
+        const FloatSize* advances = glyphBuffer.advances(start);
+        for (unsigned j = 0; j < count; j++) {
+            buffer.pos[j] = x;
+            x += SkFloatToScalar(advances[j].width());
+        }
+    }
+
+    advance = x;
+    return adoptRef(builder.build());
+}
+
+} // namespace blink

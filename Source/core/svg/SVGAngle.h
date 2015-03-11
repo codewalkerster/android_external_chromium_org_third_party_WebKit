@@ -23,8 +23,9 @@
 #define SVGAngle_h
 
 #include "core/svg/SVGEnumeration.h"
+#include "core/svg/properties/SVGPropertyHelper.h"
 
-namespace WebCore {
+namespace blink {
 
 class SVGAngle;
 class SVGAngleTearOff;
@@ -32,9 +33,11 @@ class SVGAngleTearOff;
 enum SVGMarkerOrientType {
     SVGMarkerOrientUnknown = 0,
     SVGMarkerOrientAuto,
-    SVGMarkerOrientAngle
+    SVGMarkerOrientAngle,
+    SVGMarkerOrientAutoStartReverse
 };
 template<> const SVGEnumerationStringEntries& getStaticStringEntries<SVGMarkerOrientType>();
+template<> unsigned short getMaxExposedEnumValue<SVGMarkerOrientType>();
 
 class SVGMarkerOrientEnumeration : public SVGEnumeration<SVGMarkerOrientType> {
 public:
@@ -58,7 +61,7 @@ private:
     SVGAngle* m_angle;
 };
 
-class SVGAngle : public SVGPropertyBase {
+class SVGAngle : public SVGPropertyHelper<SVGAngle> {
 public:
     typedef SVGAngleTearOff TearOffType;
 
@@ -95,7 +98,6 @@ public:
     // SVGPropertyBase:
 
     PassRefPtr<SVGAngle> clone() const;
-    virtual PassRefPtr<SVGPropertyBase> cloneForAnimation(const String&) const OVERRIDE;
 
     virtual String valueAsString() const OVERRIDE;
     void setValueAsString(const String&, ExceptionState&);
@@ -122,6 +124,6 @@ inline PassRefPtr<SVGAngle> toSVGAngle(PassRefPtr<SVGPropertyBase> passBase)
     return static_pointer_cast<SVGAngle>(base.release());
 }
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // SVGAngle_h

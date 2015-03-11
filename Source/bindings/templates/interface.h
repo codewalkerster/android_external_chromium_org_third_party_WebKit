@@ -12,7 +12,7 @@
 #include "{{filename}}"
 {% endfor %}
 
-namespace WebCore {
+namespace blink {
 
 {% if has_event_constructor %}
 class Dictionary;
@@ -27,18 +27,35 @@ public:
 {% endif %}
 class {{v8_class}} {
 public:
+    {% if has_private_script %}
+    class PrivateScript {
+    public:
+        {% for method in methods if method.is_implemented_in_private_script %}
+        static bool {{method.name}}Method({{method.argument_declarations_for_private_script | join(', ')}});
+        {% endfor %}
+        {% for attribute in attributes if attribute.is_implemented_in_private_script %}
+        static bool {{attribute.name}}AttributeGetter(LocalFrame* frame, {{cpp_class}}* holderImpl, {{attribute.cpp_type}}* result);
+        {% if not attribute.is_read_only %}
+        static bool {{attribute.name}}AttributeSetter(LocalFrame* frame, {{cpp_class}}* holderImpl, {{attribute.argument_cpp_type}} cppValue);
+        {% endif %}
+        {% endfor %}
+    };
+
+    {% endif %}
     static bool hasInstance(v8::Handle<v8::Value>, v8::Isolate*);
     static v8::Handle<v8::Object> findInstanceInPrototypeChain(v8::Handle<v8::Value>, v8::Isolate*);
     static v8::Handle<v8::FunctionTemplate> domTemplate(v8::Isolate*);
-    static {{cpp_class}}* toNative(v8::Handle<v8::Object> object)
+    static {{cpp_class}}* toImpl(v8::Handle<v8::Object> object)
     {
-        return fromInternalPointer(object->GetAlignedPointerFromInternalField(v8DOMWrapperObjectIndex));
+        return toImpl(blink::toScriptWrappableBase(object));
     }
-    static {{cpp_class}}* toNativeWithTypeCheck(v8::Isolate*, v8::Handle<v8::Value>);
+    static {{cpp_class}}* toImplWithTypeCheck(v8::Isolate*, v8::Handle<v8::Value>);
     static const WrapperTypeInfo wrapperTypeInfo;
-    static void derefObject(void*);
+    static void refObject(ScriptWrappableBase* internalPointer);
+    static void derefObject(ScriptWrappableBase* internalPointer);
+    static WrapperPersistentNode* createPersistentHandle(ScriptWrappableBase* internalPointer);
     {% if has_visit_dom_wrapper %}
-    static void visitDOMWrapper(void*, const v8::Persistent<v8::Object>&, v8::Isolate*);
+    static void visitDOMWrapper(ScriptWrappableBase* internalPointer, const v8::Persistent<v8::Object>&, v8::Isolate*);
     {% endif %}
     {% if is_active_dom_object %}
     static ActiveDOMObject* toActiveDOMObject(v8::Handle<v8::Object>);
@@ -49,10 +66,12 @@ public:
     {% if interface_name == 'Window' %}
     static v8::Handle<v8::ObjectTemplate> getShadowObjectTemplate(v8::Isolate*);
     {% endif %}
-    {% for method in methods if method.is_custom %}
+    {% for method in methods %}
+    {% if method.is_custom %}
     {% filter conditional(method.conditional_string) %}
     static void {{method.name}}MethodCustom(const v8::FunctionCallbackInfo<v8::Value>&);
     {% endfilter %}
+    {% endif %}
     {% endfor %}
     {% if constructors or has_custom_constructor or has_event_constructor %}
     static void constructorCallback(const v8::FunctionCallbackInfo<v8::Value>&);
@@ -125,54 +144,32 @@ public:
 #else
     static const int internalFieldCount = v8DefaultWrapperInternalFieldCount + {{custom_internal_field_counter}};
 #endif
-    {% else %}
+    {% elif gc_type == 'RefCountedObject' %}
     static const int internalFieldCount = v8DefaultWrapperInternalFieldCount + {{custom_internal_field_counter}};
     {% endif %}
     {# End custom internal fields #}
-    static inline void* toInternalPointer({{cpp_class}}* impl)
+    static inline ScriptWrappableBase* toScriptWrappableBase({{cpp_class}}* impl)
     {
-        {% if parent_interface %}
-        return V8{{parent_interface}}::toInternalPointer(impl);
-        {% else %}
-        return impl;
-        {% endif %}
+        return impl->toScriptWrappableBase();
     }
 
-    static inline {{cpp_class}}* fromInternalPointer(void* object)
+    static inline {{cpp_class}}* toImpl(ScriptWrappableBase* internalPointer)
     {
-        {% if parent_interface %}
-        return static_cast<{{cpp_class}}*>(V8{{parent_interface}}::fromInternalPointer(object));
-        {% else %}
-        return static_cast<{{cpp_class}}*>(object);
-        {% endif %}
+        return internalPointer->toImpl<{{cpp_class}}>();
     }
     {% if interface_name == 'Window' %}
     static bool namedSecurityCheckCustom(v8::Local<v8::Object> host, v8::Local<v8::Value> key, v8::AccessType, v8::Local<v8::Value> data);
     static bool indexedSecurityCheckCustom(v8::Local<v8::Object> host, uint32_t index, v8::AccessType, v8::Local<v8::Value> data);
     {% endif %}
-    static void installPerContextEnabledProperties(v8::Handle<v8::Object>, {{cpp_class}}*, v8::Isolate*){% if has_per_context_enabled_attributes %};
+    static void installConditionallyEnabledProperties(v8::Handle<v8::Object>, v8::Isolate*){% if has_conditional_attributes %};
     {% else %} { }
     {% endif %}
-    static void installPerContextEnabledMethods(v8::Handle<v8::Object>, v8::Isolate*){% if per_context_enabled_methods %};
+    static void installConditionallyEnabledMethods(v8::Handle<v8::Object>, v8::Isolate*){% if conditionally_enabled_methods %};
     {% else %} { }
-    {% endif %}
-    {# Element wrappers #}
-    {% if interface_name == 'HTMLElement' %}
-    friend v8::Handle<v8::Object> createV8HTMLWrapper(HTMLElement*, v8::Handle<v8::Object> creationContext, v8::Isolate*);
-    friend v8::Handle<v8::Object> createV8HTMLDirectWrapper(HTMLElement*, v8::Handle<v8::Object> creationContext, v8::Isolate*);
-    {% elif interface_name == 'SVGElement' %}
-    friend v8::Handle<v8::Object> createV8SVGWrapper(SVGElement*, v8::Handle<v8::Object> creationContext, v8::Isolate*);
-    friend v8::Handle<v8::Object> createV8SVGDirectWrapper(SVGElement*, v8::Handle<v8::Object> creationContext, v8::Isolate*);
-    friend v8::Handle<v8::Object> createV8SVGFallbackWrapper(SVGElement*, v8::Handle<v8::Object> creationContext, v8::Isolate*);
-    {% elif interface_name == 'HTMLUnknownElement' %}
-    friend v8::Handle<v8::Object> createV8HTMLFallbackWrapper(HTMLUnknownElement*, v8::Handle<v8::Object> creationContext, v8::Isolate*);
-    {% elif interface_name == 'Element' %}
-    // This is a performance optimization hack. See V8Element::wrap.
-    friend v8::Handle<v8::Object> wrap(Node*, v8::Handle<v8::Object> creationContext, v8::Isolate*);
     {% endif %}
 
 private:
-    {% if not has_custom_to_v8 %}
+    {% if not has_custom_to_v8 and not is_script_wrappable %}
     friend v8::Handle<v8::Object> wrap({{cpp_class}}*, v8::Handle<v8::Object> creationContext, v8::Isolate*);
     static v8::Handle<v8::Object> createWrapper({{pass_cpp_type}}, v8::Handle<v8::Object> creationContext, v8::Isolate*);
     {% endif %}
@@ -200,7 +197,14 @@ inline void v8SetReturnValueFast(const CallbackInfo& callbackInfo, {{cpp_class}}
      v8SetReturnValue(callbackInfo, toV8(impl, callbackInfo.Holder(), callbackInfo.GetIsolate()));
 }
 {% else %}{# has_custom_to_v8 #}
+{% if is_script_wrappable %}
+inline v8::Handle<v8::Object> wrap({{cpp_class}}* impl, v8::Handle<v8::Object> creationContext, v8::Isolate* isolate)
+{
+    return impl->wrap(creationContext, isolate);
+}
+{% else %}
 v8::Handle<v8::Object> wrap({{cpp_class}}* impl, v8::Handle<v8::Object> creationContext, v8::Isolate*);
+{% endif %}
 
 inline v8::Handle<v8::Value> toV8({{cpp_class}}* impl, v8::Handle<v8::Object> creationContext, v8::Isolate* isolate)
 {
@@ -209,7 +213,12 @@ inline v8::Handle<v8::Value> toV8({{cpp_class}}* impl, v8::Handle<v8::Object> cr
     v8::Handle<v8::Value> wrapper = DOMDataStore::getWrapper<{{v8_class}}>(impl, isolate);
     if (!wrapper.IsEmpty())
         return wrapper;
+
+{% if is_script_wrappable %}
+    return impl->wrap(creationContext, isolate);
+{% else %}
     return wrap(impl, creationContext, isolate);
+{% endif %}
 }
 
 template<typename CallbackInfo>
@@ -280,6 +289,6 @@ inline void v8SetReturnValueFast(const CallbackInfo& callbackInfo, {{pass_cpp_ty
 bool initialize{{cpp_class}}({{cpp_class}}Init&, const Dictionary&, ExceptionState&, const v8::FunctionCallbackInfo<v8::Value>& info, const String& = "");
 
 {% endif %}
-}
+} // namespace blink
 {% endfilter %}
 #endif // {{v8_class}}_h

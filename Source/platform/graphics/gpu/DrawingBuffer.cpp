@@ -47,9 +47,7 @@
 #include "wtf/RefCountedLeakCounter.h"
 #endif
 
-using namespace std;
-
-namespace WebCore {
+namespace blink {
 
 namespace {
 // Global resource ceiling (expressed in terms of pixels) for DrawingBuffer creation and resize.
@@ -66,7 +64,7 @@ DEFINE_DEBUG_ONLY_GLOBAL(WTF::RefCountedLeakCounter, drawingBufferCounter, ("Dra
 
 class ScopedTextureUnit0BindingRestorer {
 public:
-    ScopedTextureUnit0BindingRestorer(blink::WebGraphicsContext3D* context, GLenum activeTextureUnit, Platform3DObject textureUnitZeroId)
+    ScopedTextureUnit0BindingRestorer(WebGraphicsContext3D* context, GLenum activeTextureUnit, Platform3DObject textureUnitZeroId)
         : m_context(context)
         , m_oldActiveTextureUnit(activeTextureUnit)
         , m_oldTextureUnitZeroId(textureUnitZeroId)
@@ -80,14 +78,14 @@ public:
     }
 
 private:
-    blink::WebGraphicsContext3D* m_context;
+    WebGraphicsContext3D* m_context;
     GLenum m_oldActiveTextureUnit;
     Platform3DObject m_oldTextureUnitZeroId;
 };
 
 } // namespace
 
-PassRefPtr<DrawingBuffer> DrawingBuffer::create(PassOwnPtr<blink::WebGraphicsContext3D> context, const IntSize& size, PreserveDrawingBuffer preserve, blink::WebGraphicsContext3D::Attributes requestedAttributes, PassRefPtr<ContextEvictionManager> contextEvictionManager)
+PassRefPtr<DrawingBuffer> DrawingBuffer::create(PassOwnPtr<WebGraphicsContext3D> context, const IntSize& size, PreserveDrawingBuffer preserve, WebGraphicsContext3D::Attributes requestedAttributes, PassRefPtr<ContextEvictionManager> contextEvictionManager)
 {
     ASSERT(context);
     OwnPtr<Extensions3DUtil> extensionsUtil = Extensions3DUtil::create(context.get());
@@ -113,12 +111,12 @@ PassRefPtr<DrawingBuffer> DrawingBuffer::create(PassOwnPtr<blink::WebGraphicsCon
     return drawingBuffer.release();
 }
 
-DrawingBuffer::DrawingBuffer(PassOwnPtr<blink::WebGraphicsContext3D> context,
+DrawingBuffer::DrawingBuffer(PassOwnPtr<WebGraphicsContext3D> context,
     PassOwnPtr<Extensions3DUtil> extensionsUtil,
     bool multisampleExtensionSupported,
     bool packedDepthStencilExtensionSupported,
     PreserveDrawingBuffer preserve,
-    blink::WebGraphicsContext3D::Attributes requestedAttributes,
+    WebGraphicsContext3D::Attributes requestedAttributes,
     PassRefPtr<ContextEvictionManager> contextEvictionManager)
     : m_preserveDrawingBuffer(preserve)
     , m_scissorEnabled(false)
@@ -148,6 +146,7 @@ DrawingBuffer::DrawingBuffer(PassOwnPtr<blink::WebGraphicsContext3D> context,
     , m_sampleCount(0)
     , m_packAlignment(4)
     , m_destructionInProgress(false)
+    , m_isHidden(false)
     , m_contextEvictionManager(contextEvictionManager)
 {
     // Used by browser tests to detect the use of a DrawingBuffer.
@@ -185,16 +184,30 @@ void DrawingBuffer::markLayerComposited()
     m_layerComposited = true;
 }
 
-blink::WebGraphicsContext3D* DrawingBuffer::context()
+WebGraphicsContext3D* DrawingBuffer::context()
 {
     return m_context.get();
 }
 
-bool DrawingBuffer::prepareMailbox(blink::WebExternalTextureMailbox* outMailbox, blink::WebExternalBitmap* bitmap)
+void DrawingBuffer::setIsHidden(bool hidden)
 {
-    if (!m_contentsChanged)
-        return false;
+    if (m_isHidden == hidden)
+        return;
+    m_isHidden = hidden;
+    if (m_isHidden)
+        freeRecycledMailboxes();
+}
 
+void DrawingBuffer::freeRecycledMailboxes()
+{
+    if (m_recycledMailboxQueue.isEmpty())
+        return;
+    while (!m_recycledMailboxQueue.isEmpty())
+        deleteMailbox(m_recycledMailboxQueue.takeLast());
+}
+
+bool DrawingBuffer::prepareMailbox(WebExternalTextureMailbox* outMailbox, WebExternalBitmap* bitmap)
+{
     if (m_destructionInProgress) {
         // It can be hit in the following sequence.
         // 1. WebGL draws something.
@@ -203,8 +216,9 @@ bool DrawingBuffer::prepareMailbox(blink::WebExternalTextureMailbox* outMailbox,
         // 4. Here.
         return false;
     }
-
-    m_context->makeContextCurrent();
+    ASSERT(!m_isHidden);
+    if (!m_contentsChanged)
+        return false;
 
     // Resolve the multisampled buffer into m_colorBuffer texture.
     if (m_multisampleMode != None)
@@ -240,7 +254,7 @@ bool DrawingBuffer::prepareMailbox(blink::WebExternalTextureMailbox* outMailbox,
     }
 
     if (m_preserveDrawingBuffer == Discard) {
-        swap(frontColorBufferMailbox->textureInfo, m_colorBuffer);
+        std::swap(frontColorBufferMailbox->textureInfo, m_colorBuffer);
         // It appears safe to overwrite the context's framebuffer binding in the Discard case since there will always be a
         // WebGLRenderingContext::clearIfComposited() call made before the next draw call which restores the framebuffer binding.
         // If this stops being true at some point, we should track the current framebuffer binding in the DrawingBuffer and restore
@@ -261,8 +275,7 @@ bool DrawingBuffer::prepareMailbox(blink::WebExternalTextureMailbox* outMailbox,
 
     m_contentsChanged = false;
 
-    m_context->bindTexture(GL_TEXTURE_2D, frontColorBufferMailbox->textureInfo.textureId);
-    m_context->produceTextureCHROMIUM(GL_TEXTURE_2D, frontColorBufferMailbox->mailbox.name);
+    m_context->produceTextureDirectCHROMIUM(frontColorBufferMailbox->textureInfo.textureId, GL_TEXTURE_2D, frontColorBufferMailbox->mailbox.name);
     m_context->flush();
     frontColorBufferMailbox->mailbox.syncPoint = m_context->insertSyncPoint();
     frontColorBufferMailbox->mailbox.allowOverlay = frontColorBufferMailbox->textureInfo.imageId != 0;
@@ -276,10 +289,10 @@ bool DrawingBuffer::prepareMailbox(blink::WebExternalTextureMailbox* outMailbox,
     return true;
 }
 
-void DrawingBuffer::mailboxReleased(const blink::WebExternalTextureMailbox& mailbox)
+void DrawingBuffer::mailboxReleased(const WebExternalTextureMailbox& mailbox, bool lostResource)
 {
-    if (m_destructionInProgress) {
-        mailboxReleasedWhileDestructionInProgress(mailbox);
+    if (m_destructionInProgress || m_context->isContextLost() || lostResource || m_isHidden) {
+        mailboxReleasedWithoutRecycling(mailbox);
         return;
     }
 
@@ -296,10 +309,9 @@ void DrawingBuffer::mailboxReleased(const blink::WebExternalTextureMailbox& mail
     ASSERT_NOT_REACHED();
 }
 
-void DrawingBuffer::mailboxReleasedWhileDestructionInProgress(const blink::WebExternalTextureMailbox& mailbox)
+void DrawingBuffer::mailboxReleasedWithoutRecycling(const WebExternalTextureMailbox& mailbox)
 {
     ASSERT(m_textureMailboxes.size());
-    m_context->makeContextCurrent();
     // Ensure not to call the destructor until deleteMailbox() is completed.
     RefPtr<DrawingBuffer> self = this;
     deleteMailbox(mailbox);
@@ -310,7 +322,14 @@ PassRefPtr<DrawingBuffer::MailboxInfo> DrawingBuffer::recycledMailbox()
     if (m_recycledMailboxQueue.isEmpty())
         return PassRefPtr<MailboxInfo>();
 
-    blink::WebExternalTextureMailbox mailbox = m_recycledMailboxQueue.takeLast();
+    WebExternalTextureMailbox mailbox;
+    while (!m_recycledMailboxQueue.isEmpty()) {
+        mailbox = m_recycledMailboxQueue.takeLast();
+        // Never have more than one mailbox in the released state.
+        if (!m_recycledMailboxQueue.isEmpty())
+            deleteMailbox(mailbox);
+    }
+
     RefPtr<MailboxInfo> mailboxInfo;
     for (size_t i = 0; i < m_textureMailboxes.size(); i++) {
         if (nameEquals(m_textureMailboxes[i]->mailbox, mailbox)) {
@@ -344,7 +363,7 @@ PassRefPtr<DrawingBuffer::MailboxInfo> DrawingBuffer::createNewMailbox(const Tex
     return returnMailbox.release();
 }
 
-void DrawingBuffer::deleteMailbox(const blink::WebExternalTextureMailbox& mailbox)
+void DrawingBuffer::deleteMailbox(const WebExternalTextureMailbox& mailbox)
 {
     for (size_t i = 0; i < m_textureMailboxes.size(); i++) {
         if (nameEquals(m_textureMailboxes[i]->mailbox, mailbox)) {
@@ -363,12 +382,6 @@ void DrawingBuffer::deleteMailbox(const blink::WebExternalTextureMailbox& mailbo
 
 bool DrawingBuffer::initialize(const IntSize& size)
 {
-    if (!m_context->makeContextCurrent()) {
-        // Most likely the GPU process exited and the attempt to reconnect to it failed.
-        // Need to try to restore the context again later.
-        return false;
-    }
-
     if (m_context->isContextLost()) {
         // Need to try to restore the context again later.
         return false;
@@ -411,17 +424,17 @@ bool DrawingBuffer::initialize(const IntSize& size)
     // If that succeeds, we then see what we actually got and update our actual attributes to reflect that.
     m_actualAttributes = m_requestedAttributes;
     if (m_requestedAttributes.alpha) {
-        blink::WGC3Dint alphaBits = 0;
+        WGC3Dint alphaBits = 0;
         m_context->getIntegerv(GL_ALPHA_BITS, &alphaBits);
         m_actualAttributes.alpha = alphaBits > 0;
     }
     if (m_requestedAttributes.depth) {
-        blink::WGC3Dint depthBits = 0;
+        WGC3Dint depthBits = 0;
         m_context->getIntegerv(GL_DEPTH_BITS, &depthBits);
         m_actualAttributes.depth = depthBits > 0;
     }
     if (m_requestedAttributes.stencil) {
-        blink::WGC3Dint stencilBits = 0;
+        WGC3Dint stencilBits = 0;
         m_context->getIntegerv(GL_STENCIL_BITS, &stencilBits);
         m_actualAttributes.stencil = stencilBits > 0;
     }
@@ -429,13 +442,10 @@ bool DrawingBuffer::initialize(const IntSize& size)
     return true;
 }
 
-bool DrawingBuffer::copyToPlatformTexture(blink::WebGraphicsContext3D* context, Platform3DObject texture, GLenum internalFormat, GLenum destType, GLint level, bool premultiplyAlpha, bool flipY, bool fromFrontBuffer)
+bool DrawingBuffer::copyToPlatformTexture(WebGraphicsContext3D* context, Platform3DObject texture, GLenum internalFormat, GLenum destType, GLint level, bool premultiplyAlpha, bool flipY, bool fromFrontBuffer)
 {
-    if (!m_context->makeContextCurrent())
-        return false;
-
     GLint textureId = m_colorBuffer.textureId;
-    if (fromFrontBuffer)
+    if (fromFrontBuffer && m_frontColorBuffer.textureId)
         textureId = m_frontColorBuffer.textureId;
 
     if (m_contentsChanged) {
@@ -459,9 +469,6 @@ bool DrawingBuffer::copyToPlatformTexture(blink::WebGraphicsContext3D* context, 
     m_context->flush();
 
     bufferMailbox->mailbox.syncPoint = m_context->insertSyncPoint();
-
-    if (!context->makeContextCurrent())
-        return false;
 
     context->waitSyncPoint(bufferMailbox->mailbox.syncPoint);
     Platform3DObject sourceTexture = context->createAndConsumeTextureCHROMIUM(GL_TEXTURE_2D, bufferMailbox->mailbox.name);
@@ -494,10 +501,10 @@ Platform3DObject DrawingBuffer::framebuffer() const
     return m_fbo;
 }
 
-blink::WebLayer* DrawingBuffer::platformLayer()
+WebLayer* DrawingBuffer::platformLayer()
 {
     if (!m_layer) {
-        m_layer = adoptPtr(blink::Platform::current()->compositorSupport()->createExternalTextureLayer(this));
+        m_layer = adoptPtr(Platform::current()->compositorSupport()->createExternalTextureLayer(this));
 
         m_layer->setOpaque(!m_actualAttributes.alpha);
         m_layer->setBlendBackgroundColor(m_actualAttributes.alpha);
@@ -510,7 +517,7 @@ blink::WebLayer* DrawingBuffer::platformLayer()
 
 void DrawingBuffer::paintCompositedResultsToCanvas(ImageBuffer* imageBuffer)
 {
-    if (!m_context->makeContextCurrent() || m_context->getGraphicsResetStatusARB() != GL_NO_ERROR)
+    if (m_context->getGraphicsResetStatusARB() != GL_NO_ERROR)
         return;
 
     if (!imageBuffer)
@@ -519,57 +526,39 @@ void DrawingBuffer::paintCompositedResultsToCanvas(ImageBuffer* imageBuffer)
     if (tex) {
         RefPtr<MailboxInfo> bufferMailbox = adoptRef(new MailboxInfo());
         m_context->genMailboxCHROMIUM(bufferMailbox->mailbox.name);
-        m_context->bindTexture(GL_TEXTURE_2D, m_frontColorBuffer.textureId);
-        m_context->produceTextureCHROMIUM(GL_TEXTURE_2D, bufferMailbox->mailbox.name);
+        m_context->produceTextureDirectCHROMIUM(m_frontColorBuffer.textureId, GL_TEXTURE_2D, bufferMailbox->mailbox.name);
         m_context->flush();
 
         bufferMailbox->mailbox.syncPoint = m_context->insertSyncPoint();
-        OwnPtr<blink::WebGraphicsContext3DProvider> provider =
-            adoptPtr(blink::Platform::current()->createSharedOffscreenGraphicsContext3DProvider());
+        OwnPtr<WebGraphicsContext3DProvider> provider =
+            adoptPtr(Platform::current()->createSharedOffscreenGraphicsContext3DProvider());
         if (!provider)
             return;
-        blink::WebGraphicsContext3D* context = provider->context3d();
-        if (!context || !context->makeContextCurrent())
+        WebGraphicsContext3D* context = provider->context3d();
+        if (!context)
             return;
 
-        Platform3DObject sourceTexture = context->createTexture();
-        GLint boundTexture = 0;
-        context->getIntegerv(GL_TEXTURE_BINDING_2D, &boundTexture);
-        context->bindTexture(GL_TEXTURE_2D, sourceTexture);
         context->waitSyncPoint(bufferMailbox->mailbox.syncPoint);
-        context->consumeTextureCHROMIUM(GL_TEXTURE_2D, bufferMailbox->mailbox.name);
+        Platform3DObject sourceTexture = context->createAndConsumeTextureCHROMIUM(GL_TEXTURE_2D, bufferMailbox->mailbox.name);
         context->copyTextureCHROMIUM(GL_TEXTURE_2D, sourceTexture,
             tex, 0, GL_RGBA, GL_UNSIGNED_BYTE);
-        context->bindTexture(GL_TEXTURE_2D, boundTexture);
         context->deleteTexture(sourceTexture);
         context->flush();
         m_context->waitSyncPoint(context->insertSyncPoint());
+        imageBuffer->didModifyBackingTexture();
+
         return;
     }
 
-    // Since the m_frontColorBuffer was produced and sent to the compositor, it cannot be bound to an fbo.
-    // We have to make a copy of it here and bind that copy instead.
-    // FIXME: That's not true any more, provided we don't change texture
-    // parameters.
-    unsigned sourceTexture = createColorTexture();
-    texImage2DResourceSafe(GL_TEXTURE_2D, 0, m_internalColorFormat, m_size.width(), m_size.height(), 0, m_colorFormat, GL_UNSIGNED_BYTE);
-    m_context->copyTextureCHROMIUM(GL_TEXTURE_2D, m_frontColorBuffer.textureId, sourceTexture, 0, GL_RGBA, GL_UNSIGNED_BYTE);
-
-    // Since we're using the same context as WebGL, we have to restore any state we change (in this case, just the framebuffer binding).
-    // FIXME: The WebGLRenderingContext tracks the current framebuffer binding, it would be slightly more efficient to use this value
-    // rather than querying it off of the context.
-    GLint previousFramebuffer = 0;
-    m_context->getIntegerv(GL_FRAMEBUFFER_BINDING, &previousFramebuffer);
-
     Platform3DObject framebuffer = m_context->createFramebuffer();
     m_context->bindFramebuffer(GL_FRAMEBUFFER, framebuffer);
-    m_context->framebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, sourceTexture, 0);
+    // We don't need to bind a copy of m_frontColorBuffer since the texture parameters are untouched.
+    m_context->framebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, m_frontColorBuffer.textureId, 0);
 
     paintFramebufferToCanvas(framebuffer, size().width(), size().height(), !m_actualAttributes.premultipliedAlpha, imageBuffer);
     m_context->deleteFramebuffer(framebuffer);
-    m_context->deleteTexture(sourceTexture);
-
-    m_context->bindFramebuffer(GL_FRAMEBUFFER, previousFramebuffer);
+    // Since we're using the same context as WebGL, we have to restore any state we change (in this case, just the framebuffer binding).
+    restoreFramebufferBinding();
 }
 
 void DrawingBuffer::clearPlatformLayer()
@@ -584,8 +573,6 @@ void DrawingBuffer::beginDestruction()
 {
     ASSERT(!m_destructionInProgress);
     m_destructionInProgress = true;
-
-    m_context->makeContextCurrent();
 
     clearPlatformLayer();
 
@@ -771,7 +758,7 @@ void DrawingBuffer::setSize(const IntSize& size)
 
 int DrawingBuffer::pixelDelta(const IntSize& newSize, const IntSize& curSize)
 {
-    return (max(0, newSize.width()) * max(0, newSize.height())) - (max(0, curSize.width()) * max(0, curSize.height()));
+    return (std::max(0, newSize.width()) * std::max(0, newSize.height())) - (std::max(0, curSize.width()) * std::max(0, curSize.height()));
 }
 
 IntSize DrawingBuffer::adjustSize(const IntSize& desiredSize, const IntSize& curSize, int maxTextureSize)
@@ -881,8 +868,6 @@ void DrawingBuffer::commit(long x, long y, long width, long height)
     if (height < 0)
         height = m_size.height();
 
-    m_context->makeContextCurrent();
-
     if (m_multisampleFBO && !m_contentsChangeCommitted) {
         m_context->bindFramebuffer(GL_READ_FRAMEBUFFER_ANGLE, m_multisampleFBO);
         m_context->bindFramebuffer(GL_DRAW_FRAMEBUFFER_ANGLE, m_fbo);
@@ -958,7 +943,7 @@ void DrawingBuffer::paintFramebufferToCanvas(int framebuffer, int width, int hei
 
     const SkBitmap& canvasBitmap = imageBuffer->bitmap();
     const SkBitmap* readbackBitmap = 0;
-    ASSERT(canvasBitmap.colorType() == kPMColor_SkColorType);
+    ASSERT(canvasBitmap.colorType() == kN32_SkColorType);
     if (canvasBitmap.width() == width && canvasBitmap.height() == height) {
         // This is the fastest and most common case. We read back
         // directly into the canvas's backing store.
@@ -969,7 +954,7 @@ void DrawingBuffer::paintFramebufferToCanvas(int framebuffer, int width, int hei
         // pixel data. We will then use Skia to rescale this bitmap to
         // the size of the canvas's backing store.
         if (m_resizingBitmap.width() != width || m_resizingBitmap.height() != height) {
-            if (!m_resizingBitmap.allocN32Pixels(width, height))
+            if (!m_resizingBitmap.tryAllocN32Pixels(width, height))
                 return;
         }
         readbackBitmap = &m_resizingBitmap;
@@ -1069,4 +1054,4 @@ void DrawingBuffer::deleteChromiumImageForTexture(TextureInfo* info)
     }
 }
 
-} // namespace WebCore
+} // namespace blink

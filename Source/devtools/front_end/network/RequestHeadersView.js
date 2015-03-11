@@ -37,7 +37,8 @@ WebInspector.RequestHeadersView = function(request)
 {
     WebInspector.VBox.call(this);
     this.registerRequiredCSS("resourceView.css");
-    this.element.classList.add("resource-headers-view");
+    this.registerRequiredCSS("requestHeadersView.css");
+    this.element.classList.add("request-headers-view");
 
     this._request = request;
 
@@ -233,7 +234,7 @@ WebInspector.RequestHeadersView.prototype = {
         paramsTreeElement.removeChildren();
 
         paramsTreeElement.listItemElement.removeChildren();
-        paramsTreeElement.listItemElement.appendChild(document.createTextNode(title));
+        paramsTreeElement.listItemElement.createTextChild(title);
 
         var headerCount = document.createElement("span");
         headerCount.classList.add("header-count");
@@ -241,7 +242,7 @@ WebInspector.RequestHeadersView.prototype = {
         paramsTreeElement.listItemElement.appendChild(headerCount);
 
         /**
-         * @param {?Event} event
+         * @param {!Event} event
          * @this {WebInspector.RequestHeadersView}
          */
         function toggleViewSource(event)
@@ -286,10 +287,10 @@ WebInspector.RequestHeadersView.prototype = {
 
         var listItem = this._requestPayloadTreeElement.listItemElement;
         listItem.removeChildren();
-        listItem.appendChild(document.createTextNode(this._requestPayloadTreeElement.title));
+        listItem.createTextChild(this._requestPayloadTreeElement.title);
 
         /**
-         * @param {?Event} event
+         * @param {!Event} event
          * @this {WebInspector.RequestHeadersView}
          */
         function toggleViewSource(event)
@@ -312,7 +313,7 @@ WebInspector.RequestHeadersView.prototype = {
 
     /**
      * @param {boolean} viewSource
-     * @param {function(?Event)} handler
+     * @param {function(!Event)} handler
      * @return {!Element}
      */
     _createViewSourceToggle: function(viewSource, handler)
@@ -324,7 +325,7 @@ WebInspector.RequestHeadersView.prototype = {
     },
 
     /**
-     * @param {?Event} event
+     * @param {!Event} event
      */
     _toggleURLDecoding: function(event)
     {
@@ -399,7 +400,10 @@ WebInspector.RequestHeadersView.prototype = {
 
             var statusTextElement = statusCodeFragment.createChild("div", "header-value source-code");
             var statusText = this._request.statusCode + " " + this._request.statusText;
-            if (this._request.cached) {
+            if (this._request.fetchedViaServiceWorker) {
+                statusText += " " + WebInspector.UIString("(from ServiceWorker)");
+                statusTextElement.classList.add("status-from-cache");
+            } else if (this._request.cached) {
                 statusText += " " + WebInspector.UIString("(from cache)");
                 statusTextElement.classList.add("status-from-cache");
             }
@@ -476,7 +480,7 @@ WebInspector.RequestHeadersView.prototype = {
     },
 
     /**
-     * @param {?Event} event
+     * @param {!Event} event
      */
     _toggleRequestHeadersText: function(event)
     {
@@ -485,7 +489,7 @@ WebInspector.RequestHeadersView.prototype = {
     },
 
     /**
-     * @param {?Event} event
+     * @param {!Event} event
      */
     _toggleResponseHeadersText: function(event)
     {

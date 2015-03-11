@@ -29,7 +29,7 @@
 #include "core/events/Event.h"
 #include "core/html/track/TrackBase.h"
 
-namespace WebCore {
+namespace blink {
 
 struct TrackEventInit : public EventInit {
     TrackEventInit();
@@ -38,6 +38,7 @@ struct TrackEventInit : public EventInit {
 };
 
 class TrackEvent FINAL : public Event {
+    DEFINE_WRAPPERTYPEINFO();
 public:
     virtual ~TrackEvent();
 
@@ -64,6 +65,6 @@ private:
     RefPtrWillBeMember<TrackBase> m_track;
 };
 
-} // namespace WebCore
+} // namespace blink
 
-#endif
+#endif // TrackEvent_h

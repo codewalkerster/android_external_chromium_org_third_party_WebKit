@@ -29,6 +29,7 @@
 #include "core/editing/TextGranularity.h"
 #include "core/events/TextEventInputType.h"
 #include "core/page/DragActions.h"
+#include "core/page/EventWithHitTestResults.h"
 #include "core/page/FocusType.h"
 #include "core/rendering/HitTestRequest.h"
 #include "core/rendering/style/RenderStyleConstants.h"
@@ -44,23 +45,25 @@
 #include "wtf/HashTraits.h"
 #include "wtf/RefPtr.h"
 
-namespace WebCore {
+namespace blink {
 
 class AutoscrollController;
-class Clipboard;
+class DataTransfer;
 class Document;
+class DragState;
 class Element;
 class Event;
 class EventTarget;
+template <typename EventType>
+class EventWithHitTestResults;
 class FloatPoint;
 class FloatQuad;
-class FullscreenElementStack;
-class LocalFrame;
+class Fullscreen;
 class HTMLFrameSetElement;
 class HitTestRequest;
 class HitTestResult;
 class KeyboardEvent;
-class MouseEventWithHitTestResults;
+class LocalFrame;
 class Node;
 class OptionalCursor;
 class PlatformGestureEvent;
@@ -70,16 +73,12 @@ class PlatformWheelEvent;
 class RenderLayer;
 class RenderLayerScrollableArea;
 class RenderObject;
-class RenderWidget;
 class ScrollableArea;
 class Scrollbar;
 class TextEvent;
-class TouchEvent;
 class VisibleSelection;
 class WheelEvent;
 class Widget;
-
-class DragState;
 
 enum AppendTrailingWhitespace { ShouldAppendTrailingWhitespace, DontAppendTrailingWhitespace };
 enum CheckDragHysteresis { ShouldCheckDragHysteresis, DontCheckDragHysteresis };
@@ -116,9 +115,9 @@ public:
 
     void setCapturingMouseEventsNode(PassRefPtrWillBeRawPtr<Node>); // A caller is responsible for resetting capturing node to 0.
 
-    bool updateDragAndDrop(const PlatformMouseEvent&, Clipboard*);
-    void cancelDragAndDrop(const PlatformMouseEvent&, Clipboard*);
-    bool performDragAndDrop(const PlatformMouseEvent&, Clipboard*);
+    bool updateDragAndDrop(const PlatformMouseEvent&, DataTransfer*);
+    void cancelDragAndDrop(const PlatformMouseEvent&, DataTransfer*);
+    bool performDragAndDrop(const PlatformMouseEvent&, DataTransfer*);
     void updateDragStateAfterEditDragIfNeeded(Element* rootEditableElement);
 
     void scheduleHoverStateUpdate();
@@ -143,19 +142,33 @@ public:
     bool handleWheelEvent(const PlatformWheelEvent&);
     void defaultWheelEventHandler(Node*, WheelEvent*);
 
+    // Called on the local root frame exactly once per gesture event.
     bool handleGestureEvent(const PlatformGestureEvent&);
+    bool handleGestureEvent(const GestureEventWithHitTestResults&);
+
+    // Hit-test the provided (non-scroll) gesture event, applying touch-adjustment and updating
+    // hover/active state across all frames if necessary. This should be called at most once
+    // per gesture event, and called on the local root frame.
+    // Note: This is similar to (the less clearly named) prepareMouseEvent.
+    // FIXME: Remove readOnly param when there is only ever a single call to this.
+    GestureEventWithHitTestResults targetGestureEvent(const PlatformGestureEvent&, bool readOnly = false);
+
+    // Handle the provided non-scroll gesture event. Should be called only on the inner frame.
+    bool handleGestureEventInFrame(const GestureEventWithHitTestResults&);
+
+    // Handle the provided scroll gesture event, propagating down to child frames as necessary.
+    bool handleGestureScrollEvent(const PlatformGestureEvent&);
     bool handleGestureScrollEnd(const PlatformGestureEvent&);
     bool isScrollbarHandlingGestures() const;
 
-    bool bestClickableNodeForTouchPoint(const IntPoint& touchCenter, const IntSize& touchRadius, IntPoint& targetPoint, Node*& targetNode);
-    bool bestContextMenuNodeForTouchPoint(const IntPoint& touchCenter, const IntSize& touchRadius, IntPoint& targetPoint, Node*& targetNode);
+    bool bestClickableNodeForHitTestResult(const HitTestResult&, IntPoint& targetPoint, Node*& targetNode);
+    bool bestContextMenuNodeForHitTestResult(const HitTestResult&, IntPoint& targetPoint, Node*& targetNode);
+    // FIXME: This doesn't appear to be used outside tests anymore, what path are we using now and is it tested?
     bool bestZoomableAreaForTouchPoint(const IntPoint& touchCenter, const IntSize& touchRadius, IntRect& targetArea, Node*& targetNode);
-
-    void adjustGesturePosition(const PlatformGestureEvent&, IntPoint& adjustedPoint);
 
     bool sendContextMenuEvent(const PlatformMouseEvent&);
     bool sendContextMenuEventForKey();
-    bool sendContextMenuEventForGesture(const PlatformGestureEvent&);
+    bool sendContextMenuEventForGesture(const GestureEventWithHitTestResults&);
 
     void setMouseDownMayStartAutoscroll() { m_mouseDownMayStartAutoscroll = true; }
 
@@ -178,13 +191,17 @@ public:
     bool useHandCursor(Node*, bool isOverLink);
 
     void notifyElementActivated();
+    void notifySelectionChanged();
 
     PassRefPtr<UserGestureToken> takeLastMouseDownGestureToken() { return m_lastMouseDownUserGestureToken.release(); }
+
+    int clickCount() { return m_clickCount; }
+    bool mouseDownWasSingleClickInSelection() { return m_mouseDownWasSingleClickInSelection; }
 
 private:
     static DragState& dragState();
 
-    PassRefPtrWillBeRawPtr<Clipboard> createDraggingClipboard() const;
+    PassRefPtrWillBeRawPtr<DataTransfer> createDraggingDataTransfer() const;
 
     bool updateSelectionForMouseDownDispatchingSelectStart(Node*, const VisibleSelection&, TextGranularity);
     void selectClosestWordFromHitTestResult(const HitTestResult&, AppendTrailingWhitespace);
@@ -204,10 +221,11 @@ private:
 
     bool handlePasteGlobalSelection(const PlatformMouseEvent&);
 
-    bool handleGestureTap(const PlatformGestureEvent&, const IntPoint& adjustedPoint);
-    bool handleGestureLongPress(const PlatformGestureEvent&, const IntPoint& adjustedPoint);
-    bool handleGestureLongTap(const PlatformGestureEvent&, const IntPoint& adjustedPoint);
-    bool handleGestureTwoFingerTap(const PlatformGestureEvent&, const IntPoint& adjustedPoint);
+    HitTestRequest::HitTestRequestType getHitTypeForGestureType(PlatformEvent::Type);
+    void applyTouchAdjustment(PlatformGestureEvent*, HitTestResult*);
+    bool handleGestureTap(const GestureEventWithHitTestResults&);
+    bool handleGestureLongPress(const GestureEventWithHitTestResults&);
+    bool handleGestureLongTap(const GestureEventWithHitTestResults&);
     bool handleGestureScrollUpdate(const PlatformGestureEvent&);
     bool handleGestureScrollBegin(const PlatformGestureEvent&);
     void clearGestureScrollNodes();
@@ -248,7 +266,7 @@ private:
     TouchAction intersectTouchAction(const TouchAction, const TouchAction);
     TouchAction computeEffectiveTouchAction(const Node&);
 
-    HitTestResult hitTestResultInFrame(LocalFrame*, const LayoutPoint&, HitTestRequest::HitTestRequestType hitType = HitTestRequest::ReadOnly | HitTestRequest::Active | HitTestRequest::ConfusingAndOftenMisusedDisallowShadowContent);
+    HitTestResult hitTestResultInFrame(LocalFrame*, const LayoutPoint&, HitTestRequest::HitTestRequestType hitType = HitTestRequest::ReadOnly | HitTestRequest::Active);
 
     void invalidateClick();
 
@@ -257,9 +275,9 @@ private:
     MouseEventWithHitTestResults prepareMouseEvent(const HitTestRequest&, const PlatformMouseEvent&);
 
     bool dispatchMouseEvent(const AtomicString& eventType, Node* target, int clickCount, const PlatformMouseEvent&, bool setUnder);
-    bool dispatchDragEvent(const AtomicString& eventType, Node* target, const PlatformMouseEvent&, Clipboard*);
+    bool dispatchDragEvent(const AtomicString& eventType, Node* target, const PlatformMouseEvent&, DataTransfer*);
 
-    void freeClipboard();
+    void clearDragDataTransfer();
 
     bool handleDrag(const MouseEventWithHitTestResults&, CheckDragHysteresis);
     bool tryStartDrag(const MouseEventWithHitTestResults&);
@@ -279,7 +297,6 @@ private:
     bool passWidgetMouseDownEventToWidget(const MouseEventWithHitTestResults&);
 
     bool passWheelEventToWidget(const PlatformWheelEvent&, Widget*);
-
     void defaultSpaceEventHandler(KeyboardEvent*);
     void defaultBackspaceEventHandler(KeyboardEvent*);
     void defaultTabEventHandler(KeyboardEvent*);
@@ -294,16 +311,14 @@ private:
 
     bool capturesDragging() const { return m_capturesDragging; }
 
-    bool isKeyEventAllowedInFullScreen(FullscreenElementStack*, const PlatformKeyboardEvent&) const;
+    bool isKeyEventAllowedInFullScreen(Fullscreen*, const PlatformKeyboardEvent&) const;
 
     bool handleGestureShowPress();
 
     bool handleScrollGestureOnResizer(Node*, const PlatformGestureEvent&);
 
-    bool passGestureEventToWidget(const PlatformGestureEvent&, Widget*);
-    bool passGestureEventToWidgetIfPossible(const PlatformGestureEvent&, RenderObject*);
+    bool passScrollGestureEventToWidget(const PlatformGestureEvent&, RenderObject*);
     bool sendScrollEventToView(const PlatformGestureEvent&, const FloatSize&);
-    LocalFrame* getSubFrameForGestureEvent(const IntPoint& touchAdjustedPoint, const PlatformGestureEvent&);
 
     AutoscrollController* autoscrollController() const;
     bool panScrollInProgress() const;
@@ -340,7 +355,7 @@ private:
 
     RefPtrWillBeMember<Node> m_nodeUnderMouse;
     RefPtrWillBeMember<Node> m_lastNodeUnderMouse;
-    RefPtr<LocalFrame> m_lastMouseMoveEventSubframe;
+    RefPtrWillBeMember<LocalFrame> m_lastMouseMoveEventSubframe;
     RefPtr<Scrollbar> m_lastScrollbarUnderMouse;
     Cursor m_currentMouseCursor;
 
@@ -378,12 +393,11 @@ private:
     bool m_touchPressed;
 
     RefPtrWillBeMember<Node> m_scrollGestureHandlingNode;
-    bool m_lastHitTestResultOverWidget;
+    bool m_lastGestureScrollOverWidget;
     RefPtrWillBeMember<Node> m_previousGestureScrolledNode;
     RefPtr<Scrollbar> m_scrollbarHandlingScrollGesture;
 
     double m_maxMouseMovedDuration;
-    PlatformEvent::Type m_baseEventType;
     bool m_didStartDrag;
 
     bool m_longTapShouldInvokeContextMenu;
@@ -397,6 +411,6 @@ private:
 #endif
 };
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // EventHandler_h

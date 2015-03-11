@@ -27,15 +27,17 @@
 #include "config.h"
 #include "core/css/resolver/StyleBuilderConverter.h"
 
+#include "core/css/CSSFontFeatureValue.h"
 #include "core/css/CSSFunctionValue.h"
 #include "core/css/CSSGridLineNamesValue.h"
 #include "core/css/CSSPrimitiveValueMappings.h"
 #include "core/css/CSSReflectValue.h"
 #include "core/css/CSSShadowValue.h"
 #include "core/css/Pair.h"
+#include "core/css/Rect.h"
 #include "core/svg/SVGURIReference.h"
 
-namespace WebCore {
+namespace blink {
 
 namespace {
 
@@ -76,12 +78,173 @@ PassRefPtr<StyleReflection> StyleBuilderConverter::convertBoxReflect(StyleResolv
     return reflection.release();
 }
 
+Color StyleBuilderConverter::convertColor(StyleResolverState& state, CSSValue* value, bool forVisitedLink)
+{
+    CSSPrimitiveValue* primitiveValue = toCSSPrimitiveValue(value);
+    return state.document().textLinkColors().colorFromPrimitiveValue(primitiveValue, state.style()->color(), forVisitedLink);
+}
+
 AtomicString StyleBuilderConverter::convertFragmentIdentifier(StyleResolverState& state, CSSValue* value)
 {
     CSSPrimitiveValue* primitiveValue = toCSSPrimitiveValue(value);
     if (primitiveValue->isURI())
         return SVGURIReference::fragmentIdentifierFromIRIString(primitiveValue->getStringValue(), state.element()->treeScope());
     return nullAtom;
+}
+
+LengthBox StyleBuilderConverter::convertClip(StyleResolverState& state, CSSValue* value)
+{
+    Rect* rect = toCSSPrimitiveValue(value)->getRectValue();
+
+    return LengthBox(convertLengthOrAuto(state, rect->top()),
+        convertLengthOrAuto(state, rect->right()),
+        convertLengthOrAuto(state, rect->bottom()),
+        convertLengthOrAuto(state, rect->left()));
+}
+
+PassRefPtr<FontFeatureSettings> StyleBuilderConverter::convertFontFeatureSettings(StyleResolverState& state, CSSValue* value)
+{
+    if (value->isPrimitiveValue() && toCSSPrimitiveValue(value)->getValueID() == CSSValueNormal)
+        return FontBuilder::initialFeatureSettings();
+
+    CSSValueList* list = toCSSValueList(value);
+    RefPtr<FontFeatureSettings> settings = FontFeatureSettings::create();
+    int len = list->length();
+    for (int i = 0; i < len; ++i) {
+        CSSFontFeatureValue* feature = toCSSFontFeatureValue(list->item(i));
+        settings->append(FontFeature(feature->tag(), feature->value()));
+    }
+    return settings;
+}
+
+class RedirectSetHasViewportUnits {
+public:
+    RedirectSetHasViewportUnits(RenderStyle* from, RenderStyle* to)
+        : m_from(from), m_to(to), m_hadViewportUnits(from->hasViewportUnits())
+    {
+        from->setHasViewportUnits(false);
+    }
+    ~RedirectSetHasViewportUnits()
+    {
+        m_to->setHasViewportUnits(m_from->hasViewportUnits());
+        m_from->setHasViewportUnits(m_hadViewportUnits);
+    }
+private:
+    RenderStyle* m_from;
+    RenderStyle* m_to;
+    bool m_hadViewportUnits;
+};
+
+static float computeFontSize(StyleResolverState& state, CSSPrimitiveValue* primitiveValue, const FontDescription::Size& parentSize)
+{
+    RedirectSetHasViewportUnits redirect(state.parentStyle(), state.style());
+
+    CSSToLengthConversionData conversionData(state.parentStyle(), state.rootElementStyle(), state.document().renderView(), 1.0f, true);
+    if (primitiveValue->isLength())
+        return primitiveValue->computeLength<float>(conversionData);
+    if (primitiveValue->isCalculatedPercentageWithLength())
+        return primitiveValue->cssCalcValue()->toCalcValue(conversionData)->evaluate(parentSize.value);
+
+    ASSERT_NOT_REACHED();
+    return 0;
+}
+
+FontDescription::Size StyleBuilderConverter::convertFontSize(StyleResolverState& state, CSSValue* value)
+{
+    CSSPrimitiveValue* primitiveValue = toCSSPrimitiveValue(value);
+
+    FontDescription::Size parentSize(0, 0.0f, false);
+
+    // FIXME: Find out when parentStyle could be 0?
+    if (state.parentStyle())
+        parentSize = state.parentFontDescription().size();
+
+    if (CSSValueID valueID = primitiveValue->getValueID()) {
+        switch (valueID) {
+        case CSSValueXxSmall:
+        case CSSValueXSmall:
+        case CSSValueSmall:
+        case CSSValueMedium:
+        case CSSValueLarge:
+        case CSSValueXLarge:
+        case CSSValueXxLarge:
+        case CSSValueWebkitXxxLarge:
+            return FontDescription::Size(FontSize::keywordSize(valueID), 0.0f, false);
+        case CSSValueLarger:
+            return FontDescription::largerSize(parentSize);
+        case CSSValueSmaller:
+            return FontDescription::smallerSize(parentSize);
+        default:
+            ASSERT_NOT_REACHED();
+            return FontBuilder::initialSize();
+        }
+    }
+
+    bool parentIsAbsoluteSize = state.parentFontDescription().isAbsoluteSize();
+
+    if (primitiveValue->isPercentage())
+        return FontDescription::Size(0, (primitiveValue->getFloatValue() * parentSize.value / 100.0f), parentIsAbsoluteSize);
+
+    return FontDescription::Size(0, computeFontSize(state, primitiveValue, parentSize), parentIsAbsoluteSize || !primitiveValue->isFontRelativeLength());
+}
+
+FontWeight StyleBuilderConverter::convertFontWeight(StyleResolverState& state, CSSValue* value)
+{
+    CSSPrimitiveValue* primitiveValue = toCSSPrimitiveValue(value);
+    switch (primitiveValue->getValueID()) {
+    case CSSValueBolder:
+        return FontDescription::bolderWeight(state.parentStyle()->fontDescription().weight());
+    case CSSValueLighter:
+        return FontDescription::lighterWeight(state.parentStyle()->fontDescription().weight());
+    default:
+        return *primitiveValue;
+    }
+}
+
+FontDescription::VariantLigatures StyleBuilderConverter::convertFontVariantLigatures(StyleResolverState&, CSSValue* value)
+{
+    if (value->isValueList()) {
+        FontDescription::VariantLigatures ligatures;
+        CSSValueList* valueList = toCSSValueList(value);
+        for (size_t i = 0; i < valueList->length(); ++i) {
+            CSSValue* item = valueList->item(i);
+            CSSPrimitiveValue* primitiveValue = toCSSPrimitiveValue(item);
+            switch (primitiveValue->getValueID()) {
+            case CSSValueNoCommonLigatures:
+                ligatures.common = FontDescription::DisabledLigaturesState;
+                break;
+            case CSSValueCommonLigatures:
+                ligatures.common = FontDescription::EnabledLigaturesState;
+                break;
+            case CSSValueNoDiscretionaryLigatures:
+                ligatures.discretionary = FontDescription::DisabledLigaturesState;
+                break;
+            case CSSValueDiscretionaryLigatures:
+                ligatures.discretionary = FontDescription::EnabledLigaturesState;
+                break;
+            case CSSValueNoHistoricalLigatures:
+                ligatures.historical = FontDescription::DisabledLigaturesState;
+                break;
+            case CSSValueHistoricalLigatures:
+                ligatures.historical = FontDescription::EnabledLigaturesState;
+                break;
+            case CSSValueNoContextual:
+                ligatures.contextual = FontDescription::DisabledLigaturesState;
+                break;
+            case CSSValueContextual:
+                ligatures.contextual = FontDescription::EnabledLigaturesState;
+                break;
+            default:
+                ASSERT_NOT_REACHED();
+                break;
+            }
+        }
+        return ligatures;
+    }
+
+    ASSERT_WITH_SECURITY_IMPLICATION(value->isPrimitiveValue());
+    ASSERT(toCSSPrimitiveValue(value)->getValueID() == CSSValueNormal);
+    return FontDescription::VariantLigatures();
 }
 
 EGlyphOrientation StyleBuilderConverter::convertGlyphOrientation(StyleResolverState&, CSSValue* value)
@@ -168,8 +331,8 @@ GridTrackSize StyleBuilderConverter::convertGridTrackSize(StyleResolverState& st
     CSSFunctionValue* minmaxFunction = toCSSFunctionValue(value);
     CSSValueList* arguments = minmaxFunction->arguments();
     ASSERT_WITH_SECURITY_IMPLICATION(arguments->length() == 2);
-    GridLength minTrackBreadth(convertGridTrackBreadth(state, toCSSPrimitiveValue(arguments->itemWithoutBoundsCheck(0))));
-    GridLength maxTrackBreadth(convertGridTrackBreadth(state, toCSSPrimitiveValue(arguments->itemWithoutBoundsCheck(1))));
+    GridLength minTrackBreadth(convertGridTrackBreadth(state, toCSSPrimitiveValue(arguments->item(0))));
+    GridLength maxTrackBreadth(convertGridTrackBreadth(state, toCSSPrimitiveValue(arguments->item(1))));
     return GridTrackSize(minTrackBreadth, maxTrackBreadth);
 }
 
@@ -273,7 +436,7 @@ Length StyleBuilderConverter::convertLengthMaxSizing(StyleResolverState& state, 
 {
     CSSPrimitiveValue* primitiveValue = toCSSPrimitiveValue(value);
     if (primitiveValue->getValueID() == CSSValueNone)
-        return Length(Undefined);
+        return Length(MaxSizeNone);
     return convertLengthSizing(state, value);
 }
 
@@ -343,11 +506,8 @@ PassRefPtr<QuotesData> StyleBuilderConverter::convertQuotes(StyleResolverState&,
         CSSValueList* list = toCSSValueList(value);
         RefPtr<QuotesData> quotes = QuotesData::create();
         for (size_t i = 0; i < list->length(); i += 2) {
-            CSSValue* first = list->itemWithoutBoundsCheck(i);
-            // item() returns null if out of bounds so this is safe.
+            CSSValue* first = list->item(i);
             CSSValue* second = list->item(i + 1);
-            if (!second)
-                continue;
             String startQuote = toCSSPrimitiveValue(first)->getStringValue();
             String endQuote = toCSSPrimitiveValue(second)->getStringValue();
             quotes->addPair(std::make_pair(startQuote, endQuote));
@@ -391,7 +551,7 @@ PassRefPtr<ShadowList> StyleBuilderConverter::convertShadow(StyleResolverState& 
         ShadowStyle shadowStyle = item->style && item->style->getValueID() == CSSValueInset ? Inset : Normal;
         Color color;
         if (item->color)
-            color = state.document().textLinkColors().colorFromPrimitiveValue(item->color.get(), state.style()->color());
+            color = convertColor(state, item->color.get());
         else
             color = state.style()->color();
         shadows.append(ShadowData(FloatPoint(x, y), blur, spread, shadowStyle, color));
@@ -418,15 +578,23 @@ PassRefPtr<SVGLengthList> StyleBuilderConverter::convertStrokeDasharray(StyleRes
     RefPtr<SVGLengthList> array = SVGLengthList::create();
     size_t length = dashes->length();
     for (size_t i = 0; i < length; ++i) {
-        CSSValue* currValue = dashes->itemWithoutBoundsCheck(i);
+        CSSValue* currValue = dashes->item(i);
         if (!currValue->isPrimitiveValue())
             continue;
 
-        CSSPrimitiveValue* dash = toCSSPrimitiveValue(dashes->itemWithoutBoundsCheck(i));
+        CSSPrimitiveValue* dash = toCSSPrimitiveValue(dashes->item(i));
         array->append(SVGLength::fromCSSPrimitiveValue(dash));
     }
 
     return array.release();
+}
+
+StyleColor StyleBuilderConverter::convertStyleColor(StyleResolverState& state, CSSValue* value, bool forVisitedLink)
+{
+    CSSPrimitiveValue* primitiveValue = toCSSPrimitiveValue(value);
+    if (primitiveValue->getValueID() == CSSValueCurrentcolor)
+        return StyleColor::currentColor();
+    return state.document().textLinkColors().colorFromPrimitiveValue(primitiveValue, Color(), forVisitedLink);
 }
 
 Color StyleBuilderConverter::convertSVGColor(StyleResolverState& state, CSSValue* value)
@@ -453,4 +621,4 @@ float StyleBuilderConverter::convertTextStrokeWidth(StyleResolverState& state, C
     return primitiveValue->computeLength<float>(state.cssToLengthConversionData());
 }
 
-} // namespace WebCore
+} // namespace blink

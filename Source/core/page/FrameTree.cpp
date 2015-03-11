@@ -34,11 +34,11 @@
 
 using std::swap;
 
-namespace WebCore {
+namespace blink {
 
 namespace {
 
-const unsigned invalidChildCount = ~0;
+const unsigned invalidChildCount = ~0U;
 
 } // namespace
 
@@ -50,6 +50,7 @@ FrameTree::FrameTree(Frame* thisFrame)
 
 FrameTree::~FrameTree()
 {
+#if !ENABLE(OILPAN)
     // FIXME: Why is this here? Doesn't this parallel what we already do in ~LocalFrame?
     for (Frame* child = firstChild(); child; child = child->tree().nextSibling()) {
         if (child->isLocalFrame())
@@ -57,6 +58,7 @@ FrameTree::~FrameTree()
         else if (child->isRemoteFrame())
             toRemoteFrame(child)->setView(nullptr);
     }
+#endif
 }
 
 void FrameTree::setName(const AtomicString& name, const AtomicString& fallbackName)
@@ -85,7 +87,7 @@ Frame* FrameTree::top() const
     if (!m_thisFrame->client())
         return m_thisFrame;
     Frame* candidate = m_thisFrame->client()->top();
-    return candidate ? candidate : m_thisFrame;
+    return candidate ? candidate : m_thisFrame.get();
 }
 
 Frame* FrameTree::previousSibling() const
@@ -254,7 +256,7 @@ Frame* FrameTree::find(const AtomicString& name) const
         return top();
 
     if (name == "_parent")
-        return parent() ? parent() : m_thisFrame;
+        return parent() ? parent() : m_thisFrame.get();
 
     // Since "_blank" should never be any frame's name, the following just amounts to an optimization.
     if (name == "_blank")
@@ -377,7 +379,12 @@ Frame* FrameTree::deepLastChild() const
     return result;
 }
 
-} // namespace WebCore
+void FrameTree::trace(Visitor* visitor)
+{
+    visitor->trace(m_thisFrame);
+}
+
+} // namespace blink
 
 #ifndef NDEBUG
 
@@ -387,7 +394,7 @@ static void printIndent(int indent)
         printf("    ");
 }
 
-static void printFrames(const WebCore::Frame* frame, const WebCore::Frame* targetFrame, int indent)
+static void printFrames(const blink::Frame* frame, const blink::Frame* targetFrame, int indent)
 {
     if (frame == targetFrame) {
         printf("--> ");
@@ -395,7 +402,7 @@ static void printFrames(const WebCore::Frame* frame, const WebCore::Frame* targe
     } else
         printIndent(indent);
 
-    WebCore::FrameView* view = frame->isLocalFrame() ? toLocalFrame(frame)->view() : 0;
+    blink::FrameView* view = frame->isLocalFrame() ? toLocalFrame(frame)->view() : 0;
     printf("Frame %p %dx%d\n", frame, view ? view->width() : 0, view ? view->height() : 0);
     printIndent(indent);
     printf("  owner=%p\n", frame->owner());
@@ -406,11 +413,11 @@ static void printFrames(const WebCore::Frame* frame, const WebCore::Frame* targe
     printIndent(indent);
     printf("  uri=%s\n\n", frame->isLocalFrame() ? toLocalFrame(frame)->document()->url().string().utf8().data() : 0);
 
-    for (WebCore::Frame* child = frame->tree().firstChild(); child; child = child->tree().nextSibling())
+    for (blink::Frame* child = frame->tree().firstChild(); child; child = child->tree().nextSibling())
         printFrames(child, targetFrame, indent + 1);
 }
 
-void showFrameTree(const WebCore::Frame* frame)
+void showFrameTree(const blink::Frame* frame)
 {
     if (!frame) {
         printf("Null input frame\n");

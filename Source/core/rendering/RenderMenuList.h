@@ -29,7 +29,7 @@
 #include "platform/PopupMenuClient.h"
 #include "platform/geometry/LayoutRect.h"
 
-namespace WebCore {
+namespace blink {
 
 class HTMLSelectElement;
 class RenderText;
@@ -39,17 +39,21 @@ class RenderMenuList FINAL : public RenderFlexibleBox, private PopupMenuClient {
 public:
     RenderMenuList(Element*);
     virtual ~RenderMenuList();
+    virtual void destroy() OVERRIDE;
+    virtual void trace(Visitor*) OVERRIDE;
 
-public:
     bool popupIsVisible() const { return m_popupIsVisible; }
     void showPopup();
     void hidePopup();
+    PopupMenu* popup() const { return m_popup.get(); }
 
     void setOptionsChanged(bool changed) { m_optionsChanged = changed; }
 
     void didSetSelectedIndex(int listIndex);
 
     String text() const;
+
+    virtual PopupMenuStyle itemStyle(unsigned listIndex) const OVERRIDE;
 
 private:
     HTMLSelectElement* selectElement() const;
@@ -82,7 +86,6 @@ private:
     virtual String itemToolTip(unsigned listIndex) const OVERRIDE;
     virtual String itemAccessibilityText(unsigned listIndex) const OVERRIDE;
     virtual bool itemIsEnabled(unsigned listIndex) const OVERRIDE;
-    virtual PopupMenuStyle itemStyle(unsigned listIndex) const OVERRIDE;
     virtual PopupMenuStyle menuStyle() const OVERRIDE;
     virtual LayoutUnit clientPaddingLeft() const OVERRIDE;
     virtual LayoutUnit clientPaddingRight() const OVERRIDE;
@@ -117,8 +120,8 @@ private:
 
     void didUpdateActiveOption(int optionIndex);
 
-    RenderText* m_buttonText;
-    RenderBlock* m_innerBlock;
+    RawPtrWillBeMember<RenderText> m_buttonText;
+    RawPtrWillBeMember<RenderBlock> m_innerBlock;
 
     bool m_optionsChanged;
     int m_optionsWidth;
@@ -127,7 +130,7 @@ private:
 
     RefPtr<RenderStyle> m_optionStyle;
 
-    RefPtr<PopupMenu> m_popup;
+    RefPtrWillBeMember<PopupMenu> m_popup;
     bool m_popupIsVisible;
 };
 

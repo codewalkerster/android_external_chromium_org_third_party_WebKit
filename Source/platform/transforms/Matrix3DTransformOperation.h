@@ -28,7 +28,7 @@
 
 #include "platform/transforms/TransformOperation.h"
 
-namespace WebCore {
+namespace blink {
 
 class PLATFORM_EXPORT Matrix3DTransformOperation : public TransformOperation {
 public:
@@ -45,8 +45,6 @@ public:
     }
 
 private:
-    virtual bool isIdentity() const OVERRIDE { return m_matrix.isIdentity(); }
-
     virtual OperationType type() const OVERRIDE { return Matrix3D; }
 
     virtual bool operator==(const TransformOperation& o) const OVERRIDE
@@ -72,6 +70,6 @@ private:
     TransformationMatrix m_matrix;
 };
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // Matrix3DTransformOperation_h

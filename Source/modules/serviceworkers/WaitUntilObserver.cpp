@@ -5,10 +5,10 @@
 #include "config.h"
 #include "modules/serviceworkers/WaitUntilObserver.h"
 
-#include "bindings/v8/ScriptFunction.h"
-#include "bindings/v8/ScriptPromise.h"
-#include "bindings/v8/ScriptValue.h"
-#include "bindings/v8/V8Binding.h"
+#include "bindings/core/v8/ScriptFunction.h"
+#include "bindings/core/v8/ScriptPromise.h"
+#include "bindings/core/v8/ScriptValue.h"
+#include "bindings/core/v8/V8Binding.h"
 #include "core/dom/ExecutionContext.h"
 #include "platform/NotImplemented.h"
 #include "public/platform/WebServiceWorkerEventResult.h"
@@ -17,7 +17,7 @@
 #include "wtf/RefPtr.h"
 #include <v8.h>
 
-namespace WebCore {
+namespace blink {
 
 class WaitUntilObserver::ThenFunction FINAL : public ScriptFunction {
 public:
@@ -26,15 +26,21 @@ public:
         Rejected,
     };
 
-    static PassOwnPtr<ScriptFunction> create(PassRefPtr<WaitUntilObserver> observer, ResolveType type)
+    static v8::Handle<v8::Function> createFunction(ScriptState* scriptState, WaitUntilObserver* observer, ResolveType type)
     {
-        ExecutionContext* executionContext = observer->executionContext();
-        return adoptPtr(new ThenFunction(toIsolate(executionContext), observer, type));
+        ThenFunction* self = new ThenFunction(scriptState, observer, type);
+        return self->bindToV8Function();
+    }
+
+    virtual void trace(Visitor* visitor) OVERRIDE
+    {
+        visitor->trace(m_observer);
+        ScriptFunction::trace(visitor);
     }
 
 private:
-    ThenFunction(v8::Isolate* isolate, PassRefPtr<WaitUntilObserver> observer, ResolveType type)
-        : ScriptFunction(isolate)
+    ThenFunction(ScriptState* scriptState, WaitUntilObserver* observer, ResolveType type)
+        : ScriptFunction(scriptState)
         , m_observer(observer)
         , m_resolveType(type)
     {
@@ -51,18 +57,13 @@ private:
         return value;
     }
 
-    RefPtr<WaitUntilObserver> m_observer;
+    Member<WaitUntilObserver> m_observer;
     ResolveType m_resolveType;
 };
 
-PassRefPtr<WaitUntilObserver> WaitUntilObserver::create(ExecutionContext* context, EventType type, int eventID)
+WaitUntilObserver* WaitUntilObserver::create(ExecutionContext* context, EventType type, int eventID)
 {
-    return adoptRef(new WaitUntilObserver(context, type, eventID));
-}
-
-WaitUntilObserver::~WaitUntilObserver()
-{
-    ASSERT(!m_pendingActivity);
+    return new WaitUntilObserver(context, type, eventID);
 }
 
 void WaitUntilObserver::willDispatchEvent()
@@ -79,8 +80,8 @@ void WaitUntilObserver::waitUntil(ScriptState* scriptState, const ScriptValue& v
 {
     incrementPendingActivity();
     ScriptPromise::cast(scriptState, value).then(
-        ThenFunction::create(this, ThenFunction::Fulfilled),
-        ThenFunction::create(this, ThenFunction::Rejected));
+        ThenFunction::createFunction(scriptState, this, ThenFunction::Fulfilled),
+        ThenFunction::createFunction(scriptState, this, ThenFunction::Rejected));
 }
 
 WaitUntilObserver::WaitUntilObserver(ExecutionContext* context, EventType type, int eventID)
@@ -108,11 +109,11 @@ void WaitUntilObserver::incrementPendingActivity()
 void WaitUntilObserver::decrementPendingActivity()
 {
     ASSERT(m_pendingActivity > 0);
-    if (--m_pendingActivity || !executionContext())
+    if (!executionContext() || (!m_hasError && --m_pendingActivity))
         return;
 
     ServiceWorkerGlobalScopeClient* client = ServiceWorkerGlobalScopeClient::from(executionContext());
-    blink::WebServiceWorkerEventResult result = m_hasError ? blink::WebServiceWorkerEventResultRejected : blink::WebServiceWorkerEventResultCompleted;
+    WebServiceWorkerEventResult result = m_hasError ? WebServiceWorkerEventResultRejected : WebServiceWorkerEventResultCompleted;
     switch (m_type) {
     case Activate:
         client->didHandleActivateEvent(m_eventID, result);
@@ -124,4 +125,4 @@ void WaitUntilObserver::decrementPendingActivity()
     observeContext(0);
 }
 
-} // namespace WebCore
+} // namespace blink

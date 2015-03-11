@@ -24,7 +24,7 @@
 #include "config.h"
 #include "core/html/HTMLFrameSetElement.h"
 
-#include "bindings/v8/ScriptEventListener.h"
+#include "bindings/core/v8/ScriptEventListener.h"
 #include "core/CSSPropertyNames.h"
 #include "core/HTMLNames.h"
 #include "core/dom/Document.h"
@@ -36,7 +36,7 @@
 #include "core/loader/FrameLoaderClient.h"
 #include "core/rendering/RenderFrameSet.h"
 
-namespace WebCore {
+namespace blink {
 
 using namespace HTMLNames;
 
@@ -49,7 +49,6 @@ inline HTMLFrameSetElement::HTMLFrameSetElement(Document& document)
     , m_frameborderSet(false)
     , m_noresize(false)
 {
-    ScriptWrappable::init(this);
     setHasCustomStyleCallbacks();
 }
 
@@ -222,4 +221,4 @@ LocalDOMWindow* HTMLFrameSetElement::anonymousNamedGetter(const AtomicString& na
     return document->domWindow();
 }
 
-} // namespace WebCore
+} // namespace blink

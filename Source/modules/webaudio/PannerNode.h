@@ -28,15 +28,13 @@
 #include "platform/audio/AudioBus.h"
 #include "platform/audio/Cone.h"
 #include "platform/audio/Distance.h"
-#include "platform/audio/HRTFDatabaseLoader.h"
 #include "platform/audio/Panner.h"
 #include "modules/webaudio/AudioListener.h"
 #include "modules/webaudio/AudioNode.h"
 #include "platform/geometry/FloatPoint3D.h"
 #include "wtf/HashMap.h"
-#include "wtf/OwnPtr.h"
 
-namespace WebCore {
+namespace blink {
 
 // PannerNode is an AudioNode with one input and one output.
 // It positions a sound in 3D space, with the exact effect dependent on the panning model.
@@ -46,6 +44,7 @@ namespace WebCore {
 // All of these effects follow the OpenAL specification very closely.
 
 class PannerNode FINAL : public AudioNode {
+    DEFINE_WRAPPERTYPEINFO();
 public:
     // These enums are used to distinguish what cached values of panner are dirty.
     enum {
@@ -54,14 +53,15 @@ public:
         DopplerRateDirty = 0x4,
     };
 
-    static PassRefPtrWillBeRawPtr<PannerNode> create(AudioContext* context, float sampleRate)
+    static PannerNode* create(AudioContext* context, float sampleRate)
     {
-        return adoptRefWillBeNoop(new PannerNode(context, sampleRate));
+        return adoptRefCountedGarbageCollectedWillBeNoop(new PannerNode(context, sampleRate));
     }
 
     virtual ~PannerNode();
 
     // AudioNode
+    virtual void dispose() OVERRIDE;
     virtual void process(size_t framesToProcess) OVERRIDE;
     virtual void pullInputs(size_t framesToProcess) OVERRIDE;
     virtual void initialize() OVERRIDE;
@@ -107,6 +107,8 @@ public:
     virtual double tailTime() const OVERRIDE { return m_panner ? m_panner->tailTime() : 0; }
     virtual double latencyTime() const OVERRIDE { return m_panner ? m_panner->latencyTime() : 0; }
 
+    virtual void trace(Visitor*) OVERRIDE;
+
 private:
     PannerNode(AudioContext*, float sampleRate);
 
@@ -131,7 +133,7 @@ private:
     // This is in order to handle the pitch change necessary for the doppler shift.
     void notifyAudioSourcesConnectedToNode(AudioNode*, HashMap<AudioNode*, bool> &visitedNodes);
 
-    OwnPtr<Panner> m_panner;
+    Member<Panner> m_panner;
     unsigned m_panningModel;
     unsigned m_distanceModel;
 
@@ -155,8 +157,6 @@ private:
     float m_cachedDistanceConeGain;
     double m_cachedDopplerRate;
 
-    RefPtr<HRTFDatabaseLoader> m_hrtfDatabaseLoader;
-
     // AudioContext's connection count
     unsigned m_connectionCount;
 
@@ -164,6 +164,6 @@ private:
     mutable Mutex m_processLock;
 };
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // PannerNode_h

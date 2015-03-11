@@ -27,12 +27,11 @@
 #include "core/svg/SVGAltGlyphItemElement.h"
 #include "core/svg/SVGGlyphRefElement.h"
 
-namespace WebCore {
+namespace blink {
 
 inline SVGAltGlyphDefElement::SVGAltGlyphDefElement(Document& document)
     : SVGElement(SVGNames::altGlyphDefTag, document)
 {
-    ScriptWrappable::init(this);
 }
 
 DEFINE_NODE_FACTORY(SVGAltGlyphDefElement)

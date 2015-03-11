@@ -26,12 +26,13 @@
 #include "core/svg/SVGElement.h"
 #include "core/svg/SVGURIReference.h"
 
-namespace WebCore {
+namespace blink {
 
 class SVGPathElement;
 
 class SVGMPathElement FINAL : public SVGElement,
                               public SVGURIReference {
+    DEFINE_WRAPPERTYPEINFO();
 public:
     DECLARE_NODE_FACTORY(SVGMPathElement);
 
@@ -58,6 +59,6 @@ private:
 
 };
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // SVGMPathElement_h

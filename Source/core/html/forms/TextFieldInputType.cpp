@@ -32,7 +32,7 @@
 #include "config.h"
 #include "core/html/forms/TextFieldInputType.h"
 
-#include "bindings/v8/ExceptionStatePlaceholder.h"
+#include "bindings/core/v8/ExceptionStatePlaceholder.h"
 #include "core/HTMLNames.h"
 #include "core/dom/NodeRenderStyle.h"
 #include "core/dom/shadow/ShadowRoot.h"
@@ -55,7 +55,7 @@
 #include "core/rendering/RenderTheme.h"
 #include "wtf/text/WTFString.h"
 
-namespace WebCore {
+namespace blink {
 
 using namespace HTMLNames;
 
@@ -380,11 +380,6 @@ bool TextFieldInputType::supportsReadOnly() const
     return true;
 }
 
-bool TextFieldInputType::shouldUseInputMethod() const
-{
-    return true;
-}
-
 static bool isASCIILineBreak(UChar c)
 {
     return c == '\r' || c == '\n';
@@ -424,7 +419,7 @@ void TextFieldInputType::handleBeforeTextInsertedEvent(BeforeTextInsertedEvent* 
 
     // Selected characters will be removed by the next text event.
     unsigned baseLength = oldLength - selectionLength;
-    unsigned maxLength = static_cast<unsigned>(isTextType() ? element().maxLength() : HTMLInputElement::maximumLength); // maxLength can never be negative.
+    unsigned maxLength = static_cast<unsigned>(this->maxLength()); // maxLength can never be negative.
     unsigned appendableLength = maxLength > baseLength ? maxLength - baseLength : 0;
 
     // Truncate the inserted text to avoid violating the maxLength and other constraints.
@@ -560,4 +555,4 @@ void TextFieldInputType::spinButtonDidReleaseMouseCapture(SpinButtonElement::Eve
         element().dispatchFormControlChangeEvent();
 }
 
-} // namespace WebCore
+} // namespace blink

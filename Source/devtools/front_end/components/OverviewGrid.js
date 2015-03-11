@@ -154,15 +154,15 @@ WebInspector.OverviewGrid.ResizerOffset = 3.5; // half pixel because offset valu
  * @constructor
  * @extends {WebInspector.Object}
  * @param {!Element} parentElement
- * @param {!Element} dividersLabelBarElement
+ * @param {!Element=} dividersLabelBarElement
  */
 WebInspector.OverviewGrid.Window = function(parentElement, dividersLabelBarElement)
 {
     this._parentElement = parentElement;
-    this._dividersLabelBarElement = dividersLabelBarElement;
 
     WebInspector.installDragHandle(this._parentElement, this._startWindowSelectorDragging.bind(this), this._windowSelectorDragging.bind(this), this._endWindowSelectorDragging.bind(this), "ew-resize", null);
-    WebInspector.installDragHandle(this._dividersLabelBarElement, this._startWindowDragging.bind(this), this._windowDragging.bind(this), null, "move");
+    if (dividersLabelBarElement)
+        WebInspector.installDragHandle(dividersLabelBarElement, this._startWindowDragging.bind(this), this._windowDragging.bind(this), null, "move");
 
     this.windowLeft = 0.0;
     this.windowRight = 1.0;
@@ -171,6 +171,7 @@ WebInspector.OverviewGrid.Window = function(parentElement, dividersLabelBarEleme
     this._parentElement.addEventListener("dblclick", this._resizeWindowMaximum.bind(this), true);
 
     this._overviewWindowElement = parentElement.createChild("div", "overview-grid-window");
+    this._overviewWindowElement.appendChild(WebInspector.View.createStyleElement("overviewGrid.css"));
     this._overviewWindowBordersElement = parentElement.createChild("div", "overview-grid-window-rulers");
     parentElement.createChild("div", "overview-grid-dividers-background");
 
@@ -391,7 +392,7 @@ WebInspector.OverviewGrid.Window.prototype = {
     },
 
     /**
-     * @param {?Event} event
+     * @param {!Event} event
      */
     _onMouseWheel: function(event)
     {

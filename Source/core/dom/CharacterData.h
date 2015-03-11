@@ -26,11 +26,12 @@
 #include "core/dom/Node.h"
 #include "wtf/text/WTFString.h"
 
-namespace WebCore {
+namespace blink {
 
 class ExceptionState;
 
 class CharacterData : public Node {
+    DEFINE_WRAPPERTYPEINFO();
 public:
     void atomize();
     const String& data() const { return m_data; }
@@ -56,7 +57,6 @@ protected:
         , m_data(!text.isNull() ? text : emptyString())
     {
         ASSERT(type == CreateOther || type == CreateText || type == CreateEditingText);
-        ScriptWrappable::init(this);
     }
 
     void setDataWithoutUpdate(const String& data)
@@ -75,10 +75,13 @@ private:
     virtual int maxCharacterOffset() const OVERRIDE FINAL;
     virtual bool offsetInCharacters() const OVERRIDE FINAL;
     void setDataAndUpdate(const String&, unsigned offsetOfReplacedData, unsigned oldLength, unsigned newLength, RecalcStyleBehavior = DoNotRecalcStyle);
+
+    bool isContainerNode() const WTF_DELETED_FUNCTION; // This will catch anyone doing an unnecessary check.
+    bool isElementNode() const WTF_DELETED_FUNCTION; // This will catch anyone doing an unnecessary check.
 };
 
 DEFINE_NODE_TYPE_CASTS(CharacterData, isCharacterDataNode());
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // CharacterData_h

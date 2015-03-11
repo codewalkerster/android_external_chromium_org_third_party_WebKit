@@ -51,7 +51,7 @@
 #include "platform/text/PlatformLocale.h"
 #include "wtf/DateMath.h"
 
-namespace WebCore {
+namespace blink {
 
 class DateTimeFormatValidator : public DateTimeFormat::TokenHandler {
 public:
@@ -264,6 +264,7 @@ void BaseMultipleFieldsDateAndTimeInputType::pickerIndicatorChooseValue(const St
     DateTimeEditElement* edit = this->dateTimeEditElement();
     if (!edit)
         return;
+    EventQueueScope scope;
     DateComponents date;
     unsigned end;
     if (date.parseDate(value, 0, end) && end == value.length())
@@ -278,6 +279,11 @@ void BaseMultipleFieldsDateAndTimeInputType::pickerIndicatorChooseValue(double v
         element().setValue(emptyString(), DispatchInputAndChangeEvent);
     else
         element().setValueAsNumber(value, ASSERT_NO_EXCEPTION, DispatchInputAndChangeEvent);
+}
+
+Element& BaseMultipleFieldsDateAndTimeInputType::pickerOwnerElement() const
+{
+    return element();
 }
 
 bool BaseMultipleFieldsDateAndTimeInputType::setupDateTimeChooserParameters(DateTimeChooserParameters& parameters)
@@ -326,7 +332,7 @@ PassRefPtr<RenderStyle> BaseMultipleFieldsDateAndTimeInputType::customStyleForRe
         newDisplay = INLINE_FLEX;
     else if (originalDisplay == BLOCK)
         newDisplay = FLEX;
-    TextDirection contentDirection = element().locale().isRTL() ? RTL : LTR;
+    TextDirection contentDirection = computedTextDirection();
     if (originalStyle->direction() == contentDirection && originalDisplay == newDisplay)
         return originalStyle;
 
@@ -384,7 +390,7 @@ void BaseMultipleFieldsDateAndTimeInputType::destroyShadowSubtree()
     m_isDestroyingShadowSubtree = false;
 }
 
-void BaseMultipleFieldsDateAndTimeInputType::handleFocusEvent(Element* oldFocusedElement, FocusType type)
+void BaseMultipleFieldsDateAndTimeInputType::handleFocusInEvent(Element* oldFocusedElement, FocusType type)
 {
     DateTimeEditElement* edit = dateTimeEditElement();
     if (!edit || m_isDestroyingShadowSubtree)
@@ -492,11 +498,6 @@ void BaseMultipleFieldsDateAndTimeInputType::setValue(const String& sanitizedVal
         element().updateView();
         element().setNeedsValidityCheck();
     }
-}
-
-bool BaseMultipleFieldsDateAndTimeInputType::shouldUseInputMethod() const
-{
-    return false;
 }
 
 void BaseMultipleFieldsDateAndTimeInputType::stepAttributeChanged()
@@ -620,6 +621,18 @@ void BaseMultipleFieldsDateAndTimeInputType::updateClearButtonVisibility()
     }
 }
 
-} // namespace WebCore
+TextDirection BaseMultipleFieldsDateAndTimeInputType::computedTextDirection()
+{
+    return element().locale().isRTL() ? RTL : LTR;
+}
+
+AXObject* BaseMultipleFieldsDateAndTimeInputType::popupRootAXObject()
+{
+    if (PickerIndicatorElement* picker = pickerIndicatorElement())
+        return picker->popupRootAXObject();
+    return 0;
+}
+
+} // namespace blink
 
 #endif

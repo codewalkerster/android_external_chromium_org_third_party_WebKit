@@ -26,11 +26,12 @@
 #ifndef CanvasRenderingContext2D_h
 #define CanvasRenderingContext2D_h
 
-#include "bindings/v8/ScriptWrappable.h"
+#include "bindings/core/v8/ScriptWrappable.h"
 #include "core/css/CSSFontSelectorClient.h"
 #include "core/html/canvas/Canvas2DContextAttributes.h"
 #include "core/html/canvas/CanvasPathMethods.h"
 #include "core/html/canvas/CanvasRenderingContext.h"
+#include "core/html/canvas/HitRegion.h"
 #include "core/svg/SVGMatrixTearOff.h"
 #include "platform/fonts/Font.h"
 #include "platform/graphics/Color.h"
@@ -45,7 +46,7 @@
 
 namespace blink { class WebLayer; }
 
-namespace WebCore {
+namespace blink {
 
 class CanvasImageSource;
 class CanvasGradient;
@@ -59,6 +60,7 @@ class GraphicsContext;
 class HTMLCanvasElement;
 class HTMLImageElement;
 class HTMLVideoElement;
+class HitRegionOptions;
 class ImageBitmap;
 class ImageData;
 class TextMetrics;
@@ -66,6 +68,7 @@ class TextMetrics;
 typedef WillBeHeapHashMap<String, RefPtrWillBeMember<MutableStylePropertySet> > MutableStylePropertyMap;
 
 class CanvasRenderingContext2D FINAL: public CanvasRenderingContext, public ScriptWrappable, public CanvasPathMethods {
+    DEFINE_WRAPPERTYPEINFO();
 public:
     static PassOwnPtrWillBeRawPtr<CanvasRenderingContext2D> create(HTMLCanvasElement* canvas, const Canvas2DContextAttributes* attrs, bool usesCSSCompatibilityParseMode)
     {
@@ -74,10 +77,10 @@ public:
     virtual ~CanvasRenderingContext2D();
 
     CanvasStyle* strokeStyle() const;
-    void setStrokeStyle(PassRefPtr<CanvasStyle>);
+    void setStrokeStyle(PassRefPtrWillBeRawPtr<CanvasStyle>);
 
     CanvasStyle* fillStyle() const;
-    void setFillStyle(PassRefPtr<CanvasStyle>);
+    void setFillStyle(PassRefPtrWillBeRawPtr<CanvasStyle>);
 
     float lineWidth() const;
     void setLineWidth(float);
@@ -189,9 +192,9 @@ public:
 
     void setCompositeOperation(const String&);
 
-    PassRefPtr<CanvasGradient> createLinearGradient(float x0, float y0, float x1, float y1);
-    PassRefPtr<CanvasGradient> createRadialGradient(float x0, float y0, float r0, float x1, float y1, float r1, ExceptionState&);
-    PassRefPtr<CanvasPattern> createPattern(CanvasImageSource*, const String& repetitionType, ExceptionState&);
+    PassRefPtrWillBeRawPtr<CanvasGradient> createLinearGradient(float x0, float y0, float x1, float y1);
+    PassRefPtrWillBeRawPtr<CanvasGradient> createRadialGradient(float x0, float y0, float r0, float x1, float y1, float r1, ExceptionState&);
+    PassRefPtrWillBeRawPtr<CanvasPattern> createPattern(CanvasImageSource*, const String& repetitionType, ExceptionState&);
 
     PassRefPtrWillBeRawPtr<ImageData> createImageData(PassRefPtrWillBeRawPtr<ImageData>) const;
     PassRefPtrWillBeRawPtr<ImageData> createImageData(float width, float height, ExceptionState&) const;
@@ -210,11 +213,14 @@ public:
     String textBaseline() const;
     void setTextBaseline(const String&);
 
+    String direction() const;
+    void setDirection(const String&);
+
     void fillText(const String& text, float x, float y);
     void fillText(const String& text, float x, float y, float maxWidth);
     void strokeText(const String& text, float x, float y);
     void strokeText(const String& text, float x, float y, float maxWidth);
-    PassRefPtr<TextMetrics> measureText(const String& text);
+    PassRefPtrWillBeRawPtr<TextMetrics> measureText(const String& text);
 
     LineCap getLineCap() const { return state().m_lineCap; }
     LineJoin getLineJoin() const { return state().m_lineJoin; }
@@ -222,10 +228,16 @@ public:
     bool imageSmoothingEnabled() const;
     void setImageSmoothingEnabled(bool);
 
-    PassRefPtr<Canvas2DContextAttributes> getContextAttributes() const;
+    PassRefPtrWillBeRawPtr<Canvas2DContextAttributes> getContextAttributes() const;
 
     void drawFocusIfNeeded(Element*);
     void drawFocusIfNeeded(Path2D*, Element*);
+
+    void addHitRegion(const HitRegionOptions&, ExceptionState&);
+    void removeHitRegion(const String& id);
+    void clearHitRegions();
+    HitRegion* hitRegionAtPoint(const LayoutPoint&);
+    unsigned hitRegionsCount() const;
 
     void loseContext();
     void restoreContext();
@@ -233,6 +245,12 @@ public:
     virtual void trace(Visitor*) OVERRIDE;
 
 private:
+    enum Direction {
+        DirectionInherit,
+        DirectionRTL,
+        DirectionLTR
+    };
+
     class State FINAL : public CSSFontSelectorClient {
     public:
         State();
@@ -244,14 +262,14 @@ private:
         // CSSFontSelectorClient implementation
         virtual void fontsNeedUpdate(CSSFontSelector*) OVERRIDE;
 
-        virtual void trace(Visitor* visitor) OVERRIDE { CSSFontSelectorClient::trace(visitor); }
+        virtual void trace(Visitor*) OVERRIDE;
 
         unsigned m_unrealizedSaveCount;
 
         String m_unparsedStrokeColor;
         String m_unparsedFillColor;
-        RefPtr<CanvasStyle> m_strokeStyle;
-        RefPtr<CanvasStyle> m_fillStyle;
+        RefPtrWillBeMember<CanvasStyle> m_strokeStyle;
+        RefPtrWillBeMember<CanvasStyle> m_fillStyle;
         float m_lineWidth;
         LineCap m_lineCap;
         LineJoin m_lineJoin;
@@ -271,10 +289,13 @@ private:
         // Text state.
         TextAlign m_textAlign;
         TextBaseline m_textBaseline;
+        Direction m_direction;
 
         String m_unparsedFont;
         Font m_font;
         bool m_realizedFont;
+
+        bool m_hasClip;
     };
 
     CanvasRenderingContext2D(HTMLCanvasElement*, const Canvas2DContextAttributes* attrs, bool usesCSSCompatibilityParseMode);
@@ -298,12 +319,12 @@ private:
     GraphicsContext* drawingContext() const;
 
     void unwindStateStack();
-    void realizeSaves();
+    void realizeSaves(GraphicsContext*);
 
     void applyStrokePattern();
     void applyFillPattern();
 
-    void drawImageInternal(CanvasImageSource*, float sx, float sy, float sw, float sh, float dx, float dy, float dw, float dh, ExceptionState&, CompositeOperator, blink::WebBlendMode);
+    void drawImageInternal(CanvasImageSource*, float sx, float sy, float sw, float sh, float dx, float dy, float dw, float dh, ExceptionState&, CompositeOperator, blink::WebBlendMode, GraphicsContext* = 0);
     void drawVideo(HTMLVideoElement*, FloatRect srcRect, FloatRect dstRect);
 
     void fillInternal(const Path&, const String& windingRuleString);
@@ -333,17 +354,23 @@ private:
     bool focusRingCallIsValid(const Path&, Element*);
     void drawFocusRing(const Path&);
 
+    void addHitRegionInternal(const HitRegionOptionsInternal&, ExceptionState&);
+    bool hasClip() { return state().m_hasClip; }
+
     void validateStateStack();
 
     virtual bool is2d() const OVERRIDE { return true; }
     virtual bool isAccelerated() const OVERRIDE;
     virtual bool hasAlpha() const OVERRIDE { return m_hasAlpha; }
+    virtual void setIsHidden(bool) OVERRIDE;
 
     virtual bool isTransformInvertible() const OVERRIDE { return state().m_invertibleCTM; }
 
     virtual blink::WebLayer* platformLayer() const OVERRIDE;
+    TextDirection toTextDirection(Direction, RenderStyle** computedStyle = nullptr) const;
 
     WillBeHeapVector<OwnPtrWillBeMember<State> > m_stateStack;
+    OwnPtrWillBeMember<HitRegionManager> m_hitRegionManager;
     bool m_usesCSSCompatibilityParseMode;
     bool m_hasAlpha;
     bool m_isContextLost;
@@ -358,6 +385,6 @@ private:
 
 DEFINE_TYPE_CASTS(CanvasRenderingContext2D, CanvasRenderingContext, context, context->is2d(), context.is2d());
 
-} // namespace WebCore
+} // namespace blink
 
-#endif
+#endif // CanvasRenderingContext2D_h

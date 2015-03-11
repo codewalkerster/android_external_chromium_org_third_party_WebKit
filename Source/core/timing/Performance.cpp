@@ -41,7 +41,7 @@
 #include "platform/weborigin/SecurityOrigin.h"
 #include "wtf/CurrentTime.h"
 
-namespace WebCore {
+namespace blink {
 
 static const size_t defaultResourceTimingBufferSize = 150;
 
@@ -51,7 +51,6 @@ Performance::Performance(LocalFrame* frame)
     , m_referenceTime(frame && frame->host() ? frame->document()->loader()->timing()->referenceMonotonicTime() : 0.0)
     , m_userTiming(nullptr)
 {
-    ScriptWrappable::init(this);
 }
 
 Performance::~Performance()
@@ -174,7 +173,7 @@ static bool passesTimingAllowCheck(const ResourceResponse& response, Document* r
 
     const String& securityOrigin = requestingDocument->securityOrigin()->toString();
     Vector<String> timingAllowOrigins;
-    timingAllowOriginString.string().split(" ", timingAllowOrigins);
+    timingAllowOriginString.string().split(' ', timingAllowOrigins);
     for (size_t i = 0; i < timingAllowOrigins.size(); ++i) {
         if (timingAllowOrigins[i] == securityOrigin)
             return true;
@@ -282,6 +281,7 @@ void Performance::trace(Visitor* visitor)
     visitor->trace(m_resourceTimingBuffer);
     visitor->trace(m_userTiming);
     EventTargetWithInlineData::trace(visitor);
+    DOMWindowProperty::trace(visitor);
 }
 
-} // namespace WebCore
+} // namespace blink

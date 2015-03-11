@@ -29,7 +29,7 @@
 #include "core/events/Event.h"
 #include "core/html/MediaKeyError.h"
 
-namespace WebCore {
+namespace blink {
 
 struct MediaKeyEventInit : public EventInit {
     MediaKeyEventInit();
@@ -39,11 +39,12 @@ struct MediaKeyEventInit : public EventInit {
     RefPtr<Uint8Array> initData;
     RefPtr<Uint8Array> message;
     String defaultURL;
-    RefPtr<MediaKeyError> errorCode;
+    RefPtrWillBeMember<MediaKeyError> errorCode;
     unsigned short systemCode;
 };
 
 class MediaKeyEvent FINAL : public Event {
+    DEFINE_WRAPPERTYPEINFO();
 public:
     virtual ~MediaKeyEvent();
 
@@ -65,7 +66,6 @@ public:
     Uint8Array* message() const { return m_message.get(); }
     String defaultURL() const { return m_defaultURL; }
     MediaKeyError* errorCode() const { return m_errorCode.get(); }
-    MediaKeyError* errorCode(bool& isNull) const { isNull = !m_errorCode; return m_errorCode.get(); }
     unsigned short systemCode() const { return m_systemCode; }
 
     virtual void trace(Visitor*) OVERRIDE;
@@ -79,10 +79,10 @@ private:
     RefPtr<Uint8Array> m_initData;
     RefPtr<Uint8Array> m_message;
     String m_defaultURL;
-    RefPtr<MediaKeyError> m_errorCode;
+    RefPtrWillBeMember<MediaKeyError> m_errorCode;
     unsigned short m_systemCode;
 };
 
-} // namespace WebCore
+} // namespace blink
 
-#endif
+#endif // MediaKeyEvent_h

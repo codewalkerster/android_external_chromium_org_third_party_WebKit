@@ -29,7 +29,7 @@
 #include "core/svg/SVGGlyphMap.h"
 #include "core/svg/SVGParserUtilities.h"
 
-namespace WebCore {
+namespace blink {
 
 // Describe an SVG <hkern>/<vkern> element
 struct SVGKerningPair {
@@ -52,6 +52,7 @@ typedef Vector<SVGKerningPair> KerningPairVector;
 typedef HashMap<KerningPairKey, float> KerningTable;
 
 class SVGFontElement FINAL : public SVGElement {
+    DEFINE_WRAPPERTYPEINFO();
 public:
     DECLARE_NODE_FACTORY(SVGFontElement);
 
@@ -85,7 +86,7 @@ private:
     bool m_isGlyphCacheValid;
 };
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // ENABLE(SVG_FONTS)
-#endif
+#endif // SVGFontElement_h

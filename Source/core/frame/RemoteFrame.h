@@ -7,16 +7,18 @@
 
 #include "core/frame/Frame.h"
 
-namespace WebCore {
+namespace blink {
 
 class RemoteFrameView;
 
 class RemoteFrame: public Frame {
 public:
-    static PassRefPtr<RemoteFrame> create(FrameClient*, FrameHost*, FrameOwner*);
+    static PassRefPtrWillBeRawPtr<RemoteFrame> create(FrameClient*, FrameHost*, FrameOwner*);
     virtual bool isRemoteFrame() const OVERRIDE { return true; }
 
     virtual ~RemoteFrame();
+
+    virtual void detach() OVERRIDE;
 
     void setView(PassRefPtr<RemoteFrameView>);
     void createView();
@@ -36,6 +38,6 @@ inline RemoteFrameView* RemoteFrame::view() const
 
 DEFINE_TYPE_CASTS(RemoteFrame, Frame, remoteFrame, remoteFrame->isRemoteFrame(), remoteFrame.isRemoteFrame());
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // RemoteFrame_h

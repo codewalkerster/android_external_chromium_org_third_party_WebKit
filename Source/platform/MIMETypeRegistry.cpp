@@ -37,7 +37,7 @@
 #include "public/platform/WebMimeRegistry.h"
 #include "wtf/text/CString.h"
 
-namespace WebCore {
+namespace blink {
 
 String MIMETypeRegistry::getMIMETypeForExtension(const String &ext)
 {
@@ -76,6 +76,12 @@ bool MIMETypeRegistry::isSupportedImageMIMEType(const String& mimeType)
 bool MIMETypeRegistry::isSupportedImageResourceMIMEType(const String& mimeType)
 {
     return isSupportedImageMIMEType(mimeType);
+}
+
+bool MIMETypeRegistry::isSupportedImagePrefixedMIMEType(const String& mimeType)
+{
+    return blink::Platform::current()->mimeRegistry()->supportsImagePrefixedMIMEType(mimeType.lower())
+        != blink::WebMimeRegistry::IsNotSupported;
 }
 
 bool MIMETypeRegistry::isSupportedImageMIMETypeForEncoding(const String& mimeType)
@@ -122,4 +128,4 @@ bool MIMETypeRegistry::isJavaAppletMIMEType(const String& mimeType)
         || mimeType.startsWith("application/x-java-vm", false);
 }
 
-} // namespace WebCore
+} // namespace blink

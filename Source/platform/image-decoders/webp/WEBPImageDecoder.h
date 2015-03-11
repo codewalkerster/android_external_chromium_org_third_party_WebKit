@@ -34,7 +34,7 @@
 #include "webp/decode.h"
 #include "webp/demux.h"
 
-namespace WebCore {
+namespace blink {
 
 class PLATFORM_EXPORT WEBPImageDecoder : public ImageDecoder {
 public:
@@ -63,7 +63,8 @@ private:
 
 #if USE(QCMSLIB)
     qcms_transform* colorTransform() const { return m_transform; }
-    void createColorTransform(const char* data, size_t);
+    bool createColorTransform(const char* data, size_t);
+    void clearColorTransform();
     void readColorProfile();
 
     bool m_haveReadProfile;
@@ -89,6 +90,6 @@ private:
     void clearDecoder();
 };
 
-} // namespace WebCore
+} // namespace blink
 
 #endif

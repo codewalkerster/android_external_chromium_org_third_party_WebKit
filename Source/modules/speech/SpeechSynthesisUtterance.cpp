@@ -26,7 +26,7 @@
 #include "config.h"
 #include "modules/speech/SpeechSynthesisUtterance.h"
 
-namespace WebCore {
+namespace blink {
 
 SpeechSynthesisUtterance* SpeechSynthesisUtterance::create(ExecutionContext* context, const String& text)
 {
@@ -37,7 +37,6 @@ SpeechSynthesisUtterance::SpeechSynthesisUtterance(ExecutionContext* context, co
     : ContextLifecycleObserver(context)
     , m_platformUtterance(PlatformSpeechSynthesisUtterance::create(this))
 {
-    ScriptWrappable::init(this);
     m_platformUtterance->setText(text);
 }
 
@@ -77,4 +76,4 @@ void SpeechSynthesisUtterance::trace(Visitor* visitor)
     EventTargetWithInlineData::trace(visitor);
 }
 
-} // namespace WebCore
+} // namespace blink

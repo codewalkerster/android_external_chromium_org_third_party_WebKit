@@ -31,7 +31,7 @@
 #include "wtf/RefCounted.h"
 #include "wtf/text/AtomicString.h"
 
-namespace WebCore {
+namespace blink {
 
 class ExceptionState;
 
@@ -41,6 +41,7 @@ class DOMSettableTokenList FINAL
     , public RefCounted<DOMSettableTokenList>
 #endif
     {
+    DEFINE_WRAPPERTYPEINFO();
     WTF_MAKE_FAST_ALLOCATED_WILL_BE_REMOVED;
 public:
     static PassRefPtrWillBeRawPtr<DOMSettableTokenList> create()
@@ -77,6 +78,6 @@ private:
     SpaceSplitString m_tokens;
 };
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // DOMSettableTokenList_h

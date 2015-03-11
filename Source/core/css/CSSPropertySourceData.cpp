@@ -36,7 +36,7 @@
 #include "wtf/text/StringBuilder.h"
 #include "wtf/text/StringHash.h"
 
-namespace WebCore {
+namespace blink {
 
 SourceRange::SourceRange()
     : start(0)
@@ -93,7 +93,7 @@ String CSSPropertySourceData::toString() const
 
     StringBuilder result;
     if (disabled)
-        result.append("/* ");
+        result.appendLiteral("/* ");
     result.append(name);
     result.appendLiteral(": ");
     result.append(value);
@@ -101,7 +101,7 @@ String CSSPropertySourceData::toString() const
         result.appendLiteral(" !important");
     result.append(';');
     if (disabled)
-        result.append(" */");
+        result.appendLiteral(" */");
     return result.toString();
 }
 
@@ -119,4 +119,4 @@ void CSSRuleSourceData::trace(Visitor* visitor)
     visitor->trace(childRules);
 }
 
-} // namespace WebCore
+} // namespace blink

@@ -31,7 +31,7 @@
 #ifndef MutationObserver_h
 #define MutationObserver_h
 
-#include "bindings/v8/ScriptWrappable.h"
+#include "bindings/core/v8/ScriptWrappable.h"
 #include "platform/heap/Handle.h"
 #include "wtf/HashSet.h"
 #include "wtf/PassOwnPtr.h"
@@ -40,12 +40,13 @@
 #include "wtf/RefPtr.h"
 #include "wtf/Vector.h"
 
-namespace WebCore {
+namespace blink {
 
 class Dictionary;
 class ExceptionState;
 class MutationCallback;
 class MutationObserver;
+class MutationObserverInit;
 class MutationObserverRegistration;
 class MutationRecord;
 class Node;
@@ -59,6 +60,7 @@ typedef WillBeHeapVector<RefPtrWillBeMember<MutationObserver> > MutationObserver
 typedef WillBeHeapVector<RefPtrWillBeMember<MutationRecord> > MutationRecordVector;
 
 class MutationObserver FINAL : public RefCountedWillBeGarbageCollectedFinalized<MutationObserver>, public ScriptWrappable {
+    DEFINE_WRAPPERTYPEINFO();
 public:
     enum MutationType {
         ChildList = 1 << 0,
@@ -84,7 +86,7 @@ public:
 
     ~MutationObserver();
 
-    void observe(Node*, const Dictionary&, ExceptionState&);
+    void observe(Node*, const MutationObserverInit&, ExceptionState&);
     WillBeHeapVector<RefPtrWillBeMember<MutationRecord> > takeRecords();
     void disconnect();
     void observationStarted(MutationObserverRegistration*);
@@ -93,7 +95,7 @@ public:
     void setHasTransientRegistration();
     bool canDeliver();
 
-    HashSet<Node*> getObservedNodes() const;
+    WillBeHeapHashSet<RawPtrWillBeMember<Node> > getObservedNodes() const;
 
     void trace(Visitor*);
 
@@ -109,6 +111,6 @@ private:
     unsigned m_priority;
 };
 
-}
+} // namespace blink
 
 #endif // MutationObserver_h

@@ -26,20 +26,21 @@
 #ifndef WebGLDebugRendererInfo_h
 #define WebGLDebugRendererInfo_h
 
-#include "bindings/v8/ScriptWrappable.h"
+#include "bindings/core/v8/ScriptWrappable.h"
 #include "core/html/canvas/WebGLExtension.h"
 #include "wtf/PassRefPtr.h"
 
-namespace WebCore {
+namespace blink {
 
 class WebGLDebugRendererInfo FINAL : public WebGLExtension, public ScriptWrappable {
+    DEFINE_WRAPPERTYPEINFO();
 public:
     enum EnumType {
         UNMASKED_VENDOR_WEBGL = 0x9245,
         UNMASKED_RENDERER_WEBGL = 0x9246
     };
 
-    static PassRefPtr<WebGLDebugRendererInfo> create(WebGLRenderingContextBase*);
+    static PassRefPtrWillBeRawPtr<WebGLDebugRendererInfo> create(WebGLRenderingContextBase*);
     static bool supported(WebGLRenderingContextBase*);
     static const char* extensionName();
 
@@ -47,9 +48,9 @@ public:
     virtual WebGLExtensionName name() const OVERRIDE;
 
 private:
-    WebGLDebugRendererInfo(WebGLRenderingContextBase*);
+    explicit WebGLDebugRendererInfo(WebGLRenderingContextBase*);
 };
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // WebGLDebugRendererInfo_h

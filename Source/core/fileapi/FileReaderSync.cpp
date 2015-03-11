@@ -31,7 +31,7 @@
 #include "config.h"
 #include "core/fileapi/FileReaderSync.h"
 
-#include "bindings/v8/ExceptionState.h"
+#include "bindings/core/v8/ExceptionState.h"
 #include "core/dom/ExceptionCode.h"
 #include "core/fileapi/Blob.h"
 #include "core/fileapi/FileError.h"
@@ -39,11 +39,10 @@
 #include "wtf/ArrayBuffer.h"
 #include "wtf/PassRefPtr.h"
 
-namespace WebCore {
+namespace blink {
 
 FileReaderSync::FileReaderSync()
 {
-    ScriptWrappable::init(this);
 }
 
 PassRefPtr<ArrayBuffer> FileReaderSync::readAsArrayBuffer(ExecutionContext* executionContext, Blob* blob, ExceptionState& exceptionState)
@@ -104,4 +103,4 @@ void FileReaderSync::startLoading(ExecutionContext* executionContext, FileReader
         FileError::throwDOMException(exceptionState, loader.errorCode());
 }
 
-} // namespace WebCore
+} // namespace blink

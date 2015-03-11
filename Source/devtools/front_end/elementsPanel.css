@@ -49,6 +49,10 @@
     -webkit-transform: translateZ(0);
 }
 
+.elements-tree-outline.pick-node-mode {
+    cursor: pointer;
+}
+
 #elements-content .editing {
     margin-left: 8px;
 }
@@ -69,7 +73,7 @@
 }
 
 #elements-content .CodeMirror {
-    /* Consistent with the .editing class in inspector.css */
+    /* Consistent with the .editing class in inspectorStyle.css */
     box-shadow: rgba(0, 0, 0, .5) 3px 3px 4px;
     outline: 1px solid rgb(66%, 66%, 66%) !important;
     background-color: white;
@@ -191,6 +195,7 @@
     background-clip: padding;
     -webkit-user-select: text;
     border-bottom: 1px solid rgb(191, 191, 191);
+    position: relative;
 }
 
 .styles-pane .sidebar-separator {
@@ -598,6 +603,7 @@
 }
 
 .sidebar-pane .style-panes-wrapper {
+    transform: translateZ(0);
     flex: 1;
     overflow-y: auto;
     position: relative;
@@ -645,10 +651,6 @@
     margin-bottom: 5px;
 }
 
-.sidebar-pane.composite .platform-fonts .css-font-value {
-    margin-left: 1ex;
-}
-
 .sidebar-pane.composite .platform-fonts .font-stats-item {
     padding-left: 1em;
 }
@@ -659,20 +661,6 @@
 
 .sidebar-pane.composite .metrics-and-styles .metrics {
     border-bottom: none;
-}
-
-.styles-section.computed-style > .header > .sidebar-pane-subtitle {
-    line-height: 17px;
-    margin: 2px;
-    -webkit-user-select: none;
-}
-
-.styles-section.computed-style > .header > .sidebar-pane-subtitle > input {
-    vertical-align: middle;
-}
-
-.sidebar-pane.composite .sidebar-pane-toolbar > .sidebar-pane-subtitle {
-    left: 8px;
 }
 
 .sidebar-pane > .body > .split-view {
@@ -705,10 +693,6 @@
     background-position: -46px 0;
 }
 
-.panel.elements .sidebar-pane-toolbar > select.select-settings {
-    background-image: url(Images/paneSettingsButtons.png);
-}
-
 .panel.elements .sidebar-pane-toolbar > select.select-filter {
     background-image: url(Images/paneFilterButtons.png);
 }
@@ -734,4 +718,78 @@
 
 li.child-editing .styles-clipboard-only {
     display: none;
+}
+
+/* Breadcrumbs */
+
+.crumbs {
+    display: inline-block;
+    pointer-events: auto;
+    cursor: default;
+    font-size: 11px;
+    line-height: 17px;
+}
+
+.crumbs .crumb {
+    display: inline-block;
+    padding: 0 7px;
+    height: 18px;
+    white-space: nowrap;
+}
+
+.crumbs .crumb.collapsed > * {
+    display: none;
+}
+
+.crumbs .crumb.collapsed::before {
+    content: "\2026";
+    font-weight: bold;
+}
+
+.crumbs .crumb.compact .extra {
+    display: none;
+}
+
+.crumbs .crumb.selected, .crumbs .crumb.selected:hover {
+    background-color: rgb(56, 121, 217);
+    color: white;
+    text-shadow: rgba(255, 255, 255, 0.5) 0 0 0;
+}
+
+.crumbs .crumb:hover {
+    background-color: rgb(216, 216, 216);
+}
+
+.elements-tree-element-pick-node-1 {
+    border-radius: 3px;
+    padding: 1px 0 1px 0;
+    -webkit-animation: elements-tree-element-pick-node-animation-1 0.5s 1;
+}
+
+.elements-tree-element-pick-node-2 {
+    border-radius: 3px;
+    padding: 1px 0 1px 0;
+    -webkit-animation: elements-tree-element-pick-node-animation-2 0.5s 1;
+}
+
+@-webkit-keyframes elements-tree-element-pick-node-animation-1 {
+    from { background-color: rgb(255, 210, 126); }
+    to { background-color: inherit; }
+}
+
+@-webkit-keyframes elements-tree-element-pick-node-animation-2 {
+    from { background-color: rgb(255, 210, 126); }
+    to { background-color: inherit; }
+}
+
+.sidebar-separator {
+    background-color: rgb(230, 230, 230);
+    padding: 0 5px;
+    border-top: 1px solid rgb(189, 189, 189);
+    border-bottom: 1px solid rgb(189, 189, 189);
+    color: rgb(50, 50, 50);
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    line-height: 16px;
 }

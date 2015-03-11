@@ -20,15 +20,17 @@
 #ifndef FrameTree_h
 #define FrameTree_h
 
+#include "platform/heap/Handle.h"
 #include "wtf/text/AtomicString.h"
 
-namespace WebCore {
+namespace blink {
 
 class Frame;
 class TreeScope;
 
-class FrameTree {
+class FrameTree FINAL {
     WTF_MAKE_NONCOPYABLE(FrameTree);
+    DISALLOW_ALLOCATION();
 public:
     explicit FrameTree(Frame* thisFrame);
     ~FrameTree();
@@ -60,13 +62,15 @@ public:
     unsigned scopedChildCount() const;
     void invalidateScopedChildCount();
 
+    void trace(Visitor*);
+
 private:
     Frame* deepLastChild() const;
     AtomicString uniqueChildName(const AtomicString& requestedName) const;
     bool uniqueNameExists(const AtomicString& name) const;
     unsigned scopedChildCount(TreeScope*) const;
 
-    Frame* m_thisFrame;
+    RawPtrWillBeMember<Frame> m_thisFrame;
 
     AtomicString m_name; // The actual frame name (may be empty).
     AtomicString m_uniqueName;
@@ -74,11 +78,11 @@ private:
     mutable unsigned m_scopedChildCount;
 };
 
-} // namespace WebCore
+} // namespace blink
 
 #ifndef NDEBUG
 // Outside the WebCore namespace for ease of invocation from gdb.
-void showFrameTree(const WebCore::Frame*);
+void showFrameTree(const blink::Frame*);
 #endif
 
 #endif // FrameTree_h

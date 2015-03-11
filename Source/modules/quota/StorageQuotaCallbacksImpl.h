@@ -31,34 +31,34 @@
 #ifndef StorageQuotaCallbacksImpl_h
 #define StorageQuotaCallbacksImpl_h
 
-#include "bindings/v8/ScriptPromiseResolverWithContext.h"
+#include "bindings/core/v8/ScriptPromiseResolver.h"
 #include "platform/StorageQuotaCallbacks.h"
 #include "wtf/OwnPtr.h"
 #include "wtf/PassRefPtr.h"
 #include "wtf/RefPtr.h"
 
-namespace WebCore {
+namespace blink {
 
 class StorageQuotaCallbacksImpl FINAL : public StorageQuotaCallbacks {
     WTF_MAKE_NONCOPYABLE(StorageQuotaCallbacksImpl);
 public:
-    static PassOwnPtr<StorageQuotaCallbacksImpl> create(PassRefPtr<ScriptPromiseResolverWithContext> resolver)
+    static PassOwnPtrWillBeRawPtr<StorageQuotaCallbacksImpl> create(PassRefPtr<ScriptPromiseResolver> resolver)
     {
-        return adoptPtr(new StorageQuotaCallbacksImpl(resolver));
+        return adoptPtrWillBeNoop(new StorageQuotaCallbacksImpl(resolver));
     }
 
     virtual ~StorageQuotaCallbacksImpl();
 
     virtual void didQueryStorageUsageAndQuota(unsigned long long usageInBytes, unsigned long long quotaInBytes) OVERRIDE;
     virtual void didGrantStorageQuota(unsigned long long usageInBytes, unsigned long long grantedQuotaInBytes) OVERRIDE;
-    virtual void didFail(blink::WebStorageQuotaError) OVERRIDE;
+    virtual void didFail(WebStorageQuotaError) OVERRIDE;
 
 private:
-    StorageQuotaCallbacksImpl(PassRefPtr<ScriptPromiseResolverWithContext>);
+    StorageQuotaCallbacksImpl(PassRefPtr<ScriptPromiseResolver>);
 
-    RefPtr<ScriptPromiseResolverWithContext> m_resolver;
+    RefPtr<ScriptPromiseResolver> m_resolver;
 };
 
-} // namespace
+} // namespace blink
 
 #endif // StorageQuotaCallbacksImpl_h

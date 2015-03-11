@@ -31,20 +31,19 @@
 #include "config.h"
 #include "InstallEvent.h"
 
-#include "bindings/v8/ScriptPromiseResolver.h"
 #include "modules/serviceworkers/WaitUntilObserver.h"
 #include "platform/NotImplemented.h"
 #include "wtf/RefPtr.h"
 #include <v8.h>
 
-namespace WebCore {
+namespace blink {
 
 PassRefPtrWillBeRawPtr<InstallEvent> InstallEvent::create()
 {
     return adoptRefWillBeNoop(new InstallEvent());
 }
 
-PassRefPtrWillBeRawPtr<InstallEvent> InstallEvent::create(const AtomicString& type, const EventInit& initializer, PassRefPtr<WaitUntilObserver> observer)
+PassRefPtrWillBeRawPtr<InstallEvent> InstallEvent::create(const AtomicString& type, const EventInit& initializer, WaitUntilObserver* observer)
 {
     return adoptRefWillBeNoop(new InstallEvent(type, initializer, observer));
 }
@@ -61,10 +60,7 @@ ScriptPromise InstallEvent::reloadAll(ScriptState* scriptState)
     notImplemented();
 
     // For now this just returns a promise which is already rejected.
-    RefPtr<ScriptPromiseResolver> resolver = ScriptPromiseResolver::create(scriptState);
-    ScriptPromise promise = resolver->promise();
-    resolver->reject(ScriptValue(scriptState, v8::Null(scriptState->isolate())));
-    return promise;
+    return ScriptPromise::reject(scriptState, v8::Null(scriptState->isolate()));
 }
 
 const AtomicString& InstallEvent::interfaceName() const
@@ -74,18 +70,16 @@ const AtomicString& InstallEvent::interfaceName() const
 
 InstallEvent::InstallEvent()
 {
-    ScriptWrappable::init(this);
 }
 
-InstallEvent::InstallEvent(const AtomicString& type, const EventInit& initializer, PassRefPtr<WaitUntilObserver> observer)
-    : InstallPhaseEvent(type, initializer, observer)
+InstallEvent::InstallEvent(const AtomicString& type, const EventInit& initializer, WaitUntilObserver* observer)
+    : ExtendableEvent(type, initializer, observer)
 {
-    ScriptWrappable::init(this);
 }
 
 void InstallEvent::trace(Visitor* visitor)
 {
-    InstallPhaseEvent::trace(visitor);
+    ExtendableEvent::trace(visitor);
 }
 
-} // namespace WebCore
+} // namespace blink

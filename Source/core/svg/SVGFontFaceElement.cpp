@@ -42,7 +42,7 @@
 #include "platform/fonts/Font.h"
 #include <math.h>
 
-namespace WebCore {
+namespace blink {
 
 using namespace SVGNames;
 
@@ -52,7 +52,6 @@ inline SVGFontFaceElement::SVGFontFaceElement(Document& document)
     , m_fontElement(nullptr)
     , m_weakFactory(this)
 {
-    ScriptWrappable::init(this);
     RefPtrWillBeRawPtr<MutableStylePropertySet> styleDeclaration = MutableStylePropertySet::create(HTMLStandardMode);
     m_fontFaceRule->setProperties(styleDeclaration.release());
 }
@@ -301,7 +300,7 @@ void SVGFontFaceElement::rebuildFontFace()
 
         unsigned srcLength = srcList ? srcList->length() : 0;
         for (unsigned i = 0; i < srcLength; i++) {
-            if (CSSFontFaceSrcValue* item = toCSSFontFaceSrcValue(srcList->itemWithoutBoundsCheck(i)))
+            if (CSSFontFaceSrcValue* item = toCSSFontFaceSrcValue(srcList->item(i)))
                 item->setSVGFontFaceElement(this);
         }
     }
@@ -343,9 +342,9 @@ void SVGFontFaceElement::removedFrom(ContainerNode* rootParent)
         ASSERT(!m_fontElement);
 }
 
-void SVGFontFaceElement::childrenChanged(bool changedByParser, Node* beforeChange, Node* afterChange, int childCountDelta)
+void SVGFontFaceElement::childrenChanged(const ChildrenChange& change)
 {
-    SVGElement::childrenChanged(changedByParser, beforeChange, afterChange, childCountDelta);
+    SVGElement::childrenChanged(change);
     rebuildFontFace();
 }
 
@@ -356,6 +355,6 @@ void SVGFontFaceElement::trace(Visitor* visitor)
     SVGElement::trace(visitor);
 }
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // ENABLE(SVG_FONTS)

@@ -38,7 +38,7 @@
 #include "platform/text/TextStream.h"
 #include "platform/transforms/AffineTransform.h"
 
-namespace WebCore {
+namespace blink {
 
 FEImage::FEImage(Filter* filter, PassRefPtr<Image> image, PassRefPtr<SVGPreserveAspectRatio> preserveAspectRatio)
     : FilterEffect(filter)
@@ -70,6 +70,14 @@ static FloatRect getRendererRepaintRect(RenderObject* renderer)
 {
     return renderer->localToParentTransform().mapRect(
         renderer->paintInvalidationRectInLocalCoordinates());
+}
+
+AffineTransform makeMapBetweenRects(const FloatRect& source, const FloatRect& dest)
+{
+    AffineTransform transform;
+    transform.translate(dest.x() - source.x(), dest.y() - source.y());
+    transform.scale(dest.width() / source.width(), dest.height() / source.height());
+    return transform;
 }
 
 FloatRect FEImage::determineAbsolutePaintRect(const FloatRect& originalRequestedRect)
@@ -203,8 +211,9 @@ PassRefPtr<SkImageFilter> FEImage::createImageFilterForRenderer(RenderObject* re
     if (!context)
         return adoptRef(SkBitmapSource::Create(SkBitmap()));
     AffineTransform contentTransformation;
+    FloatRect bounds(FloatPoint(), dstRect.size());
     context->save();
-    context->beginRecording(FloatRect(FloatPoint(), dstRect.size()));
+    context->beginRecording(bounds);
     context->concatCTM(transform);
     SVGRenderingContext::renderSubtree(context, renderer, contentTransformation);
     RefPtr<DisplayList> displayList = context->endRecording();
@@ -241,4 +250,4 @@ PassRefPtr<SkImageFilter> FEImage::createImageFilter(SkiaImageFilterBuilder* bui
     return result.release();
 }
 
-} // namespace WebCore
+} // namespace blink

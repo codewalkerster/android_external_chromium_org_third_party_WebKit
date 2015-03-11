@@ -12,26 +12,38 @@
 #include "platform/weborigin/KURL.h"
 #include "wtf/RefCounted.h"
 
-namespace WebCore {
+namespace blink {
 
 class NullExecutionContext FINAL : public RefCountedWillBeGarbageCollectedFinalized<NullExecutionContext>, public SecurityContext, public ExecutionContext {
     WILL_BE_USING_GARBAGE_COLLECTED_MIXIN(NullExecutionContext);
 public:
     NullExecutionContext();
 
+    virtual void disableEval(const String&) OVERRIDE { }
+    virtual String userAgent(const KURL&) const OVERRIDE { return String(); }
+
+    virtual void postTask(PassOwnPtr<ExecutionContextTask>) OVERRIDE;
+
+    virtual EventTarget* errorEventTarget() OVERRIDE { return 0; }
     virtual EventQueue* eventQueue() const OVERRIDE { return m_queue.get(); }
 
     virtual bool tasksNeedSuspension() OVERRIDE { return m_tasksNeedSuspension; }
     void setTasksNeedSuspension(bool flag) { m_tasksNeedSuspension = flag; }
+
+    virtual void reportBlockedScriptExecutionToInspector(const String& directiveText) OVERRIDE { }
+    virtual void didUpdateSecurityOrigin() OVERRIDE { }
+    virtual SecurityContext& securityContext() OVERRIDE { return *this; }
+
+    double timerAlignmentInterval() const;
+
+    virtual void addConsoleMessage(PassRefPtrWillBeRawPtr<ConsoleMessage>) OVERRIDE { }
+    virtual void logExceptionToConsole(const String& errorMessage, int scriptId, const String& sourceURL, int lineNumber, int columnNumber, PassRefPtrWillBeRawPtr<ScriptCallStack>) OVERRIDE { }
 
     void trace(Visitor* visitor)
     {
         visitor->trace(m_queue);
         ExecutionContext::trace(visitor);
     }
-
-    virtual void reportBlockedScriptExecutionToInspector(const String& directiveText) OVERRIDE { }
-    virtual SecurityContext& securityContext() OVERRIDE { return *this; }
 
 #if !ENABLE(OILPAN)
     using RefCounted<NullExecutionContext>::ref;
@@ -52,6 +64,6 @@ private:
     KURL m_dummyURL;
 };
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // NullExecutionContext_h

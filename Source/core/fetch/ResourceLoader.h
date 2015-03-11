@@ -40,7 +40,7 @@ namespace blink {
 class WebThreadedDataReceiver;
 }
 
-namespace WebCore {
+namespace blink {
 
 class Resource;
 class KURL;
@@ -48,10 +48,11 @@ class ResourceError;
 class ResourceResponse;
 class ResourceLoaderHost;
 
-class ResourceLoader FINAL : public RefCounted<ResourceLoader>, protected blink::WebURLLoaderClient {
+class ResourceLoader FINAL : public RefCountedWillBeGarbageCollectedFinalized<ResourceLoader>, protected WebURLLoaderClient {
 public:
-    static PassRefPtr<ResourceLoader> create(ResourceLoaderHost*, Resource*, const ResourceRequest&, const ResourceLoaderOptions&);
+    static PassRefPtrWillBeRawPtr<ResourceLoader> create(ResourceLoaderHost*, Resource*, const ResourceRequest&, const ResourceLoaderOptions&);
     virtual ~ResourceLoader();
+    void trace(Visitor*);
 
     void start();
     void changeToSynchronous();
@@ -83,7 +84,6 @@ public:
     virtual void didDownloadData(blink::WebURLLoader*, int, int) OVERRIDE;
 
     const KURL& url() const { return m_request.url(); }
-    bool shouldSniffContent() const { return m_options.sniffContent == SniffContent; }
     bool isLoadedBy(ResourceLoaderHost*) const;
 
     bool reachedTerminalState() const { return m_state == Terminated; }
@@ -112,7 +112,7 @@ private:
     ResourceRequest& applyOptions(ResourceRequest&) const;
 
     OwnPtr<blink::WebURLLoader> m_loader;
-    RefPtrWillBePersistent<ResourceLoaderHost> m_host;
+    RefPtrWillBeMember<ResourceLoaderHost> m_host;
 
     ResourceRequest m_request;
     ResourceRequest m_originalRequest; // Before redirects.
@@ -139,7 +139,7 @@ private:
         ConnectionStateFailed,
     };
 
-    Resource* m_resource;
+    RawPtrWillBeMember<Resource> m_resource;
     ResourceLoaderState m_state;
 
     // Used for sanity checking to make sure we don't experience illegal state

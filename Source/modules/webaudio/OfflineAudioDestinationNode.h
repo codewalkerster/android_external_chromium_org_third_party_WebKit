@@ -31,21 +31,22 @@
 #include "wtf/PassRefPtr.h"
 #include "wtf/RefPtr.h"
 
-namespace WebCore {
+namespace blink {
 
 class AudioBus;
 class AudioContext;
 
 class OfflineAudioDestinationNode FINAL : public AudioDestinationNode {
 public:
-    static PassRefPtrWillBeRawPtr<OfflineAudioDestinationNode> create(AudioContext* context, AudioBuffer* renderTarget)
+    static OfflineAudioDestinationNode* create(AudioContext* context, AudioBuffer* renderTarget)
     {
-        return adoptRefWillBeNoop(new OfflineAudioDestinationNode(context, renderTarget));
+        return adoptRefCountedGarbageCollectedWillBeNoop(new OfflineAudioDestinationNode(context, renderTarget));
     }
 
     virtual ~OfflineAudioDestinationNode();
 
     // AudioNode
+    virtual void dispose() OVERRIDE;
     virtual void initialize() OVERRIDE;
     virtual void uninitialize() OVERRIDE;
 
@@ -57,27 +58,22 @@ public:
     virtual void trace(Visitor*) OVERRIDE;
 
 private:
-    class OfflineRenderingTask;
-    friend class OfflineRenderingTask;
-
     OfflineAudioDestinationNode(AudioContext*, AudioBuffer* renderTarget);
 
     // This AudioNode renders into this AudioBuffer.
-    RefPtrWillBeMember<AudioBuffer> m_renderTarget;
-
+    Member<AudioBuffer> m_renderTarget;
     // Temporary AudioBus for each render quantum.
     RefPtr<AudioBus> m_renderBus;
 
     // Rendering thread.
-    OwnPtr<blink::WebThread> m_renderThread;
+    OwnPtr<WebThread> m_renderThread;
     bool m_startedRendering;
     void offlineRender();
 
     // For completion callback on main thread.
-    static void notifyCompleteDispatch(void* userData);
     void notifyComplete();
 };
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // OfflineAudioDestinationNode_h

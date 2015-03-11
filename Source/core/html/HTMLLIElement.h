@@ -25,9 +25,10 @@
 
 #include "core/html/HTMLElement.h"
 
-namespace WebCore {
+namespace blink {
 
 class HTMLLIElement FINAL : public HTMLElement {
+    DEFINE_WRAPPERTYPEINFO();
 public:
     DECLARE_NODE_FACTORY(HTMLLIElement);
 
@@ -43,6 +44,6 @@ private:
     void parseValue(const AtomicString&);
 };
 
-} //namespace
+} // namespace blink
 
-#endif
+#endif // HTMLLIElement_h

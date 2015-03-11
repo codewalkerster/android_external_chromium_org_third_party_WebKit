@@ -37,7 +37,7 @@
 #include "wtf/Noncopyable.h"
 #include "wtf/text/WTFString.h"
 
-namespace WebCore {
+namespace blink {
 
 class AutoscrollController;
 class BackForwardClient;
@@ -54,20 +54,12 @@ class EditorClient;
 class FocusController;
 class Frame;
 class FrameHost;
-class HistoryItem;
 class InspectorClient;
 class InspectorController;
 class PageLifecycleNotifier;
-class PlatformMouseEvent;
 class PluginData;
 class PointerLockController;
-class Range;
-class RenderBox;
-class RenderObject;
-class RenderTheme;
 class StorageClient;
-class VisibleSelection;
-class ScrollableArea;
 class ScrollingCoordinator;
 class Settings;
 class SpellCheckerClient;
@@ -146,7 +138,7 @@ public:
     void decrementSubframeCount() { ASSERT(m_subframeCount); --m_subframeCount; }
     int subframeCount() const { checkSubframeCountConsistency(); return m_subframeCount; }
 
-    PageAnimator& animator() { return m_animator; }
+    PageAnimator& animator() { return *m_animator; }
     Chrome& chrome() const { return *m_chrome; }
     AutoscrollController& autoscrollController() const { return *m_autoscrollController; }
     DragCaretController& dragCaretController() const { return *m_dragCaretController; }
@@ -184,6 +176,8 @@ public:
 
     float deviceScaleFactor() const { return m_deviceScaleFactor; }
     void setDeviceScaleFactor(float);
+    void setDeviceColorProfile(const Vector<char>&);
+    void resetDeviceColorProfile();
 
     static void allVisitedStateChanged();
     static void visitedStateChanged(LinkHash visitedHash);
@@ -203,7 +197,7 @@ public:
     bool isCursorVisible() const;
     void setIsCursorVisible(bool isVisible) { m_isCursorVisible = isVisible; }
 
-#ifndef NDEBUG
+#if ENABLE(ASSERT)
     void setIsPainting(bool painting) { m_isPainting = painting; }
     bool isPainting() const { return m_isPainting; }
 #endif
@@ -234,7 +228,7 @@ protected:
 private:
     void initGroup();
 
-#if ASSERT_ENABLED
+#if ENABLE(ASSERT)
     void checkSubframeCountConsistency() const;
 #else
     void checkSubframeCountConsistency() const { }
@@ -247,14 +241,14 @@ private:
     // SettingsDelegate overrides.
     virtual void settingsChanged(SettingsDelegate::ChangeType) OVERRIDE;
 
-    PageAnimator m_animator;
+    RefPtrWillBeMember<PageAnimator> m_animator;
     const OwnPtr<AutoscrollController> m_autoscrollController;
     const OwnPtr<Chrome> m_chrome;
     const OwnPtrWillBeMember<DragCaretController> m_dragCaretController;
     const OwnPtrWillBeMember<DragController> m_dragController;
-    const OwnPtr<FocusController> m_focusController;
-    const OwnPtr<ContextMenuController> m_contextMenuController;
-    const OwnPtr<InspectorController> m_inspectorController;
+    const OwnPtrWillBeMember<FocusController> m_focusController;
+    const OwnPtrWillBeMember<ContextMenuController> m_contextMenuController;
+    const OwnPtrWillBeMember<InspectorController> m_inspectorController;
     const OwnPtrWillBeMember<PointerLockController> m_pointerLockController;
     OwnPtr<ScrollingCoordinator> m_scrollingCoordinator;
     const OwnPtrWillBeMember<UndoStack> m_undoStack;
@@ -271,7 +265,7 @@ private:
     // other, thus keeping each other alive. The call to willBeDestroyed()
     // breaks this cycle, so the frame is still properly destroyed once no
     // longer needed.
-    Frame* m_mainFrame;
+    RawPtrWillBeMember<Frame> m_mainFrame;
 
     mutable RefPtr<PluginData> m_pluginData;
 
@@ -299,7 +293,7 @@ private:
 
     bool m_isCursorVisible;
 
-#ifndef NDEBUG
+#if ENABLE(ASSERT)
     bool m_isPainting;
 #endif
 
@@ -310,6 +304,6 @@ private:
     OwnPtrWillBeMember<FrameHost> m_frameHost;
 };
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // Page_h

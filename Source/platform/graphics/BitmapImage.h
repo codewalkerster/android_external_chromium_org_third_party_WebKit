@@ -36,7 +36,7 @@
 #include "platform/graphics/ImageSource.h"
 #include "wtf/Forward.h"
 
-namespace WebCore {
+namespace blink {
 
 class NativeImageSkia;
 template <typename T> class Timer;
@@ -47,43 +47,43 @@ class PLATFORM_EXPORT BitmapImage : public Image {
     friend class GradientGeneratedImage;
     friend class GraphicsContext;
 public:
-    static PassRefPtr<BitmapImage> create(PassRefPtr<NativeImageSkia> nativeImage, ImageObserver* observer = 0)
-    {
-        return adoptRef(new BitmapImage(nativeImage, observer));
-    }
+    static PassRefPtr<BitmapImage> create(PassRefPtr<NativeImageSkia>, ImageObserver* = 0);
+
     static PassRefPtr<BitmapImage> create(ImageObserver* observer = 0)
     {
         return adoptRef(new BitmapImage(observer));
     }
+
     virtual ~BitmapImage();
 
     virtual bool isBitmapImage() const OVERRIDE;
 
-    virtual bool currentFrameHasSingleSecurityOrigin() const OVERRIDE { return true; };
+    virtual bool currentFrameHasSingleSecurityOrigin() const OVERRIDE;
 
     virtual IntSize size() const OVERRIDE;
     IntSize sizeRespectingOrientation() const;
-    IntSize currentFrameSize() const;
     virtual bool getHotSpot(IntPoint&) const OVERRIDE;
-
-    virtual bool dataChanged(bool allDataReceived) OVERRIDE;
-    bool isAllDataReceived() const;
-    bool hasColorProfile() const;
     virtual String filenameExtension() const OVERRIDE;
+    virtual bool dataChanged(bool allDataReceived) OVERRIDE;
 
-    // It may look unusual that there is no start animation call as public API.  This is because
-    // we start and stop animating lazily.  Animation begins whenever someone draws the image.  It will
-    // automatically pause once all observers no longer want to render the image anywhere.
+    bool isAllDataReceived() const { return m_allDataReceived; }
+    bool hasColorProfile() const;
+    void resetDecoder();
+
+    // It may look unusual that there's no start animation call as public API.
+    // This because we start and stop animating lazily. Animation starts when
+    // the image is rendered, and automatically pauses once all observers no
+    // longer want to render the image.
     virtual void stopAnimation() OVERRIDE;
     virtual void resetAnimation() OVERRIDE;
     virtual bool maybeAnimated() OVERRIDE;
 
     virtual PassRefPtr<NativeImageSkia> nativeImageForCurrentFrame() OVERRIDE;
+    virtual PassRefPtr<Image> imageForDefaultFrame() OVERRIDE;
     virtual bool currentFrameKnownToBeOpaque() OVERRIDE;
-
     ImageOrientation currentFrameOrientation();
 
-#if ASSERT_ENABLED
+#if ENABLE(ASSERT)
     virtual bool notSolidColor() OVERRIDE;
 #endif
 
@@ -102,12 +102,14 @@ protected:
     BitmapImage(PassRefPtr<NativeImageSkia>, ImageObserver* = 0);
     BitmapImage(ImageObserver* = 0);
 
-    virtual void draw(GraphicsContext*, const FloatRect& dstRect, const FloatRect& srcRect, CompositeOperator, blink::WebBlendMode) OVERRIDE;
-    virtual void draw(GraphicsContext*, const FloatRect& dstRect, const FloatRect& srcRect, CompositeOperator, blink::WebBlendMode, RespectImageOrientationEnum) OVERRIDE;
+    virtual void draw(GraphicsContext*, const FloatRect& dstRect, const FloatRect& srcRect, CompositeOperator, WebBlendMode) OVERRIDE;
+    virtual void draw(GraphicsContext*, const FloatRect& dstRect, const FloatRect& srcRect, CompositeOperator, WebBlendMode, RespectImageOrientationEnum) OVERRIDE;
 
     size_t currentFrame() const { return m_currentFrame; }
     size_t frameCount();
+
     PassRefPtr<NativeImageSkia> frameAtIndex(size_t);
+
     bool frameIsCompleteAtIndex(size_t);
     float frameDurationAtIndex(size_t);
     bool frameHasAlphaAtIndex(size_t);
@@ -115,6 +117,7 @@ protected:
 
     // Decodes and caches a frame. Never accessed except internally.
     void cacheFrame(size_t index);
+
     // Called before accessing m_frames[index]. Returns false on index out of bounds.
     bool ensureFrameIsCached(size_t index);
 
@@ -159,6 +162,7 @@ protected:
     virtual bool mayFillWithSolidColor() OVERRIDE;
     virtual Color solidColor() const OVERRIDE;
 
+private:
     ImageSource m_source;
     mutable IntSize m_size; // The size to use for the overall image (will just be the size of the first image).
     mutable IntSize m_sizeRespectingOrientation;
@@ -190,6 +194,6 @@ protected:
 
 DEFINE_IMAGE_TYPE_CASTS(BitmapImage);
 
-}
+} // namespace blink
 
 #endif

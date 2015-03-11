@@ -30,30 +30,35 @@
 #include "platform/heap/Handle.h"
 #include "public/web/WebGeolocationController.h"
 
-namespace WebCore {
-class GeolocationPosition;
-}
-
 namespace blink {
+
+class GeolocationPosition;
 class WebGeolocationClient;
 
-class GeolocationClientProxy FINAL : public WebCore::GeolocationClient {
+class GeolocationClientProxy FINAL : public GeolocationClient {
 public:
-    GeolocationClientProxy(WebGeolocationClient* client);
+    static PassOwnPtrWillBeRawPtr<GeolocationClientProxy> create(WebGeolocationClient* client)
+    {
+        return adoptPtrWillBeNoop(new GeolocationClientProxy(client));
+    }
+
     virtual ~GeolocationClientProxy();
-    void setController(WebCore::GeolocationController *controller);
-    virtual void geolocationDestroyed() OVERRIDE;
+    void setController(GeolocationController*);
     virtual void startUpdating() OVERRIDE;
     virtual void stopUpdating() OVERRIDE;
     virtual void setEnableHighAccuracy(bool) OVERRIDE;
-    virtual WebCore::GeolocationPosition* lastPosition() OVERRIDE;
+    virtual GeolocationPosition* lastPosition() OVERRIDE;
 
-    virtual void requestPermission(WebCore::Geolocation*) OVERRIDE;
-    virtual void cancelPermissionRequest(WebCore::Geolocation*) OVERRIDE;
+    virtual void requestPermission(Geolocation*) OVERRIDE;
+    virtual void cancelPermissionRequest(Geolocation*) OVERRIDE;
+
+    virtual void trace(Visitor*) OVERRIDE;
 
 private:
+    explicit GeolocationClientProxy(WebGeolocationClient*);
+
     WebGeolocationClient* m_client;
-    WebCore::Persistent<WebCore::GeolocationPosition> m_lastPosition;
+    PersistentWillBeMember<GeolocationPosition> m_lastPosition;
 };
 
 } // namespace blink

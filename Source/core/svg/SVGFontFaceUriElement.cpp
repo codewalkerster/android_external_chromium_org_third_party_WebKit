@@ -30,14 +30,13 @@
 #include "core/fetch/ResourceFetcher.h"
 #include "core/svg/SVGFontFaceElement.h"
 
-namespace WebCore {
+namespace blink {
 
 using namespace SVGNames;
 
 inline SVGFontFaceUriElement::SVGFontFaceUriElement(Document& document)
     : SVGElement(font_face_uriTag, document)
 {
-    ScriptWrappable::init(this);
 }
 
 DEFINE_NODE_FACTORY(SVGFontFaceUriElement)
@@ -52,7 +51,7 @@ PassRefPtrWillBeRawPtr<CSSFontFaceSrcValue> SVGFontFaceUriElement::srcValue() co
 {
     RefPtrWillBeRawPtr<CSSFontFaceSrcValue> src = CSSFontFaceSrcValue::create(getAttribute(XLinkNames::hrefAttr));
     AtomicString value(fastGetAttribute(formatAttr));
-    src->setFormat(value.isEmpty() ? "svg" : value); // Default format
+    src->setFormat(value.isEmpty() ? AtomicString("svg", AtomicString::ConstructFromLiteral) : value); // Default format
     return src.release();
 }
 
@@ -64,9 +63,9 @@ void SVGFontFaceUriElement::parseAttribute(const QualifiedName& name, const Atom
         SVGElement::parseAttribute(name, value);
 }
 
-void SVGFontFaceUriElement::childrenChanged(bool changedByParser, Node* beforeChange, Node* afterChange, int childCountDelta)
+void SVGFontFaceUriElement::childrenChanged(const ChildrenChange& change)
 {
-    SVGElement::childrenChanged(changedByParser, beforeChange, afterChange, childCountDelta);
+    SVGElement::childrenChanged(change);
 
     if (!isSVGFontFaceSrcElement(parentNode()))
         return;

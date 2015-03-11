@@ -33,12 +33,11 @@
 #include "wtf/HashMap.h"
 #include "wtf/Vector.h"
 
-namespace WebCore {
+namespace blink {
 
 class DataObject;
 class DocumentFragment;
 class LocalFrame;
-class KURL;
 class Range;
 
 enum DragApplicationFlags {

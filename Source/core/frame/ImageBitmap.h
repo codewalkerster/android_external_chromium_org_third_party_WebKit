@@ -5,7 +5,7 @@
 #ifndef ImageBitmap_h
 #define ImageBitmap_h
 
-#include "bindings/v8/ScriptWrappable.h"
+#include "bindings/core/v8/ScriptWrappable.h"
 #include "core/html/HTMLImageElement.h"
 #include "core/html/canvas/CanvasImageSource.h"
 #include "platform/geometry/IntRect.h"
@@ -14,13 +14,14 @@
 #include "wtf/PassRefPtr.h"
 #include "wtf/RefCounted.h"
 
-namespace WebCore {
+namespace blink {
 
 class HTMLCanvasElement;
 class HTMLVideoElement;
 class ImageData;
 
 class ImageBitmap FINAL : public RefCountedWillBeGarbageCollectedFinalized<ImageBitmap>, public ScriptWrappable, public ImageLoaderClient, public CanvasImageSource {
+    DEFINE_WRAPPERTYPEINFO();
     WILL_BE_USING_GARBAGE_COLLECTED_MIXIN(ImageBitmap);
 public:
     static PassRefPtrWillBeRawPtr<ImageBitmap> create(HTMLImageElement*, const IntRect&);
@@ -76,6 +77,6 @@ private:
 
 };
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // ImageBitmap_h

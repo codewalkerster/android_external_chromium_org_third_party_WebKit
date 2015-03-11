@@ -30,12 +30,12 @@
 #include "config.h"
 #include "modules/crypto/Crypto.h"
 
-#include "bindings/v8/ExceptionState.h"
+#include "bindings/core/v8/ExceptionState.h"
 #include "core/dom/ExceptionCode.h"
 #include "wtf/ArrayBufferView.h"
 #include "wtf/CryptographicallyRandomNumber.h"
 
-namespace WebCore {
+namespace blink {
 
 namespace {
 
@@ -55,7 +55,6 @@ bool isIntegerArray(ArrayBufferView* array)
 
 Crypto::Crypto()
 {
-    ScriptWrappable::init(this);
 }
 
 void Crypto::getRandomValues(ArrayBufferView* array, ExceptionState& exceptionState)

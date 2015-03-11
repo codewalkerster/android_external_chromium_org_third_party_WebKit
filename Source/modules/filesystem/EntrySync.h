@@ -31,19 +31,20 @@
 #ifndef EntrySync_h
 #define EntrySync_h
 
-#include "bindings/v8/ScriptWrappable.h"
+#include "bindings/core/v8/ScriptWrappable.h"
 #include "modules/filesystem/DOMFileSystemSync.h"
 #include "modules/filesystem/EntryBase.h"
 #include "platform/heap/Handle.h"
 #include "wtf/Forward.h"
 
-namespace WebCore {
+namespace blink {
 
 class DirectoryEntrySync;
 class Metadata;
 class ExceptionState;
 
 class EntrySync : public EntryBase, public ScriptWrappable {
+    DEFINE_WRAPPERTYPEINFO();
 public:
     static EntrySync* create(EntryBase*);
 
@@ -61,6 +62,6 @@ protected:
     EntrySync(DOMFileSystemBase*, const String& fullPath);
 };
 
-}
+} // namespace blink
 
 #endif // EntrySync_h

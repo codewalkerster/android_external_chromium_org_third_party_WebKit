@@ -11,6 +11,9 @@ WebInspector.ExecutionContextSelector = function()
     WebInspector.targetManager.observeTargets(this);
     WebInspector.context.addFlavorChangeListener(WebInspector.ExecutionContext, this._executionContextChanged, this);
     WebInspector.context.addFlavorChangeListener(WebInspector.Target, this._targetChanged, this);
+
+    WebInspector.targetManager.addModelListener(WebInspector.RuntimeModel, WebInspector.RuntimeModel.Events.ExecutionContextCreated, this._onExecutionContextCreated, this);
+    WebInspector.targetManager.addModelListener(WebInspector.RuntimeModel, WebInspector.RuntimeModel.Events.ExecutionContextDestroyed, this._onExecutionContextDestroyed, this);
 }
 
 WebInspector.ExecutionContextSelector.prototype = {
@@ -20,11 +23,12 @@ WebInspector.ExecutionContextSelector.prototype = {
      */
     targetAdded: function(target)
     {
-        if (!WebInspector.context.flavor(WebInspector.Target))
-            WebInspector.context.setFlavor(WebInspector.Target, target);
-
-        target.runtimeModel.addEventListener(WebInspector.RuntimeModel.Events.ExecutionContextCreated, this._onExecutionContextCreated, this);
-        target.runtimeModel.addEventListener(WebInspector.RuntimeModel.Events.ExecutionContextDestroyed, this._onExecutionContextDestroyed, this);
+        // Defer selecting default target since we need all clients to get their
+        // targetAdded notifications first.
+        setImmediate(function() {
+            if (!WebInspector.context.flavor(WebInspector.Target))
+                WebInspector.context.setFlavor(WebInspector.Target, target);
+        });
     },
 
     /**
@@ -32,9 +36,7 @@ WebInspector.ExecutionContextSelector.prototype = {
      */
     targetRemoved: function(target)
     {
-        target.runtimeModel.removeEventListener(WebInspector.RuntimeModel.Events.ExecutionContextCreated, this._onExecutionContextCreated, this);
-        target.runtimeModel.removeEventListener(WebInspector.RuntimeModel.Events.ExecutionContextDestroyed, this._onExecutionContextDestroyed, this);
-        var currentExecutionContext = WebInspector.context.flavor(WebInspector.Target);
+        var currentExecutionContext = WebInspector.context.flavor(WebInspector.ExecutionContext);
         if (currentExecutionContext && currentExecutionContext.target() === target)
             this._currentExecutionContextGone();
 

@@ -39,8 +39,6 @@
 
 namespace blink {
 
-using namespace WebCore;
-
 PopupMenuChromium::PopupMenuChromium(LocalFrame& frame, PopupMenuClient* client)
     : m_popupClient(client)
     , m_frameView(frame.view())
@@ -51,7 +49,7 @@ PopupMenuChromium::~PopupMenuChromium()
 {
     // When the PopupMenuChromium is destroyed, the client could already have been deleted.
     if (m_popup)
-        m_popup->listBox()->disconnectClient();
+        m_popup->disconnectClient();
     hide();
 }
 
@@ -72,7 +70,7 @@ void PopupMenuChromium::hide()
 
 void PopupMenuChromium::updateFromElement()
 {
-    m_popup->listBox()->updateFromElement();
+    m_popup->updateFromElement();
 }
 
 

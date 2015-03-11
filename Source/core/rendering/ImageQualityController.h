@@ -39,7 +39,7 @@
 #include "platform/graphics/ImageSource.h"
 #include "wtf/HashMap.h"
 
-namespace WebCore {
+namespace blink {
 
 typedef HashMap<const void*, LayoutSize> LayerSizeMap;
 typedef HashMap<RenderObject*, LayerSizeMap> ObjectLayerSizeMap;
@@ -55,12 +55,16 @@ public:
 
     InterpolationQuality chooseInterpolationQuality(GraphicsContext*, RenderObject*, Image*, const void* layer, const LayoutSize&);
 
+    // For testing.
+    static bool has(RenderObject*);
+    // This is public for testing. Do not call this from other classes.
+    void set(RenderObject*, LayerSizeMap* innerMap, const void* layer, const LayoutSize&);
+
 private:
     ImageQualityController();
 
     bool shouldPaintAtLowQuality(GraphicsContext*, RenderObject*, Image*, const void* layer, const LayoutSize&);
     void removeLayer(RenderObject*, LayerSizeMap* innerMap, const void* layer);
-    void set(RenderObject*, LayerSizeMap* innerMap, const void* layer, const LayoutSize&);
     void objectDestroyed(RenderObject*);
     bool isEmpty() { return m_objectLayerSizeMap.isEmpty(); }
 
@@ -73,6 +77,6 @@ private:
     bool m_liveResizeOptimizationIsActive;
 };
 
-} // namespace WebCore
+} // namespace blink
 
 #endif

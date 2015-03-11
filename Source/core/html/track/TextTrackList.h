@@ -26,7 +26,6 @@
 #ifndef TextTrackList_h
 #define TextTrackList_h
 
-#include "bindings/v8/ScriptWrappable.h"
 #include "core/events/EventListener.h"
 #include "core/events/EventTarget.h"
 #include "core/html/HTMLMediaElement.h"
@@ -36,18 +35,19 @@
 #include "wtf/RefCounted.h"
 #include "wtf/Vector.h"
 
-namespace WebCore {
+namespace blink {
 
 class GenericEventQueue;
 class TextTrack;
 
-class TextTrackList FINAL : public RefCountedWillBeRefCountedGarbageCollected<TextTrackList>, public ScriptWrappable, public EventTargetWithInlineData {
+class TextTrackList FINAL : public RefCountedWillBeGarbageCollectedFinalized<TextTrackList>, public EventTargetWithInlineData {
+    DEFINE_WRAPPERTYPEINFO();
     REFCOUNTED_EVENT_TARGET(TextTrackList);
     WILL_BE_USING_GARBAGE_COLLECTED_MIXIN(TextTrackList);
 public:
     static PassRefPtrWillBeRawPtr<TextTrackList> create(HTMLMediaElement* owner)
     {
-        return adoptRefWillBeRefCountedGarbageCollected(new TextTrackList(owner));
+        return adoptRefWillBeNoop(new TextTrackList(owner));
     }
     virtual ~TextTrackList();
 
@@ -98,6 +98,6 @@ private:
     WillBeHeapVector<RefPtrWillBeMember<TextTrack> > m_inbandTracks;
 };
 
-} // namespace WebCore
+} // namespace blink
 
-#endif
+#endif // TextTrackList_h

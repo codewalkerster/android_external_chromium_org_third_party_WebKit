@@ -53,7 +53,7 @@
 #define JMPBUF(png_ptr) png_ptr->jmpbuf
 #endif
 
-namespace WebCore {
+namespace blink {
 
 // Gamma constants.
 const double cMaxGamma = 21474.83;
@@ -129,9 +129,7 @@ public:
             // This will zero the pointers.
             png_destroy_read_struct(&m_png, &m_info, 0);
 #if USE(QCMSLIB)
-        if (m_transform)
-            qcms_transform_release(m_transform);
-        m_transform = 0;
+        clearColorTransform();
 #endif
         delete[] m_interlaceBuffer;
         m_interlaceBuffer = 0;
@@ -177,11 +175,16 @@ public:
     void createRowBuffer(int size) { m_rowBuffer = adoptArrayPtr(new png_byte[size]); }
     qcms_transform* colorTransform() const { return m_transform; }
 
-    void createColorTransform(const ColorProfile& colorProfile, bool hasAlpha)
+    void clearColorTransform()
     {
         if (m_transform)
             qcms_transform_release(m_transform);
         m_transform = 0;
+    }
+
+    void createColorTransform(const ColorProfile& colorProfile, bool hasAlpha)
+    {
+        clearColorTransform();
 
         if (colorProfile.isEmpty())
             return;
@@ -544,4 +547,4 @@ void PNGImageDecoder::decode(bool onlySize)
         m_reader.clear();
 }
 
-} // namespace WebCore
+} // namespace blink

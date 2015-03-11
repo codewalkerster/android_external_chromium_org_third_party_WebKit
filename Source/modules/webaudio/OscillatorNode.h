@@ -33,7 +33,7 @@
 #include "wtf/RefPtr.h"
 #include "wtf/Threading.h"
 
-namespace WebCore {
+namespace blink {
 
 class AudioContext;
 class PeriodicWave;
@@ -41,6 +41,7 @@ class PeriodicWave;
 // OscillatorNode is an audio generator of periodic waveforms.
 
 class OscillatorNode FINAL : public AudioScheduledSourceNode {
+    DEFINE_WRAPPERTYPEINFO();
 public:
     // The waveform type.
     // These must be defined as in the .idl file.
@@ -52,11 +53,12 @@ public:
         CUSTOM = 4
     };
 
-    static PassRefPtrWillBeRawPtr<OscillatorNode> create(AudioContext*, float sampleRate);
+    static OscillatorNode* create(AudioContext*, float sampleRate);
 
     virtual ~OscillatorNode();
 
     // AudioNode
+    virtual void dispose() OVERRIDE;
     virtual void process(size_t framesToProcess) OVERRIDE;
 
     String type() const;
@@ -84,10 +86,10 @@ private:
     unsigned short m_type;
 
     // Frequency value in Hertz.
-    RefPtrWillBeMember<AudioParam> m_frequency;
+    Member<AudioParam> m_frequency;
 
     // Detune value (deviating from the frequency) in Cents.
-    RefPtrWillBeMember<AudioParam> m_detune;
+    Member<AudioParam> m_detune;
 
     bool m_firstRender;
 
@@ -102,9 +104,9 @@ private:
     AudioFloatArray m_phaseIncrements;
     AudioFloatArray m_detuneValues;
 
-    RefPtrWillBeMember<PeriodicWave> m_periodicWave;
+    Member<PeriodicWave> m_periodicWave;
 };
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // OscillatorNode_h

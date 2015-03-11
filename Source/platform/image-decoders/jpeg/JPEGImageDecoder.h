@@ -32,7 +32,7 @@
 #include "wtf/Noncopyable.h"
 #include "wtf/OwnPtr.h"
 
-namespace WebCore {
+namespace blink {
 
 class JPEGImageReader;
 
@@ -48,12 +48,17 @@ public:
     virtual bool isSizeAvailable() OVERRIDE;
     virtual bool hasColorProfile() const OVERRIDE { return m_hasColorProfile; }
     virtual IntSize decodedSize() const OVERRIDE { return m_decodedSize; }
+    virtual IntSize decodedYUVSize(int component, SizeType) const OVERRIDE;
     virtual bool setSize(unsigned width, unsigned height) OVERRIDE;
     virtual ImageFrame* frameBufferAtIndex(size_t) OVERRIDE;
     // CAUTION: setFailed() deletes |m_reader|.  Be careful to avoid
     // accessing deleted memory, especially when calling this from inside
     // JPEGImageReader!
     virtual bool setFailed() OVERRIDE;
+    virtual bool canDecodeToYUV() const OVERRIDE;
+    virtual bool decodeToYUV() OVERRIDE;
+    virtual void setImagePlanes(PassOwnPtr<ImagePlanes>) OVERRIDE;
+    bool hasImagePlanes() const { return m_imagePlanes; }
 
     bool outputScanlines();
     unsigned desiredScaleNumerator() const;
@@ -70,10 +75,11 @@ private:
     void decode(bool onlySize);
 
     OwnPtr<JPEGImageReader> m_reader;
+    OwnPtr<ImagePlanes> m_imagePlanes;
     IntSize m_decodedSize;
     bool m_hasColorProfile;
 };
 
-} // namespace WebCore
+} // namespace blink
 
 #endif

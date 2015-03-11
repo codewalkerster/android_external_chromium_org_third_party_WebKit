@@ -35,7 +35,7 @@
 #include "wtf/RefPtr.h"
 #include "wtf/Threading.h"
 
-namespace WebCore {
+namespace blink {
 
 class AudioContext;
 
@@ -43,12 +43,14 @@ class AudioContext;
 // It generally will be used for short sounds which require a high degree of scheduling flexibility (can playback in rhythmically perfect ways).
 
 class AudioBufferSourceNode FINAL : public AudioScheduledSourceNode {
+    DEFINE_WRAPPERTYPEINFO();
 public:
-    static PassRefPtrWillBeRawPtr<AudioBufferSourceNode> create(AudioContext*, float sampleRate);
+    static AudioBufferSourceNode* create(AudioContext*, float sampleRate);
 
     virtual ~AudioBufferSourceNode();
 
     // AudioNode
+    virtual void dispose() OVERRIDE;
     virtual void process(size_t framesToProcess) OVERRIDE;
 
     // setBuffer() is called on the main thread. This is the buffer we use for playback.
@@ -101,14 +103,14 @@ private:
     inline bool renderSilenceAndFinishIfNotLooping(AudioBus*, unsigned index, size_t framesToProcess);
 
     // m_buffer holds the sample data which this node outputs.
-    RefPtrWillBeMember<AudioBuffer> m_buffer;
+    Member<AudioBuffer> m_buffer;
 
     // Pointers for the buffer and destination.
     OwnPtr<const float*[]> m_sourceChannels;
     OwnPtr<float*[]> m_destinationChannels;
 
     // Used for the "playbackRate" attributes.
-    RefPtrWillBeMember<AudioParam> m_playbackRate;
+    Member<AudioParam> m_playbackRate;
 
     // If m_isLooping is false, then this node will be done playing and become inactive after it reaches the end of the sample data in the buffer.
     // If true, it will wrap around to the start of the buffer each time it reaches the end.
@@ -130,14 +132,20 @@ private:
     // It incorporates the base pitch rate, any sample-rate conversion factor from the buffer, and any doppler shift from an associated panner node.
     double totalPitchRate();
 
-    // We optionally keep track of a panner node which has a doppler shift that is incorporated into
-    // the pitch rate. We manually manage ref-counting because we want to use RefTypeConnection.
-    PannerNode* m_pannerNode;
+    // We optionally keep track of a panner node which has a doppler shift that
+    // is incorporated into the pitch rate.
+    // This RefPtr is connection reference. We must call AudioNode::
+    // makeConnection() after ref(), and call AudioNode::breakConnection()
+    // before deref().
+    // Oilpan: This holds connection references. We must call
+    // AudioNode::makeConnection when we add an AudioNode to this, and must call
+    // AudioNode::breakConnection() when we remove an AudioNode from this.
+    Member<PannerNode> m_pannerNode;
 
     // This synchronizes process() with setBuffer() which can cause dynamic channel count changes.
     mutable Mutex m_processLock;
 };
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // AudioBufferSourceNode_h

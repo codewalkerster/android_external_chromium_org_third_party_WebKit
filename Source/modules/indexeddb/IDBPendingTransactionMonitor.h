@@ -26,41 +26,49 @@
 #ifndef IDBPendingTransactionMonitor_h
 #define IDBPendingTransactionMonitor_h
 
-#include "platform/Supplementable.h"
+#include "platform/heap/Handle.h"
 #include "wtf/Noncopyable.h"
-#include "wtf/PassOwnPtr.h"
-#include "wtf/Vector.h"
 
-namespace WebCore {
+namespace blink {
 
-class ExecutionContext;
+class IDBCursor;
+class IDBDisposerDispatcher;
+class IDBRequest;
 class IDBTransaction;
 
 // This class keeps track of the transactions created during the current
 // Javascript execution context. Transactions have an internal |active| flag
 // which is set to true on creation, but must be set to false when control
 // returns to the event loop.
-
-class IDBPendingTransactionMonitor : public Supplement<ExecutionContext> {
+// Also, this class is responsible to call IDBRequest::dispose() before an
+// IDBRequest object dies, and responsible to call IDBCursor::dispose() before
+// an IDBCursor object dies.
+// FIXME: Rename the class name.
+class IDBPendingTransactionMonitor {
     WTF_MAKE_NONCOPYABLE(IDBPendingTransactionMonitor);
 
 public:
-    static IDBPendingTransactionMonitor& from(Supplementable<ExecutionContext>&);
-    virtual ~IDBPendingTransactionMonitor();
-    // The trace functino doesn't work until ExecutionContext is moved to Oilpan
-    // heap.
-    virtual void trace(Visitor* visitor) OVERRIDE { Supplement<ExecutionContext>::trace(visitor); }
+    IDBPendingTransactionMonitor();
+    ~IDBPendingTransactionMonitor();
+
     void addNewTransaction(IDBTransaction&);
     void deactivateNewTransactions();
+    void registerRequest(IDBRequest&);
+    // It's ok to call unregisterRequest(*this) inside
+    // IDBRequest::dispose(). But we must not call unregisterRequest() with
+    // an object different from |this| of IDBRequest::dispose().
+    void unregisterRequest(IDBRequest&);
+    void registerCursor(IDBCursor&);
+    // It's ok to call unregisterCursor(*this) inside IDBCursor::dispose(). But
+    // we must not call unregisterCursor() with an object different from |this|
+    // of IDBCursor::dispose().
+    void unregisterCursor(IDBCursor&);
 
 private:
-    IDBPendingTransactionMonitor();
-    static const char* supplementName();
-
-    typedef PersistentHeapVector<Member<IDBTransaction> > TransactionList;
-    TransactionList m_transactions;
+    PersistentHeapVector<Member<IDBTransaction> > m_transactions;
+    RefPtr<IDBDisposerDispatcher> m_dispatcher;
 };
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // IDBPendingTransactionMonitor_h

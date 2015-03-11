@@ -33,7 +33,7 @@
 
 #include "core/html/forms/TextFieldInputType.h"
 
-namespace WebCore {
+namespace blink {
 
 class ExceptionState;
 
@@ -67,12 +67,11 @@ private:
     virtual String rangeUnderflowText(const Decimal& minimum) const OVERRIDE;
     virtual bool shouldRespectSpeechAttribute() OVERRIDE;
     virtual bool supportsPlaceholder() const OVERRIDE;
-    virtual bool isNumberField() const OVERRIDE;
     virtual void minOrMaxAttributeChanged() OVERRIDE;
     virtual void stepAttributeChanged() OVERRIDE;
     virtual bool supportsSelectionAPI() const OVERRIDE;
 };
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // NumberInputType_h

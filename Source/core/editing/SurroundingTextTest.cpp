@@ -5,6 +5,7 @@
 #include "config.h"
 #include "core/editing/SurroundingText.h"
 
+#include "core/dom/Document.h"
 #include "core/dom/Position.h"
 #include "core/dom/Range.h"
 #include "core/dom/Text.h"
@@ -13,7 +14,7 @@
 #include "core/testing/DummyPageHolder.h"
 #include <gtest/gtest.h>
 
-using namespace WebCore;
+using namespace blink;
 
 namespace {
 

@@ -31,7 +31,7 @@
 #include "modules/speech/SpeechRecognitionResultList.h"
 #include "platform/heap/Handle.h"
 
-namespace WebCore {
+namespace blink {
 
 class Document;
 
@@ -44,6 +44,7 @@ public:
 };
 
 class SpeechRecognitionEvent FINAL : public Event {
+    DEFINE_WRAPPERTYPEINFO();
 public:
     static PassRefPtrWillBeRawPtr<SpeechRecognitionEvent> create();
     static PassRefPtrWillBeRawPtr<SpeechRecognitionEvent> create(const AtomicString&, const SpeechRecognitionEventInit&);
@@ -73,6 +74,6 @@ private:
     PersistentWillBeMember<SpeechRecognitionResultList> m_results;
 };
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // SpeechRecognitionEvent_h

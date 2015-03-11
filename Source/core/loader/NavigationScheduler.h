@@ -32,6 +32,7 @@
 #define NavigationScheduler_h
 
 #include "platform/Timer.h"
+#include "platform/heap/Handle.h"
 #include "platform/weborigin/Referrer.h"
 #include "wtf/Forward.h"
 #include "wtf/HashMap.h"
@@ -41,7 +42,7 @@
 #include "wtf/PassRefPtr.h"
 #include "wtf/text/WTFString.h"
 
-namespace WebCore {
+namespace blink {
 
 class Document;
 class FormSubmission;
@@ -67,9 +68,9 @@ private:
     static unsigned s_navigationDisableCount;
 };
 
-class NavigationScheduler {
+class NavigationScheduler FINAL {
     WTF_MAKE_NONCOPYABLE(NavigationScheduler);
-
+    DISALLOW_ALLOCATION();
 public:
     explicit NavigationScheduler(LocalFrame*);
     ~NavigationScheduler();
@@ -78,14 +79,15 @@ public:
 
     void scheduleRedirect(double delay, const String& url);
     void scheduleLocationChange(Document*, const String& url, const Referrer& referrer, bool lockBackForwardList = true);
+    void schedulePageBlock(Document*, const Referrer&);
     void scheduleFormSubmission(PassRefPtrWillBeRawPtr<FormSubmission>);
-    void scheduleRefresh();
+    void scheduleReload();
     void scheduleHistoryNavigation(int steps);
 
     void startTimer();
-
     void cancel();
-    void clear();
+
+    void trace(Visitor*);
 
 private:
     bool shouldScheduleNavigation() const;
@@ -96,11 +98,11 @@ private:
 
     static bool mustLockBackForwardList(LocalFrame* targetFrame);
 
-    LocalFrame* m_frame;
+    RawPtrWillBeMember<LocalFrame> m_frame;
     Timer<NavigationScheduler> m_timer;
     OwnPtr<ScheduledNavigation> m_redirect;
 };
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // NavigationScheduler_h

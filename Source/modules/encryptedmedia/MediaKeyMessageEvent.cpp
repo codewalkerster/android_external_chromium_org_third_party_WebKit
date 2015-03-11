@@ -26,9 +26,7 @@
 #include "config.h"
 #include "modules/encryptedmedia/MediaKeyMessageEvent.h"
 
-#include "wtf/Uint8Array.h"
-
-namespace WebCore {
+namespace blink {
 
 MediaKeyMessageEventInit::MediaKeyMessageEventInit()
 {
@@ -36,7 +34,6 @@ MediaKeyMessageEventInit::MediaKeyMessageEventInit()
 
 MediaKeyMessageEvent::MediaKeyMessageEvent()
 {
-    ScriptWrappable::init(this);
 }
 
 MediaKeyMessageEvent::MediaKeyMessageEvent(const AtomicString& type, const MediaKeyMessageEventInit& initializer)
@@ -44,7 +41,6 @@ MediaKeyMessageEvent::MediaKeyMessageEvent(const AtomicString& type, const Media
     , m_message(initializer.message)
     , m_destinationURL(initializer.destinationURL)
 {
-    ScriptWrappable::init(this);
 }
 
 MediaKeyMessageEvent::~MediaKeyMessageEvent()
@@ -61,4 +57,4 @@ void MediaKeyMessageEvent::trace(Visitor* visitor)
     Event::trace(visitor);
 }
 
-} // namespace WebCore
+} // namespace blink

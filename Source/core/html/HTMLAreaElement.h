@@ -26,13 +26,14 @@
 #include "core/html/HTMLAnchorElement.h"
 #include "platform/geometry/LayoutRect.h"
 
-namespace WebCore {
+namespace blink {
 
 class HitTestResult;
 class HTMLImageElement;
 class Path;
 
 class HTMLAreaElement FINAL : public HTMLAnchorElement {
+    DEFINE_WRAPPERTYPEINFO();
 public:
     DECLARE_NODE_FACTORY(HTMLAreaElement);
 
@@ -66,6 +67,6 @@ private:
     Shape m_shape;
 };
 
-} //namespace
+} // namespace blink
 
-#endif
+#endif // HTMLAreaElement_h

@@ -26,7 +26,7 @@
 
 #include "core/rendering/svg/RenderSVGModelObject.h"
 
-namespace WebCore {
+namespace blink {
 
 class RenderImageResource;
 class SVGImageElement;
@@ -35,6 +35,7 @@ class RenderSVGImage FINAL : public RenderSVGModelObject {
 public:
     explicit RenderSVGImage(SVGImageElement*);
     virtual ~RenderSVGImage();
+    virtual void destroy() OVERRIDE;
 
     bool updateImageViewport();
     virtual void setNeedsBoundariesUpdate() OVERRIDE { m_needsBoundariesUpdate = true; }
@@ -42,26 +43,26 @@ public:
 
     RenderImageResource* imageResource() { return m_imageResource.get(); }
 
-    // Note: Assumes the PaintInfo context has had all local transforms applied.
-    void paintForeground(PaintInfo&);
+    virtual const AffineTransform& localToParentTransform() const OVERRIDE { return m_localTransform; }
+    OwnPtr<ImageBuffer>& bufferedForeground() { return m_bufferedForeground; }
+
+    virtual FloatRect paintInvalidationRectInLocalCoordinates() const OVERRIDE { return m_paintInvalidationBoundingBox; }
+    virtual FloatRect objectBoundingBox() const OVERRIDE { return m_objectBoundingBox; }
 
 private:
     virtual const char* renderName() const OVERRIDE { return "RenderSVGImage"; }
     virtual bool isSVGImage() const OVERRIDE { return true; }
 
-    virtual const AffineTransform& localToParentTransform() const OVERRIDE { return m_localTransform; }
-
-    virtual FloatRect objectBoundingBox() const OVERRIDE { return m_objectBoundingBox; }
     virtual FloatRect strokeBoundingBox() const OVERRIDE { return m_objectBoundingBox; }
-    virtual FloatRect paintInvalidationRectInLocalCoordinates() const OVERRIDE { return m_repaintBoundingBox; }
 
-    virtual void addFocusRingRects(Vector<IntRect>&, const LayoutPoint& additionalOffset, const RenderLayerModelObject* paintContainer = 0) OVERRIDE;
+    virtual void addFocusRingRects(Vector<LayoutRect>&, const LayoutPoint& additionalOffset, const RenderLayerModelObject* paintContainer) const OVERRIDE;
 
     virtual void imageChanged(WrappedImagePtr, const IntRect* = 0) OVERRIDE;
 
     virtual void layout() OVERRIDE;
     virtual void paint(PaintInfo&, const LayoutPoint&) OVERRIDE;
 
+    bool forceNonUniformScaling(SVGImageElement*) const;
     void invalidateBufferedForeground();
 
     virtual bool nodeAtFloatPoint(const HitTestRequest&, HitTestResult&, const FloatPoint& pointInParent, HitTestAction) OVERRIDE;
@@ -72,7 +73,7 @@ private:
     bool m_needsTransformUpdate : 1;
     AffineTransform m_localTransform;
     FloatRect m_objectBoundingBox;
-    FloatRect m_repaintBoundingBox;
+    FloatRect m_paintInvalidationBoundingBox;
     OwnPtr<RenderImageResource> m_imageResource;
 
     OwnPtr<ImageBuffer> m_bufferedForeground;
@@ -80,6 +81,6 @@ private:
 
 DEFINE_RENDER_OBJECT_TYPE_CASTS(RenderSVGImage, isSVGImage());
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // RenderSVGImage_h

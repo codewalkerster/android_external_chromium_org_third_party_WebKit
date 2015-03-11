@@ -24,7 +24,6 @@
 #include "core/svg/SVGFitToViewBox.h"
 
 #include "core/dom/Attribute.h"
-#include "core/dom/Document.h"
 #include "core/svg/SVGDocumentExtensions.h"
 #include "core/svg/SVGElement.h"
 #include "core/svg/SVGParserUtilities.h"
@@ -32,7 +31,7 @@
 #include "platform/transforms/AffineTransform.h"
 #include "wtf/text/StringImpl.h"
 
-namespace WebCore {
+namespace blink {
 
 SVGFitToViewBox::SVGFitToViewBox(SVGElement* element, PropertyMapPolicy propertyMapPolicy)
     : m_viewBox(SVGAnimatedRect::create(element, SVGNames::viewBoxAttr))
@@ -47,7 +46,7 @@ SVGFitToViewBox::SVGFitToViewBox(SVGElement* element, PropertyMapPolicy property
 
 AffineTransform SVGFitToViewBox::viewBoxToViewTransform(const FloatRect& viewBoxRect, PassRefPtr<SVGPreserveAspectRatio> preserveAspectRatio, float viewWidth, float viewHeight)
 {
-    if (!viewBoxRect.width() || !viewBoxRect.height())
+    if (!viewBoxRect.width() || !viewBoxRect.height() || !viewWidth || !viewHeight)
         return AffineTransform();
 
     return preserveAspectRatio->getCTM(viewBoxRect.x(), viewBoxRect.y(), viewBoxRect.width(), viewBoxRect.height(), viewWidth, viewHeight);

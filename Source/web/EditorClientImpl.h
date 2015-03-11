@@ -34,24 +34,21 @@
 #include "core/page/EditorClient.h"
 #include "wtf/Forward.h"
 
-namespace WebCore {
+namespace blink {
+
 class LocalFrame;
 class HTMLInputElement;
-}
-
-namespace blink {
 class WebViewImpl;
 
-class EditorClientImpl FINAL : public WebCore::EditorClient {
+class EditorClientImpl FINAL : public EditorClient {
 public:
-    EditorClientImpl(WebViewImpl*);
-
+    explicit EditorClientImpl(WebViewImpl*);
     virtual ~EditorClientImpl();
 
     virtual void respondToChangedContents() OVERRIDE;
-    virtual void respondToChangedSelection(WebCore::LocalFrame*, WebCore::SelectionType) OVERRIDE;
-    virtual bool canCopyCut(WebCore::LocalFrame*, bool defaultValue) const OVERRIDE;
-    virtual bool canPaste(WebCore::LocalFrame*, bool defaultValue) const OVERRIDE;
+    virtual void respondToChangedSelection(LocalFrame*, SelectionType) OVERRIDE;
+    virtual bool canCopyCut(LocalFrame*, bool defaultValue) const OVERRIDE;
+    virtual bool canPaste(LocalFrame*, bool defaultValue) const OVERRIDE;
     virtual bool handleKeyboardEvent() OVERRIDE;
 
 private:

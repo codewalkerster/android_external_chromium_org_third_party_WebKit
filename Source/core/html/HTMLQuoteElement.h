@@ -27,9 +27,10 @@
 #include "core/html/HTMLElement.h"
 #include "wtf/Forward.h"
 
-namespace WebCore {
+namespace blink {
 
 class HTMLQuoteElement FINAL : public HTMLElement {
+    DEFINE_WRAPPERTYPEINFO();
 public:
     DECLARE_ELEMENT_FACTORY_WITH_TAGNAME(HTMLQuoteElement);
 
@@ -41,6 +42,13 @@ private:
     virtual const QualifiedName& subResourceAttributeName() const OVERRIDE;
 };
 
-} //namespace
+inline bool isHTMLQuoteElement(const HTMLElement& element)
+{
+    return element.hasTagName(HTMLNames::qTag) || element.hasTagName(HTMLNames::blockquoteTag);
+}
 
-#endif
+DEFINE_HTMLELEMENT_TYPE_CASTS_WITH_FUNCTION(HTMLQuoteElement);
+
+} // namespace blink
+
+#endif // HTMLQuoteElement_h

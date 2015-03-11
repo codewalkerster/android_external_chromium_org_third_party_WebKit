@@ -34,9 +34,10 @@
 #include "core/css/CSSSelectorList.h"
 #include "core/dom/shadow/InsertionPoint.h"
 
-namespace WebCore {
+namespace blink {
 
 class HTMLContentElement FINAL : public InsertionPoint {
+    DEFINE_WRAPPERTYPEINFO();
 public:
     DECLARE_NODE_FACTORY(HTMLContentElement);
     virtual ~HTMLContentElement();
@@ -89,6 +90,6 @@ inline bool HTMLContentElement::canSelectNode(const WillBeHeapVector<RawPtrWillB
     return matchSelector(siblings, nth);
 }
 
-}
+} // namespace blink
 
-#endif
+#endif // HTMLContentElement_h

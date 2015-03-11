@@ -28,7 +28,7 @@
 
 #include "core/rendering/RenderMedia.h"
 
-namespace WebCore {
+namespace blink {
 
 class HTMLVideoElement;
 
@@ -44,10 +44,11 @@ public:
     bool supportsAcceleratedRendering() const;
 
     bool shouldDisplayVideo() const;
+    HTMLVideoElement* videoElement() const;
+    bool acceleratedRenderingInUse();
 
 private:
     virtual void updateFromElement() OVERRIDE;
-    inline HTMLVideoElement* videoElement() const;
 
     virtual void intrinsicSizeChanged() OVERRIDE;
     LayoutSize calculateIntrinsicSize();
@@ -72,17 +73,16 @@ private:
     virtual LayoutUnit offsetWidth() const OVERRIDE;
     virtual LayoutUnit offsetHeight() const OVERRIDE;
 
-    virtual CompositingReasons additionalCompositingReasons(CompositingTriggerFlags) const OVERRIDE;
+    virtual CompositingReasons additionalCompositingReasons() const OVERRIDE;
 
     void updatePlayer();
 
-    bool acceleratedRenderingInUse();
 
     LayoutSize m_cachedImageSize;
 };
 
 DEFINE_RENDER_OBJECT_TYPE_CASTS(RenderVideo, isVideo());
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // RenderVideo_h

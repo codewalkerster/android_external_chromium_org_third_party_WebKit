@@ -28,7 +28,7 @@
 #include "wtf/WeakPtr.h"
 #include "wtf/text/WTFString.h"
 
-namespace WebCore {
+namespace blink {
 
 class ContainerNode;
 class Document;
@@ -37,7 +37,6 @@ class FormDataList;
 class HTMLElement;
 class HTMLFormElement;
 class Node;
-class ValidationMessage;
 class ValidityState;
 class VisibleSelection;
 
@@ -57,6 +56,7 @@ public:
     virtual bool isFormControlElement() const = 0;
     virtual bool isFormControlElementWithState() const;
     virtual bool isEnumeratable() const = 0;
+    virtual bool isLabelElement() const { return false; }
 
     // Returns the 'name' attribute value. If this element has no name
     // attribute, it returns an empty string instead of null string.
@@ -95,7 +95,7 @@ public:
 protected:
     FormAssociatedElement();
 
-    void trace(Visitor*);
+    virtual void trace(Visitor*);
     void insertedInto(ContainerNode*);
     void removedFrom(ContainerNode*);
     void didMoveToNewDocument(Document& oldDocument);
@@ -131,6 +131,10 @@ private:
 #endif
     OwnPtrWillBeMember<ValidityState> m_validityState;
     String m_customValidationMessage;
+    // Non-Oilpan: Even if m_formWasSetByParser is true, m_form can be null
+    // because parentNode is not a strong reference and |this| and m_form don't
+    // die together.
+    // Oilpan: If m_formWasSetByParser is true, m_form is always non-null.
     bool m_formWasSetByParser;
 };
 

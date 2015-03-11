@@ -7,7 +7,7 @@
 
 #include "core/events/Event.h"
 
-namespace WebCore {
+namespace blink {
 
 struct AnimationPlayerEventInit : public EventInit {
     AnimationPlayerEventInit();
@@ -17,6 +17,7 @@ struct AnimationPlayerEventInit : public EventInit {
 };
 
 class AnimationPlayerEvent FINAL : public Event {
+    DEFINE_WRAPPERTYPEINFO();
 public:
     static PassRefPtrWillBeRawPtr<AnimationPlayerEvent> create()
     {
@@ -49,6 +50,6 @@ private:
     double m_timelineTime;
 };
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // AnimationPlayerEvent_h

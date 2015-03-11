@@ -32,6 +32,7 @@
 #define WebFrameClient_h
 
 #include "../platform/WebColor.h"
+#include "WebAXObject.h"
 #include "WebDOMMessageEvent.h"
 #include "WebDataSource.h"
 #include "WebFrame.h"
@@ -62,12 +63,15 @@ class WebContentDecryptionModule;
 class WebCookieJar;
 class WebDataSource;
 class WebDOMEvent;
+class WebExternalPopupMenu;
+class WebExternalPopupMenuClient;
 class WebFormElement;
 class WebGeolocationClient;
 class WebInputEvent;
 class WebMediaPlayer;
 class WebMediaPlayerClient;
 class WebMIDIClient;
+class WebNotificationPermissionCallback;
 class WebNotificationPresenter;
 class WebServiceWorkerProvider;
 class WebServiceWorkerProviderClient;
@@ -89,6 +93,7 @@ struct WebColorSuggestion;
 struct WebConsoleMessage;
 struct WebContextMenuData;
 struct WebPluginParams;
+struct WebPopupMenuInfo;
 struct WebRect;
 struct WebSize;
 struct WebURLError;
@@ -101,7 +106,8 @@ public:
     virtual WebPlugin* createPlugin(WebLocalFrame*, const WebPluginParams&) { return 0; }
 
     // May return null.
-    virtual WebMediaPlayer* createMediaPlayer(WebLocalFrame*, const WebURL&, WebMediaPlayerClient*) { return 0; }
+    // WebContentDecryptionModule* may be null if one has not yet been set.
+    virtual WebMediaPlayer* createMediaPlayer(WebLocalFrame*, const WebURL&, WebMediaPlayerClient*, WebContentDecryptionModule*) { return 0; }
 
     // May return null.
     virtual WebContentDecryptionModule* createContentDecryptionModule(WebLocalFrame*, const WebSecurityOrigin&, const WebString& keySystem) { return 0; }
@@ -114,6 +120,11 @@ public:
 
     // May return null.
     virtual WebWorkerPermissionClientProxy* createWorkerPermissionClientProxy(WebLocalFrame*) { return 0; }
+
+    // Create a new WebPopupMenu. In the "createExternalPopupMenu" form, the
+    // client is responsible for rendering the contents of the popup menu.
+    virtual WebExternalPopupMenu* createExternalPopupMenu(
+        const WebPopupMenuInfo&, WebExternalPopupMenuClient*) { return 0; }
 
 
     // Services ------------------------------------------------------------
@@ -182,6 +193,32 @@ public:
 
     // The client may choose to alter the navigation policy.  Otherwise,
     // defaultPolicy should just be returned.
+
+    struct NavigationPolicyInfo {
+        WebLocalFrame* frame;
+        WebDataSource::ExtraData* extraData;
+        const WebURLRequest& urlRequest;
+        WebNavigationType navigationType;
+        WebNavigationPolicy defaultPolicy;
+        bool isRedirect;
+        bool isTransitionNavigation;
+
+        NavigationPolicyInfo(const WebURLRequest& urlRequest)
+            : frame(0)
+            , extraData(0)
+            , urlRequest(urlRequest)
+            , navigationType(WebNavigationTypeOther)
+            , defaultPolicy(WebNavigationPolicyIgnore)
+            , isRedirect(false)
+            , isTransitionNavigation(false) { }
+    };
+
+    virtual WebNavigationPolicy decidePolicyForNavigation(const NavigationPolicyInfo& info)
+    {
+        return decidePolicyForNavigation(info.frame, info.extraData, info.urlRequest, info.navigationType, info.defaultPolicy, info.isRedirect);
+    }
+
+    // DEPRECATED
     virtual WebNavigationPolicy decidePolicyForNavigation(
         WebLocalFrame*, WebDataSource::ExtraData*, const WebURLRequest&, WebNavigationType,
         WebNavigationPolicy defaultPolicy, bool isRedirect) { return defaultPolicy; }
@@ -214,7 +251,7 @@ public:
     virtual void didCreateDataSource(WebLocalFrame*, WebDataSource*) { }
 
     // A new provisional load has been started.
-    virtual void didStartProvisionalLoad(WebLocalFrame*) { }
+    virtual void didStartProvisionalLoad(WebLocalFrame* localFrame, bool isTransitionNavigation) { }
 
     // The provisional load was redirected via a HTTP 3xx response.
     virtual void didReceiveServerRedirectForProvisionalLoad(WebLocalFrame*) { }
@@ -266,15 +303,23 @@ public:
     // The frame's manifest has changed.
     virtual void didChangeManifest(WebLocalFrame*) { }
 
-    // TODO: Remove when chromium is changed to use didChangeThemeColor().
-    virtual void didChangeBrandColor() { }
-
     // The frame's theme color has changed.
     virtual void didChangeThemeColor() { }
 
-    // Misc ----------------------------------------------------------------
+
+    // Transition navigations -----------------------------------------------
+
+    // Provides serialized markup of transition elements for use in the following navigation.
+    virtual void addNavigationTransitionData(const WebString& allowedDestinationOrigin, const WebString& selector, const WebString& markup) { }
+
+
+    // Web Notifications ---------------------------------------------------
+
+    // Requests permission to display platform notifications on the origin of this frame.
+    virtual void requestNotificationPermission(const WebSecurityOrigin&, WebNotificationPermissionCallback* callback) { }
 
     // Called to retrieve the provider of desktop notifications.
+    // FIXME: Remove this method once the presenter is obtained through Platform.
     virtual WebNotificationPresenter* notificationPresenter() { return 0; }
 
 
@@ -340,9 +385,6 @@ public:
     // An element will request a resource.
     virtual void willRequestResource(WebLocalFrame*, const WebCachedURLRequest&) { }
 
-    // The request is after preconnect is triggered.
-    virtual void willRequestAfterPreconnect(WebLocalFrame*, WebURLRequest&) { }
-
     // A request is about to be sent out, and the client may modify it.  Request
     // is writable, and changes to the URL, for example, will change the request
     // made.  If this request is the result of a redirect, then redirectResponse
@@ -357,7 +399,7 @@ public:
         WebLocalFrame*, unsigned identifier, const WebURLResponse&) { }
 
     virtual void didChangeResourcePriority(
-        WebLocalFrame* webFrame, unsigned identifier, const blink::WebURLRequest::Priority& priority, int) { }
+        WebLocalFrame* webFrame, unsigned identifier, const WebURLRequest::Priority& priority, int) { }
 
     // The resource request given by identifier succeeded.
     virtual void didFinishResourceLoad(
@@ -519,6 +561,16 @@ public:
 
     // Access the embedder API for (client-based) screen orientation client .
     virtual WebScreenOrientationClient* webScreenOrientationClient() { return 0; }
+
+    // Accessibility -------------------------------------------------------
+
+    // Notifies embedder about an accessibility event.
+    virtual void postAccessibilityEvent(const WebAXObject&, WebAXEvent) { }
+
+    // ServiceWorker -------------------------------------------------------
+
+    // Whether the frame is controlled by the ServiceWorker
+    virtual bool isControlledByServiceWorker() { return false; }
 
 protected:
     virtual ~WebFrameClient() { }

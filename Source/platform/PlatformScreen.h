@@ -31,9 +31,7 @@
 #include "wtf/Forward.h"
 #include "wtf/RefPtr.h"
 
-typedef WTF::Vector<char> ColorProfile;
-
-namespace WebCore {
+namespace blink {
 
 class FloatRect;
 class Widget;
@@ -44,11 +42,10 @@ PLATFORM_EXPORT bool screenIsMonochrome(Widget*);
 
 PLATFORM_EXPORT FloatRect screenRect(Widget*);
 PLATFORM_EXPORT FloatRect screenAvailableRect(Widget*);
-PLATFORM_EXPORT void screenColorProfile(ColorProfile&);
 
 PLATFORM_EXPORT uint16_t screenOrientationAngle(Widget*);
-PLATFORM_EXPORT blink::WebScreenOrientationType screenOrientationType(Widget*);
+PLATFORM_EXPORT WebScreenOrientationType screenOrientationType(Widget*);
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // PlatformScreen_h

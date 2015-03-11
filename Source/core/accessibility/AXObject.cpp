@@ -44,7 +44,7 @@
 
 using blink::WebLocalizedString;
 
-namespace WebCore {
+namespace blink {
 
 using namespace HTMLNames;
 
@@ -95,6 +95,7 @@ static ARIARoleMap* createARIARoleMap()
         { "menuitemradio", MenuItemRole },
         { "note", NoteRole },
         { "navigation", NavigationRole },
+        { "none", NoneRole },
         { "option", ListBoxOptionRole },
         { "presentation", PresentationalRole },
         { "progressbar", ProgressIndicatorRole },
@@ -468,7 +469,7 @@ IntRect AXObject::boundingBoxForQuads(RenderObject* obj, const Vector<FloatQuad>
         IntRect r = quads[i].enclosingBoundingBox();
         if (!r.isEmpty()) {
             if (obj->style()->hasAppearance())
-                RenderTheme::theme().adjustRepaintRect(obj, r);
+                RenderTheme::theme().adjustPaintInvalidationRect(obj, r);
             result.unite(r);
         }
     }
@@ -720,10 +721,13 @@ void AXObject::scrollToMakeVisibleWithSubFocus(const IntRect& subfocus) const
 {
     // Search up the parent chain until we find the first one that's scrollable.
     AXObject* scrollParent = parentObject();
-    ScrollableArea* scrollableArea;
-    for (scrollableArea = 0;
-        scrollParent && !(scrollableArea = scrollParent->getScrollableAreaIfScrollable());
-        scrollParent = scrollParent->parentObject()) { }
+    ScrollableArea* scrollableArea = 0;
+    while (scrollParent) {
+        scrollableArea = scrollParent->getScrollableAreaIfScrollable();
+        if (scrollableArea)
+            break;
+        scrollParent = scrollParent->parentObject();
+    }
     if (!scrollableArea)
         return;
 
@@ -896,4 +900,4 @@ AccessibilityRole AXObject::buttonRoleType() const
     return ButtonRole;
 }
 
-} // namespace WebCore
+} // namespace blink

@@ -33,7 +33,16 @@
 #include "platform/text/PlatformLocale.h"
 #include "wtf/PassOwnPtr.h"
 
-namespace WebCore {
+namespace blink {
+
+namespace {
+
+HTMLElement* nextElement(const HTMLElement& element, bool forward)
+{
+    return forward ? Traversal<HTMLElement>::next(element) : Traversal<HTMLElement>::previous(element);
+}
+
+} // namespace
 
 using namespace HTMLNames;
 
@@ -84,8 +93,7 @@ void RadioInputType::handleKeydownEvent(KeyboardEvent* event)
 
     // We can only stay within the form's children if the form hasn't been demoted to a leaf because
     // of malformed HTML.
-    HTMLElement* htmlElement = &element();
-    while ((htmlElement = (forward ? Traversal<HTMLElement>::next(*htmlElement) : Traversal<HTMLElement>::previous(*htmlElement)))) {
+    for (HTMLElement* htmlElement = nextElement(element(), forward); htmlElement; htmlElement = nextElement(*htmlElement, forward)) {
         // Once we encounter a form element, we know we're through.
         if (isHTMLFormElement(*htmlElement))
             break;
@@ -95,7 +103,7 @@ void RadioInputType::handleKeydownEvent(KeyboardEvent* event)
         HTMLInputElement* inputElement = toHTMLInputElement(htmlElement);
         if (inputElement->form() != element().form())
             break;
-        if (inputElement->isRadioButton() && inputElement->name() == element().name() && inputElement->isFocusable()) {
+        if (inputElement->type() == InputTypeNames::radio && inputElement->name() == element().name() && inputElement->isFocusable()) {
             RefPtrWillBeRawPtr<HTMLInputElement> protector(inputElement);
             document.setFocusedElement(inputElement);
             inputElement->dispatchSimulatedClick(event, SendNoEvents);
@@ -131,7 +139,7 @@ bool RadioInputType::isKeyboardFocusable() const
     Element* currentFocusedElement = element().document().focusedElement();
     if (isHTMLInputElement(currentFocusedElement)) {
         HTMLInputElement& focusedInput = toHTMLInputElement(*currentFocusedElement);
-        if (focusedInput.isRadioButton() && focusedInput.form() == element().form() && focusedInput.name() == element().name())
+        if (focusedInput.type() == InputTypeNames::radio && focusedInput.form() == element().form() && focusedInput.name() == element().name())
             return false;
     }
 
@@ -170,26 +178,21 @@ void RadioInputType::didDispatchClick(Event* event, const ClickHandlingState& st
         // Restore the original selected radio button if possible.
         // Make sure it is still a radio button and only do the restoration if it still belongs to our group.
         HTMLInputElement* checkedRadioButton = state.checkedRadioButton.get();
-        if (checkedRadioButton
-            && checkedRadioButton->isRadioButton()
+        if (!checkedRadioButton)
+            element().setChecked(false);
+        else if (checkedRadioButton->type() == InputTypeNames::radio
             && checkedRadioButton->form() == element().form()
-            && checkedRadioButton->name() == element().name()) {
+            && checkedRadioButton->name() == element().name())
             checkedRadioButton->setChecked(true);
-        }
     }
 
     // The work we did in willDispatchClick was default handling.
     event->setDefaultHandled();
 }
 
-bool RadioInputType::isRadioButton() const
+bool RadioInputType::shouldAppearIndeterminate() const
 {
-    return true;
+    return !element().checkedRadioButtonForGroup();
 }
 
-bool RadioInputType::supportsIndeterminateAppearance() const
-{
-    return false;
-}
-
-} // namespace WebCore
+} // namespace blink

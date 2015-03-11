@@ -30,6 +30,7 @@
 #include "core/frame/FrameView.h"
 #include "core/frame/LocalFrame.h"
 #include "core/frame/Settings.h"
+#include "core/paint/SVGImagePainter.h"
 #include "core/rendering/RenderLayer.h"
 #include "core/rendering/svg/RenderSVGImage.h"
 #include "core/rendering/svg/RenderSVGResource.h"
@@ -37,10 +38,11 @@
 #include "core/rendering/svg/RenderSVGResourceMasker.h"
 #include "core/rendering/svg/SVGResources.h"
 #include "core/rendering/svg/SVGResourcesCache.h"
+#include "platform/FloatConversion.h"
 
 static int kMaxImageBufferSize = 4096;
 
-namespace WebCore {
+namespace blink {
 
 static inline bool isRenderingMaskImage(RenderObject* object)
 {
@@ -63,19 +65,19 @@ SVGRenderingContext::~SVGRenderingContext()
 
         if (m_filter) {
             ASSERT(SVGResourcesCache::cachedResourcesForRenderObject(m_object)->filter() == m_filter);
-            m_filter->postApplyResource(m_object, m_paintInfo->context, ApplyToDefaultMode, 0, 0);
+            m_filter->postApplyResource(m_object, m_paintInfo->context);
             m_paintInfo->context = m_savedContext;
             m_paintInfo->rect = m_savedPaintRect;
         }
 
         if (m_clipper) {
             ASSERT(SVGResourcesCache::cachedResourcesForRenderObject(m_object)->clipper() == m_clipper);
-            m_clipper->postApplyStatefulResource(m_object, m_paintInfo->context, m_clipperContext);
+            m_clipper->postApplyStatefulResource(m_object, m_paintInfo->context, m_clipperState);
         }
 
         if (m_masker) {
             ASSERT(SVGResourcesCache::cachedResourcesForRenderObject(m_object)->masker() == m_masker);
-            m_masker->postApplyResource(m_object, m_paintInfo->context, ApplyToDefaultMode, 0, 0);
+            m_masker->postApplyResource(m_object, m_paintInfo->context);
         }
     }
 
@@ -86,11 +88,11 @@ SVGRenderingContext::~SVGRenderingContext()
         m_paintInfo->context->restore();
 }
 
-void SVGRenderingContext::prepareToRenderSVGContent(RenderObject* object, PaintInfo& paintInfo, NeedsGraphicsContextSave needsGraphicsContextSave)
+void SVGRenderingContext::prepareToRenderSVGContent(RenderObject* object, PaintInfo& paintInfo)
 {
     ASSERT(object);
 
-#ifndef NDEBUG
+#if ENABLE(ASSERT)
     // This function must not be called twice!
     ASSERT(!(m_renderingFlags & PrepareToRenderSVGContentWasCalled));
     m_renderingFlags |= PrepareToRenderSVGContentWasCalled;
@@ -100,17 +102,10 @@ void SVGRenderingContext::prepareToRenderSVGContent(RenderObject* object, PaintI
     m_paintInfo = &paintInfo;
     m_filter = 0;
 
-    // We need to save / restore the context even if the initialization failed.
-    if (needsGraphicsContextSave == SaveGraphicsContext) {
-        m_paintInfo->context->save();
-        m_renderingFlags |= RestoreGraphicsContext;
-    }
-
     RenderStyle* style = m_object->style();
     ASSERT(style);
 
-    const SVGRenderStyle* svgStyle = style->svgStyle();
-    ASSERT(svgStyle);
+    const SVGRenderStyle& svgStyle = style->svgStyle();
 
     // Setup transparency layers before setting up SVG resources!
     bool isRenderingMask = isRenderingMaskImage(m_object);
@@ -119,8 +114,8 @@ void SVGRenderingContext::prepareToRenderSVGContent(RenderObject* object, PaintI
     bool hasBlendMode = style->hasBlendMode() && !isRenderingMask;
 
     if (opacity < 1 || hasBlendMode || style->hasIsolation()) {
-        FloatRect repaintRect = m_object->paintInvalidationRectInLocalCoordinates();
-        m_paintInfo->context->clip(repaintRect);
+        FloatRect paintInvalidationRect = m_object->paintInvalidationRectInLocalCoordinates();
+        m_paintInfo->context->clip(paintInvalidationRect);
 
         if (hasBlendMode) {
             if (!(m_renderingFlags & RestoreGraphicsContext)) {
@@ -133,7 +128,7 @@ void SVGRenderingContext::prepareToRenderSVGContent(RenderObject* object, PaintI
         m_paintInfo->context->beginTransparencyLayer(opacity);
 
         if (hasBlendMode)
-            m_paintInfo->context->setCompositeOperation(CompositeSourceOver, blink::WebBlendModeNormal);
+            m_paintInfo->context->setCompositeOperation(CompositeSourceOver, WebBlendModeNormal);
 
         m_renderingFlags |= EndOpacityLayer;
     }
@@ -146,7 +141,7 @@ void SVGRenderingContext::prepareToRenderSVGContent(RenderObject* object, PaintI
 
     SVGResources* resources = SVGResourcesCache::cachedResourcesForRenderObject(m_object);
     if (!resources) {
-        if (svgStyle->hasFilter())
+        if (svgStyle.hasFilter())
             return;
 
         m_renderingFlags |= RenderingPrepared;
@@ -164,7 +159,7 @@ void SVGRenderingContext::prepareToRenderSVGContent(RenderObject* object, PaintI
 
     RenderSVGResourceClipper* clipper = resources->clipper();
     if (!clipPathOperation && clipper) {
-        if (!clipper->applyStatefulResource(m_object, m_paintInfo->context, m_clipperContext))
+        if (!clipper->applyStatefulResource(m_object, m_paintInfo->context, m_clipperState))
             return;
         m_clipper = clipper;
         m_renderingFlags |= PostApplyResources;
@@ -181,7 +176,7 @@ void SVGRenderingContext::prepareToRenderSVGContent(RenderObject* object, PaintI
             if (!m_filter->applyResource(m_object, style, m_paintInfo->context, ApplyToDefaultMode))
                 return;
 
-            // Since we're caching the resulting bitmap and do not invalidate it on repaint rect
+            // Since we're caching the resulting bitmap and do not invalidate it on paint invalidation rect
             // changes, we need to paint the whole filter region. Otherwise, elements not visible
             // at the time of the initial paint (due to scrolling, window size, etc.) will never
             // be drawn.
@@ -295,12 +290,12 @@ bool SVGRenderingContext::bufferForeground(OwnPtr<ImageBuffer>& imageBuffer)
 
     // Create a new buffer and paint the foreground into it.
     if (!imageBuffer) {
-        if ((imageBuffer = m_paintInfo->context->createCompatibleBuffer(expandedIntSize(boundingBox.size())))) {
+        if ((imageBuffer = m_paintInfo->context->createRasterBuffer(expandedIntSize(boundingBox.size())))) {
             GraphicsContext* bufferedRenderingContext = imageBuffer->context();
             bufferedRenderingContext->translate(-boundingBox.x(), -boundingBox.y());
             PaintInfo bufferedInfo(*m_paintInfo);
             bufferedInfo.context = bufferedRenderingContext;
-            toRenderSVGImage(m_object)->paintForeground(bufferedInfo);
+            SVGImagePainter::paintForeground(toRenderSVGImage(*m_object), bufferedInfo);
         } else
             return false;
     }
@@ -309,4 +304,4 @@ bool SVGRenderingContext::bufferForeground(OwnPtr<ImageBuffer>& imageBuffer)
     return true;
 }
 
-}
+} // namespace blink

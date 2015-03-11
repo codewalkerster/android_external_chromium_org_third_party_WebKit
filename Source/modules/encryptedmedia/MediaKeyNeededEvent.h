@@ -29,7 +29,7 @@
 #include "core/html/MediaKeyError.h"
 #include "modules/EventModules.h"
 
-namespace WebCore {
+namespace blink {
 
 struct MediaKeyNeededEventInit : public EventInit {
     MediaKeyNeededEventInit();
@@ -39,6 +39,7 @@ struct MediaKeyNeededEventInit : public EventInit {
 };
 
 class MediaKeyNeededEvent FINAL : public Event {
+    DEFINE_WRAPPERTYPEINFO();
 public:
     virtual ~MediaKeyNeededEvent();
 
@@ -67,6 +68,6 @@ private:
     RefPtr<Uint8Array> m_initData;
 };
 
-} // namespace WebCore
+} // namespace blink
 
-#endif
+#endif // MediaKeyNeededEvent_h

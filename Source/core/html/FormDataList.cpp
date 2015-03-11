@@ -25,7 +25,9 @@
 #include "platform/network/FormDataBuilder.h"
 #include "platform/text/LineEnding.h"
 
-namespace WebCore {
+namespace blink {
+
+DEFINE_EMPTY_DESTRUCTOR_WILL_BE_REMOVED(FormDataList);
 
 FormDataList::FormDataList(const WTF::TextEncoding& c)
     : m_encoding(c)

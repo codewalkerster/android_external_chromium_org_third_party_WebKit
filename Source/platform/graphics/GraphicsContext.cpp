@@ -34,60 +34,32 @@
 #include "platform/graphics/DisplayList.h"
 #include "platform/graphics/Gradient.h"
 #include "platform/graphics/ImageBuffer.h"
+#include "platform/graphics/UnacceleratedImageBufferSurface.h"
+#include "platform/graphics/skia/SkiaUtils.h"
 #include "platform/text/BidiResolver.h"
 #include "platform/text/TextRunIterator.h"
 #include "platform/weborigin/KURL.h"
 #include "third_party/skia/include/core/SkAnnotation.h"
+#include "third_party/skia/include/core/SkClipStack.h"
 #include "third_party/skia/include/core/SkColorFilter.h"
 #include "third_party/skia/include/core/SkData.h"
 #include "third_party/skia/include/core/SkDevice.h"
 #include "third_party/skia/include/core/SkPicture.h"
+#include "third_party/skia/include/core/SkPictureRecorder.h"
 #include "third_party/skia/include/core/SkRRect.h"
 #include "third_party/skia/include/core/SkRefCnt.h"
 #include "third_party/skia/include/core/SkSurface.h"
 #include "third_party/skia/include/effects/SkBlurMaskFilter.h"
 #include "third_party/skia/include/effects/SkCornerPathEffect.h"
 #include "third_party/skia/include/effects/SkLumaColorFilter.h"
+#include "third_party/skia/include/effects/SkMatrixImageFilter.h"
+#include "third_party/skia/include/effects/SkPictureImageFilter.h"
 #include "third_party/skia/include/gpu/GrRenderTarget.h"
 #include "third_party/skia/include/gpu/GrTexture.h"
 #include "wtf/Assertions.h"
 #include "wtf/MathExtras.h"
 
-using namespace std;
-using blink::WebBlendMode;
-
-namespace WebCore {
-
-namespace {
-
-class CompatibleImageBufferSurface : public ImageBufferSurface {
-    WTF_MAKE_NONCOPYABLE(CompatibleImageBufferSurface); WTF_MAKE_FAST_ALLOCATED;
-public:
-    CompatibleImageBufferSurface(PassRefPtr<SkSurface> surface, const IntSize& size, OpacityMode opacityMode)
-        : ImageBufferSurface(size, opacityMode)
-        , m_surface(surface)
-    {
-    }
-    virtual ~CompatibleImageBufferSurface() { }
-
-    virtual SkCanvas* canvas() const OVERRIDE { return m_surface ? m_surface->getCanvas() : 0; }
-    virtual bool isValid() const OVERRIDE { return m_surface; }
-    virtual bool isAccelerated() const OVERRIDE { return isValid() && m_surface->getCanvas()->getTopDevice()->accessRenderTarget(); }
-    virtual Platform3DObject getBackingTexture() const OVERRIDE
-    {
-        ASSERT(isAccelerated());
-        GrRenderTarget* renderTarget = m_surface->getCanvas()->getTopDevice()->accessRenderTarget();
-        if (renderTarget) {
-            return renderTarget->asTexture()->getTextureHandle();
-        }
-        return 0;
-    };
-
-private:
-    RefPtr<SkSurface> m_surface;
-};
-
-} // unnamed namespace
+namespace blink {
 
 struct GraphicsContext::CanvasSaveState {
     CanvasSaveState(bool pendingSave, int count)
@@ -98,16 +70,23 @@ struct GraphicsContext::CanvasSaveState {
 };
 
 struct GraphicsContext::RecordingState {
-    RecordingState(SkCanvas* currentCanvas, const SkMatrix& currentMatrix, PassRefPtr<DisplayList> displayList)
-        : m_savedCanvas(currentCanvas)
-        , m_displayList(displayList)
+    RecordingState(SkPictureRecorder* recorder, SkCanvas* currentCanvas, const SkMatrix& currentMatrix, bool currentShouldSmoothFonts,
+        PassRefPtr<DisplayList> displayList, RegionTrackingMode trackingMode)
+        : m_displayList(displayList)
+        , m_recorder(recorder)
+        , m_savedCanvas(currentCanvas)
         , m_savedMatrix(currentMatrix)
-    {
-    }
+        , m_savedShouldSmoothFonts(currentShouldSmoothFonts)
+        , m_regionTrackingMode(trackingMode) { }
 
-    SkCanvas* m_savedCanvas;
+    ~RecordingState() { }
+
     RefPtr<DisplayList> m_displayList;
+    SkPictureRecorder* m_recorder;
+    SkCanvas* m_savedCanvas;
     const SkMatrix m_savedMatrix;
+    bool m_savedShouldSmoothFonts;
+    RegionTrackingMode m_regionTrackingMode;
 };
 
 GraphicsContext::GraphicsContext(SkCanvas* canvas, DisabledMode disableContextOrPainting)
@@ -116,24 +95,21 @@ GraphicsContext::GraphicsContext(SkCanvas* canvas, DisabledMode disableContextOr
     , m_paintStateIndex(0)
     , m_pendingCanvasSave(false)
     , m_annotationMode(0)
-#if ASSERT_ENABLED
+#if ENABLE(ASSERT)
     , m_annotationCount(0)
     , m_layerCount(0)
     , m_disableDestructionChecks(false)
 #endif
     , m_disabledState(disableContextOrPainting)
-    , m_trackOpaqueRegion(false)
+    , m_deviceScaleFactor(1.0f)
+    , m_regionTrackingMode(RegionTrackingDisabled)
     , m_trackTextRegion(false)
-    , m_useHighResMarker(false)
-    , m_updatingControlTints(false)
     , m_accelerated(false)
     , m_isCertainlyOpaque(true)
     , m_printing(false)
     , m_antialiasHairlineImages(false)
+    , m_shouldSmoothFonts(true)
 {
-    if (!canvas)
-        m_disabledState |= PaintingDisabled;
-
     // FIXME: Do some tests to determine how many states are typically used, and allocate
     // several here.
     m_paintStateStack.append(GraphicsContextState::create());
@@ -142,7 +118,7 @@ GraphicsContext::GraphicsContext(SkCanvas* canvas, DisabledMode disableContextOr
 
 GraphicsContext::~GraphicsContext()
 {
-#if ASSERT_ENABLED
+#if ENABLE(ASSERT)
     if (!m_disableDestructionChecks) {
         ASSERT(!m_paintStateIndex);
         ASSERT(!m_paintState->saveCount());
@@ -154,6 +130,21 @@ GraphicsContext::~GraphicsContext()
 #endif
 }
 
+void GraphicsContext::resetCanvas(SkCanvas* canvas)
+{
+    m_canvas = canvas;
+    m_trackedRegion.reset();
+}
+
+void GraphicsContext::setRegionTrackingMode(RegionTrackingMode mode)
+{
+    m_regionTrackingMode = mode;
+    if (mode == RegionTrackingOpaque)
+        m_trackedRegion.setTrackedRegionType(RegionTracker::Opaque);
+    else if (mode == RegionTrackingOverwrite)
+        m_trackedRegion.setTrackedRegionType(RegionTracker::Overwrite);
+}
+
 void GraphicsContext::save()
 {
     if (contextDisabled())
@@ -161,8 +152,10 @@ void GraphicsContext::save()
 
     m_paintState->incrementSaveCount();
 
-    m_canvasStateStack.append(CanvasSaveState(m_pendingCanvasSave, m_canvas->getSaveCount()));
-    m_pendingCanvasSave = true;
+    if (m_canvas) {
+        m_canvasStateStack.append(CanvasSaveState(m_pendingCanvasSave, m_canvas->getSaveCount()));
+        m_pendingCanvasSave = true;
+    }
 }
 
 void GraphicsContext::restore()
@@ -182,10 +175,13 @@ void GraphicsContext::restore()
         m_paintState = m_paintStateStack[m_paintStateIndex].get();
     }
 
-    CanvasSaveState savedState = m_canvasStateStack.last();
-    m_canvasStateStack.removeLast();
-    m_pendingCanvasSave = savedState.m_pendingSave;
-    m_canvas->restoreToCount(savedState.m_restoreCount);
+    if (m_canvas) {
+        ASSERT(m_canvasStateStack.size() > 0);
+        CanvasSaveState savedState = m_canvasStateStack.last();
+        m_canvasStateStack.removeLast();
+        m_pendingCanvasSave = savedState.m_pendingSave;
+        m_canvas->restoreToCount(savedState.m_restoreCount);
+    }
 }
 
 void GraphicsContext::saveLayer(const SkRect* bounds, const SkPaint* paint)
@@ -193,11 +189,13 @@ void GraphicsContext::saveLayer(const SkRect* bounds, const SkPaint* paint)
     if (contextDisabled())
         return;
 
+    ASSERT(m_canvas);
+
     realizeCanvasSave();
 
     m_canvas->saveLayer(bounds, paint);
-    if (m_trackOpaqueRegion)
-        m_opaqueRegion.pushCanvasLayer(paint);
+    if (regionTrackingEnabled())
+        m_trackedRegion.pushCanvasLayer(paint);
 }
 
 void GraphicsContext::restoreLayer()
@@ -205,28 +203,27 @@ void GraphicsContext::restoreLayer()
     if (contextDisabled())
         return;
 
+    ASSERT(m_canvas);
+
     m_canvas->restore();
-    if (m_trackOpaqueRegion)
-        m_opaqueRegion.popCanvasLayer(this);
+    if (regionTrackingEnabled())
+        m_trackedRegion.popCanvasLayer(this);
 }
 
-void GraphicsContext::beginAnnotation(const char* rendererName, const char* paintPhase,
-    const String& elementId, const String& elementClass, const String& elementTag)
+void GraphicsContext::beginAnnotation(const AnnotationList& annotations)
 {
     if (contextDisabled())
         return;
 
-    canvas()->beginCommentGroup("GraphicsContextAnnotation");
+    ASSERT(m_canvas);
 
-    GraphicsContextAnnotation annotation(rendererName, paintPhase, elementId, elementClass, elementTag);
-    AnnotationList annotations;
-    annotation.asAnnotationList(annotations);
+    canvas()->beginCommentGroup("GraphicsContextAnnotation");
 
     AnnotationList::const_iterator end = annotations.end();
     for (AnnotationList::const_iterator it = annotations.begin(); it != end; ++it)
         canvas()->addComment(it->first, it->second.ascii().data());
 
-#if ASSERT_ENABLED
+#if ENABLE(ASSERT)
     ++m_annotationCount;
 #endif
 }
@@ -236,10 +233,11 @@ void GraphicsContext::endAnnotation()
     if (contextDisabled())
         return;
 
+    ASSERT(m_canvas);
+    ASSERT(m_annotationCount > 0);
     canvas()->endCommentGroup();
 
-    ASSERT(m_annotationCount > 0);
-#if ASSERT_ENABLED
+#if ENABLE(ASSERT)
     --m_annotationCount;
 #endif
 }
@@ -341,6 +339,7 @@ bool GraphicsContext::getTransformedClipBounds(FloatRect* bounds) const
 {
     if (contextDisabled())
         return false;
+    ASSERT(m_canvas);
     SkIRect skIBounds;
     if (!m_canvas->getClipDeviceBounds(&skIBounds))
         return false;
@@ -351,8 +350,10 @@ bool GraphicsContext::getTransformedClipBounds(FloatRect* bounds) const
 
 SkMatrix GraphicsContext::getTotalMatrix() const
 {
-    if (contextDisabled())
+    if (contextDisabled() || !m_canvas)
         return SkMatrix::I();
+
+    ASSERT(m_canvas);
 
     if (!isRecording())
         return m_canvas->getTotalMatrix();
@@ -364,7 +365,7 @@ SkMatrix GraphicsContext::getTotalMatrix() const
     return totalMatrix;
 }
 
-void GraphicsContext::adjustTextRenderMode(SkPaint* paint)
+void GraphicsContext::adjustTextRenderMode(SkPaint* paint) const
 {
     if (contextDisabled())
         return;
@@ -375,8 +376,9 @@ void GraphicsContext::adjustTextRenderMode(SkPaint* paint)
     paint->setLCDRenderText(couldUseLCDRenderedText());
 }
 
-bool GraphicsContext::couldUseLCDRenderedText()
+bool GraphicsContext::couldUseLCDRenderedText() const
 {
+    ASSERT(m_canvas);
     // Our layers only have a single alpha channel. This means that subpixel
     // rendered text cannot be composited correctly when the layer is
     // collapsed. Therefore, subpixel text is contextDisabled when we are drawing
@@ -394,7 +396,7 @@ void GraphicsContext::setCompositeOperation(CompositeOperator compositeOperation
     mutableState()->setCompositeOperation(compositeOperation, blendMode);
 }
 
-SkColorFilter* GraphicsContext::colorFilter()
+SkColorFilter* GraphicsContext::colorFilter() const
 {
     return immutableState()->colorFilter();
 }
@@ -414,6 +416,7 @@ bool GraphicsContext::readPixels(const SkImageInfo& info, void* pixels, size_t r
     if (contextDisabled())
         return false;
 
+    ASSERT(m_canvas);
     return m_canvas->readPixels(info, pixels, rowBytes, x, y);
 }
 
@@ -422,6 +425,7 @@ void GraphicsContext::setMatrix(const SkMatrix& matrix)
     if (contextDisabled())
         return;
 
+    ASSERT(m_canvas);
     realizeCanvasSave();
 
     m_canvas->setMatrix(matrix);
@@ -435,6 +439,7 @@ void GraphicsContext::concat(const SkMatrix& matrix)
     if (matrix.isIdentity())
         return;
 
+    ASSERT(m_canvas);
     realizeCanvasSave();
 
     m_canvas->concat(matrix);
@@ -452,7 +457,7 @@ void GraphicsContext::beginLayer(float opacity, CompositeOperator op, const Floa
 
     SkPaint layerPaint;
     layerPaint.setAlpha(static_cast<unsigned char>(opacity * 255));
-    layerPaint.setXfermode(WebCoreCompositeToSkiaComposite(op, m_paintState->blendMode()).get());
+    layerPaint.setXfermodeMode(WebCoreCompositeToSkiaComposite(op, m_paintState->blendMode()));
     layerPaint.setColorFilter(WebCoreColorFilterToSkiaColorFilter(colorFilter).get());
     layerPaint.setImageFilter(imageFilter);
 
@@ -463,7 +468,7 @@ void GraphicsContext::beginLayer(float opacity, CompositeOperator op, const Floa
         saveLayer(0, &layerPaint);
     }
 
-#if ASSERT_ENABLED
+#if ENABLE(ASSERT)
     ++m_layerCount;
 #endif
 }
@@ -476,21 +481,24 @@ void GraphicsContext::endLayer()
     restoreLayer();
 
     ASSERT(m_layerCount > 0);
-#if ASSERT_ENABLED
+#if ENABLE(ASSERT)
     --m_layerCount;
 #endif
 }
 
-void GraphicsContext::beginRecording(const FloatRect& bounds)
+void GraphicsContext::beginRecording(const FloatRect& bounds, uint32_t recordFlags)
 {
-    RefPtr<DisplayList> displayList = adoptRef(new DisplayList(bounds));
+    RefPtr<DisplayList> displayList = DisplayList::create(bounds);
 
     SkCanvas* savedCanvas = m_canvas;
     SkMatrix savedMatrix = getTotalMatrix();
+    SkPictureRecorder* recorder = 0;
 
     if (!contextDisabled()) {
-        IntRect recordingRect = enclosingIntRect(bounds);
-        m_canvas = displayList->beginRecording(recordingRect.size());
+        FloatRect bounds = displayList->bounds();
+        IntSize recordingSize = enclosingIntRect(bounds).size();
+        recorder = new SkPictureRecorder;
+        m_canvas = recorder->beginRecording(recordingSize.width(), recordingSize.height(), 0, recordFlags);
 
         // We want the bounds offset mapped to (0, 0), such that the display list content
         // is fully contained within the SkPictureRecord's bounds.
@@ -501,7 +509,11 @@ void GraphicsContext::beginRecording(const FloatRect& bounds)
         }
     }
 
-    m_recordingStateStack.append(RecordingState(savedCanvas, savedMatrix, displayList));
+    m_recordingStateStack.append(RecordingState(recorder, savedCanvas, savedMatrix, m_shouldSmoothFonts, displayList,
+        static_cast<RegionTrackingMode>(m_regionTrackingMode)));
+
+    // Disable region tracking during recording.
+    setRegionTrackingMode(RegionTrackingDisabled);
 }
 
 PassRefPtr<DisplayList> GraphicsContext::endRecording()
@@ -509,15 +521,16 @@ PassRefPtr<DisplayList> GraphicsContext::endRecording()
     ASSERT(!m_recordingStateStack.isEmpty());
 
     RecordingState recording = m_recordingStateStack.last();
-    if (!contextDisabled()) {
-        ASSERT(recording.m_displayList->isRecording());
-        recording.m_displayList->endRecording();
-    }
+    if (!contextDisabled())
+        recording.m_displayList->setPicture(recording.m_recorder->endRecording());
 
-    m_recordingStateStack.removeLast();
     m_canvas = recording.m_savedCanvas;
+    setRegionTrackingMode(recording.m_regionTrackingMode);
+    setShouldSmoothFonts(recording.m_savedShouldSmoothFonts);
+    delete recording.m_recorder;
+    m_recordingStateStack.removeLast();
 
-    return recording.m_displayList.release();
+    return recording.m_displayList;
 }
 
 bool GraphicsContext::isRecording() const
@@ -528,21 +541,42 @@ bool GraphicsContext::isRecording() const
 void GraphicsContext::drawDisplayList(DisplayList* displayList)
 {
     ASSERT(displayList);
-    ASSERT(!displayList->isRecording());
+    ASSERT(m_canvas);
 
     if (contextDisabled() || displayList->bounds().isEmpty())
         return;
 
+    bool performClip = !displayList->clip().isEmpty();
+    bool performTransform = !displayList->transform().isIdentity();
+    if (performClip || performTransform) {
+        save();
+        if (performTransform)
+            concat(displayList->transform());
+        if (performClip)
+            clipRect(displayList->clip());
+    }
+
     realizeCanvasSave();
 
-    const FloatRect& bounds = displayList->bounds();
-    if (bounds.x() || bounds.y())
-        m_canvas->translate(bounds.x(), bounds.y());
+    const FloatPoint& location = displayList->bounds().location();
+    if (location.x() || location.y()) {
+        SkMatrix m;
+        m.setTranslate(location.x(), location.y());
+        m_canvas->drawPicture(displayList->picture(), &m, 0);
+    } else {
+        m_canvas->drawPicture(displayList->picture());
+    }
 
-    m_canvas->drawPicture(displayList->picture());
+    if (regionTrackingEnabled()) {
+        // Since we don't track regions within display lists, conservatively
+        // mark the bounds as non-opaque.
+        SkPaint paint;
+        paint.setXfermodeMode(SkXfermode::kClear_Mode);
+        m_trackedRegion.didDrawBounded(this, displayList->bounds(), paint);
+    }
 
-    if (bounds.x() || bounds.y())
-        m_canvas->translate(-bounds.x(), -bounds.y());
+    if (performClip || performTransform)
+        restore();
 }
 
 void GraphicsContext::drawConvexPolygon(size_t numPoints, const FloatPoint* points, bool shouldAntialias)
@@ -564,19 +598,65 @@ void GraphicsContext::drawConvexPolygon(size_t numPoints, const FloatPoint* poin
         drawPath(path, immutableState()->strokePaint());
 }
 
+float GraphicsContext::prepareFocusRingPaint(SkPaint& paint, const Color& color, int width) const
+{
+    paint.setAntiAlias(true);
+    paint.setStyle(SkPaint::kStroke_Style);
+    paint.setColor(color.rgb());
+    paint.setStrokeWidth(focusRingWidth(width));
+
+#if OS(MACOSX)
+    paint.setAlpha(64);
+    return (width - 1) * 0.5f;
+#else
+    return 1;
+#endif
+}
+
+void GraphicsContext::drawFocusRingPath(const SkPath& path, const Color& color, int width)
+{
+    SkPaint paint;
+    float cornerRadius = prepareFocusRingPaint(paint, color, width);
+
+    paint.setPathEffect(SkCornerPathEffect::Create(SkFloatToScalar(cornerRadius)))->unref();
+
+    // Outer path
+    drawPath(path, paint);
+
+#if OS(MACOSX)
+    // Inner path
+    paint.setAlpha(128);
+    paint.setStrokeWidth(paint.getStrokeWidth() * 0.5f);
+    drawPath(path, paint);
+#endif
+}
+
+void GraphicsContext::drawFocusRingRect(const SkRect& rect, const Color& color, int width)
+{
+    SkPaint paint;
+    float cornerRadius = prepareFocusRingPaint(paint, color, width);
+
+    SkRRect rrect;
+    rrect.setRectXY(rect, SkFloatToScalar(cornerRadius), SkFloatToScalar(cornerRadius));
+
+    // Outer rect
+    drawRRect(rrect, paint);
+
+#if OS(MACOSX)
+    // Inner rect
+    paint.setAlpha(128);
+    paint.setStrokeWidth(paint.getStrokeWidth() * 0.5f);
+    drawRRect(rrect, paint);
+#endif
+}
+
 void GraphicsContext::drawFocusRing(const Path& focusRingPath, int width, int offset, const Color& color)
 {
     // FIXME: Implement support for offset.
     if (contextDisabled())
         return;
 
-    SkPaint paint;
-    paint.setAntiAlias(true);
-    paint.setStyle(SkPaint::kStroke_Style);
-    paint.setColor(color.rgb());
-
-    drawOuterPath(focusRingPath.skPath(), paint, width);
-    drawInnerPath(focusRingPath.skPath(), paint, width);
+    drawFocusRingPath(focusRingPath.skPath(), color, width);
 }
 
 void GraphicsContext::drawFocusRing(const Vector<IntRect>& rects, int width, int offset, const Color& color)
@@ -589,22 +669,20 @@ void GraphicsContext::drawFocusRing(const Vector<IntRect>& rects, int width, int
         return;
 
     SkRegion focusRingRegion;
-    const int focusRingOutset = getFocusRingOutset(offset);
+    const int outset = focusRingOutset(offset);
     for (unsigned i = 0; i < rectCount; i++) {
         SkIRect r = rects[i];
-        r.inset(-focusRingOutset, -focusRingOutset);
+        r.inset(-outset, -outset);
         focusRingRegion.op(r, SkRegion::kUnion_Op);
     }
 
-    SkPath path;
-    SkPaint paint;
-    paint.setAntiAlias(true);
-    paint.setStyle(SkPaint::kStroke_Style);
-
-    paint.setColor(color.rgb());
-    focusRingRegion.getBoundaryPath(&path);
-    drawOuterPath(path, paint, width);
-    drawInnerPath(path, paint, width);
+    if (focusRingRegion.isRect()) {
+        drawFocusRingRect(SkRect::MakeFromIRect(focusRingRegion.getBounds()), color, width);
+    } else {
+        SkPath path;
+        if (focusRingRegion.getBoundaryPath(&path))
+            drawFocusRingPath(path, color, width);
+    }
 }
 
 static inline IntRect areaCastingShadowInHole(const IntRect& holeRect, int shadowBlur, int shadowSpread, const IntSize& shadowOffset)
@@ -638,17 +716,17 @@ void GraphicsContext::drawInnerShadow(const RoundedRect& rect, const Color& shad
     }
 
     if (clippedEdges & LeftEdge) {
-        holeRect.move(-max(shadowOffset.width(), 0) - shadowBlur, 0);
-        holeRect.setWidth(holeRect.width() + max(shadowOffset.width(), 0) + shadowBlur);
+        holeRect.move(-std::max(shadowOffset.width(), 0) - shadowBlur, 0);
+        holeRect.setWidth(holeRect.width() + std::max(shadowOffset.width(), 0) + shadowBlur);
     }
     if (clippedEdges & TopEdge) {
-        holeRect.move(0, -max(shadowOffset.height(), 0) - shadowBlur);
-        holeRect.setHeight(holeRect.height() + max(shadowOffset.height(), 0) + shadowBlur);
+        holeRect.move(0, -std::max(shadowOffset.height(), 0) - shadowBlur);
+        holeRect.setHeight(holeRect.height() + std::max(shadowOffset.height(), 0) + shadowBlur);
     }
     if (clippedEdges & RightEdge)
-        holeRect.setWidth(holeRect.width() - min(shadowOffset.width(), 0) + shadowBlur);
+        holeRect.setWidth(holeRect.width() - std::min(shadowOffset.width(), 0) + shadowBlur);
     if (clippedEdges & BottomEdge)
-        holeRect.setHeight(holeRect.height() - min(shadowOffset.height(), 0) + shadowBlur);
+        holeRect.setHeight(holeRect.height() - std::min(shadowOffset.height(), 0) + shadowBlur);
 
     Color fillColor(shadowColor.red(), shadowColor.green(), shadowColor.blue(), 255);
 
@@ -676,6 +754,7 @@ void GraphicsContext::drawInnerShadow(const RoundedRect& rect, const Color& shad
 
 void GraphicsContext::drawLine(const IntPoint& point1, const IntPoint& point2)
 {
+    ASSERT(m_canvas);
     if (contextDisabled())
         return;
 
@@ -720,8 +799,8 @@ void GraphicsContext::drawLine(const IntPoint& point1, const IntPoint& point2)
 
     m_canvas->drawPoints(SkCanvas::kLines_PointMode, 2, pts, paint);
 
-    if (m_trackOpaqueRegion)
-        m_opaqueRegion.didDrawPoints(this, SkCanvas::kLines_PointMode, 2, pts, paint);
+    if (regionTrackingEnabled())
+        m_trackedRegion.didDrawPoints(this, SkCanvas::kLines_PointMode, 2, pts, paint);
 }
 
 void GraphicsContext::drawLineForDocumentMarker(const FloatPoint& pt, float width, DocumentMarkerLineStyle style)
@@ -729,7 +808,8 @@ void GraphicsContext::drawLineForDocumentMarker(const FloatPoint& pt, float widt
     if (contextDisabled())
         return;
 
-    int deviceScaleFactor = m_useHighResMarker ? 2 : 1;
+    // Use 2x resources for a device scale factor of 1.5 or above.
+    int deviceScaleFactor = m_deviceScaleFactor > 1.5f ? 2 : 1;
 
     // Create the pattern we'll use to draw the underline.
     int index = style == DocumentMarkerGrammarLineStyle ? 1 : 0;
@@ -742,7 +822,7 @@ void GraphicsContext::drawLineForDocumentMarker(const FloatPoint& pt, float widt
         const int rowPixels = 4 * deviceScaleFactor;
         const int colPixels = 3 * deviceScaleFactor;
         SkBitmap bitmap;
-        if (!bitmap.allocN32Pixels(rowPixels, colPixels))
+        if (!bitmap.tryAllocN32Pixels(rowPixels, colPixels))
             return;
 
         bitmap.eraseARGB(0, 0, 0, 0);
@@ -800,7 +880,7 @@ void GraphicsContext::drawLineForDocumentMarker(const FloatPoint& pt, float widt
         const int rowPixels = 32 * deviceScaleFactor; // Must be multiple of 4 for pattern below.
         const int colPixels = 2 * deviceScaleFactor;
         SkBitmap bitmap;
-        if (!bitmap.allocN32Pixels(rowPixels, colPixels))
+        if (!bitmap.tryAllocN32Pixels(rowPixels, colPixels))
             return;
 
         bitmap.eraseARGB(0, 0, 0, 0);
@@ -908,7 +988,7 @@ void GraphicsContext::drawRect(const IntRect& rect)
         drawRect(skRect, immutableState()->fillPaint());
 
     if (immutableState()->strokeData().style() != NoStroke
-        && immutableState()->strokeData().color().alpha()) {
+        && immutableState()->strokeColor().alpha()) {
         // Stroke a width: 1 inset border
         SkPaint paint(immutableState()->fillPaint());
         paint.setColor(effectiveStrokeColor());
@@ -957,6 +1037,7 @@ void GraphicsContext::drawBidiText(const Font& font, const TextRunPaintInfo& run
 
     FloatPoint currPoint = point;
     BidiCharacterRun* bidiRun = bidiRuns.firstRun();
+    float width = 0;
     while (bidiRun) {
         TextRun subrun = run.subRun(bidiRun->start(), bidiRun->stop() - bidiRun->start());
         bool isRTL = bidiRun->level() % 2;
@@ -965,12 +1046,12 @@ void GraphicsContext::drawBidiText(const Font& font, const TextRunPaintInfo& run
 
         TextRunPaintInfo subrunInfo(subrun);
         subrunInfo.bounds = runInfo.bounds;
-        font.drawText(this, subrunInfo, currPoint, customFontNotReadyAction);
+        width = font.drawText(this, subrunInfo, currPoint, customFontNotReadyAction);
+
 
         bidiRun = bidiRun->next();
-        // FIXME: Have Font::drawText return the width of what it drew so that we don't have to re-measure here.
         if (bidiRun)
-            currPoint.move(font.width(subrun), 0);
+            currPoint.move(width, 0);
     }
 
     bidiRuns.deleteRuns();
@@ -1000,7 +1081,7 @@ void GraphicsContext::drawImage(Image* image, const IntRect& r, CompositeOperato
 
 void GraphicsContext::drawImage(Image* image, const FloatRect& dest, const FloatRect& src, CompositeOperator op, RespectImageOrientationEnum shouldRespectImageOrientation)
 {
-    drawImage(image, dest, src, op, blink::WebBlendModeNormal, shouldRespectImageOrientation);
+    drawImage(image, dest, src, op, WebBlendModeNormal, shouldRespectImageOrientation);
 }
 
 void GraphicsContext::drawImage(Image* image, const FloatRect& dest)
@@ -1040,30 +1121,58 @@ void GraphicsContext::drawTiledImage(Image* image, const IntRect& dest, const In
 }
 
 void GraphicsContext::drawImageBuffer(ImageBuffer* image, const FloatRect& dest,
-    const FloatRect* src, CompositeOperator op)
+    const FloatRect* src, CompositeOperator op, WebBlendMode blendMode)
 {
     if (contextDisabled() || !image)
         return;
 
-    image->draw(this, dest, src, op);
+    image->draw(this, dest, src, op, blendMode);
+}
+
+void GraphicsContext::drawPicture(PassRefPtr<SkPicture> picture, const FloatRect& dest, const FloatRect& src, CompositeOperator op, WebBlendMode blendMode)
+{
+    ASSERT(m_canvas);
+    if (contextDisabled() || !picture)
+        return;
+
+    SkMatrix ctm = m_canvas->getTotalMatrix();
+    SkRect deviceDest;
+    ctm.mapRect(&deviceDest, dest);
+    SkRect sourceBounds = WebCoreFloatRectToSKRect(src);
+
+    RefPtr<SkPictureImageFilter> pictureFilter = adoptRef(SkPictureImageFilter::Create(picture.get(), sourceBounds));
+    SkMatrix layerScale;
+    layerScale.setScale(deviceDest.width() / src.width(), deviceDest.height() / src.height());
+    RefPtr<SkMatrixImageFilter> matrixFilter = adoptRef(SkMatrixImageFilter::Create(layerScale, SkPaint::kLow_FilterLevel, pictureFilter.get()));
+    SkPaint picturePaint;
+    picturePaint.setXfermodeMode(WebCoreCompositeToSkiaComposite(op, blendMode));
+    picturePaint.setImageFilter(matrixFilter.get());
+    SkRect layerBounds = SkRect::MakeWH(std::max(deviceDest.width(), sourceBounds.width()), std::max(deviceDest.height(), sourceBounds.height()));
+    m_canvas->save();
+    m_canvas->resetMatrix();
+    m_canvas->translate(deviceDest.x(), deviceDest.y());
+    m_canvas->saveLayer(&layerBounds, &picturePaint);
+    m_canvas->restore();
+    m_canvas->restore();
 }
 
 void GraphicsContext::writePixels(const SkImageInfo& info, const void* pixels, size_t rowBytes, int x, int y)
 {
+    ASSERT(m_canvas);
     if (contextDisabled())
         return;
 
     m_canvas->writePixels(info, pixels, rowBytes, x, y);
 
-    if (m_trackOpaqueRegion) {
+    if (regionTrackingEnabled()) {
         SkRect rect = SkRect::MakeXYWH(x, y, info.width(), info.height());
         SkPaint paint;
 
         paint.setXfermodeMode(SkXfermode::kSrc_Mode);
         if (kOpaque_SkAlphaType != info.alphaType())
-            paint.setAlpha(0x80); // signal to m_opaqueRegion that we are not fully opaque
+            paint.setAlpha(0x80); // signal to m_trackedRegion that we are not fully opaque
 
-        m_opaqueRegion.didDrawRect(this, rect, paint, 0);
+        m_trackedRegion.didDrawRect(this, rect, paint, 0);
         // more efficient would be to call markRectAsOpaque or MarkRectAsNonOpaque directly,
         // rather than cons-ing up a paint with an xfermode and alpha
     }
@@ -1083,20 +1192,22 @@ void GraphicsContext::writePixels(const SkBitmap& bitmap, int x, int y)
 
 void GraphicsContext::drawBitmap(const SkBitmap& bitmap, SkScalar left, SkScalar top, const SkPaint* paint)
 {
+    ASSERT(m_canvas);
     if (contextDisabled())
         return;
 
     m_canvas->drawBitmap(bitmap, left, top, paint);
 
-    if (m_trackOpaqueRegion) {
+    if (regionTrackingEnabled()) {
         SkRect rect = SkRect::MakeXYWH(left, top, bitmap.width(), bitmap.height());
-        m_opaqueRegion.didDrawRect(this, rect, *paint, &bitmap);
+        m_trackedRegion.didDrawRect(this, rect, *paint, &bitmap);
     }
 }
 
 void GraphicsContext::drawBitmapRect(const SkBitmap& bitmap, const SkRect* src,
     const SkRect& dst, const SkPaint* paint)
 {
+    ASSERT(m_canvas);
     if (contextDisabled())
         return;
 
@@ -1105,41 +1216,56 @@ void GraphicsContext::drawBitmapRect(const SkBitmap& bitmap, const SkRect* src,
 
     m_canvas->drawBitmapRectToRect(bitmap, src, dst, paint, flags);
 
-    if (m_trackOpaqueRegion)
-        m_opaqueRegion.didDrawRect(this, dst, *paint, &bitmap);
+    if (regionTrackingEnabled())
+        m_trackedRegion.didDrawRect(this, dst, *paint, &bitmap);
 }
 
 void GraphicsContext::drawOval(const SkRect& oval, const SkPaint& paint)
 {
+    ASSERT(m_canvas);
     if (contextDisabled())
         return;
 
     m_canvas->drawOval(oval, paint);
 
-    if (m_trackOpaqueRegion)
-        m_opaqueRegion.didDrawBounded(this, oval, paint);
+    if (regionTrackingEnabled())
+        m_trackedRegion.didDrawBounded(this, oval, paint);
 }
 
 void GraphicsContext::drawPath(const SkPath& path, const SkPaint& paint)
 {
+    ASSERT(m_canvas);
     if (contextDisabled())
         return;
 
     m_canvas->drawPath(path, paint);
 
-    if (m_trackOpaqueRegion)
-        m_opaqueRegion.didDrawPath(this, path, paint);
+    if (regionTrackingEnabled())
+        m_trackedRegion.didDrawPath(this, path, paint);
 }
 
 void GraphicsContext::drawRect(const SkRect& rect, const SkPaint& paint)
 {
+    ASSERT(m_canvas);
     if (contextDisabled())
         return;
 
     m_canvas->drawRect(rect, paint);
 
-    if (m_trackOpaqueRegion)
-        m_opaqueRegion.didDrawRect(this, rect, paint, 0);
+    if (regionTrackingEnabled())
+        m_trackedRegion.didDrawRect(this, rect, paint, 0);
+}
+
+void GraphicsContext::drawRRect(const SkRRect& rrect, const SkPaint& paint)
+{
+    ASSERT(m_canvas);
+    if (contextDisabled())
+        return;
+
+    m_canvas->drawRRect(rrect, paint);
+
+    if (regionTrackingEnabled())
+        m_trackedRegion.didDrawBounded(this, rrect.rect(), paint);
 }
 
 void GraphicsContext::didDrawRect(const SkRect& rect, const SkPaint& paint, const SkBitmap* bitmap)
@@ -1147,13 +1273,14 @@ void GraphicsContext::didDrawRect(const SkRect& rect, const SkPaint& paint, cons
     if (contextDisabled())
         return;
 
-    if (m_trackOpaqueRegion)
-        m_opaqueRegion.didDrawRect(this, rect, paint, bitmap);
+    if (regionTrackingEnabled())
+        m_trackedRegion.didDrawRect(this, rect, paint, bitmap);
 }
 
 void GraphicsContext::drawPosText(const void* text, size_t byteLength,
-    const SkPoint pos[],  const SkRect& textRect, const SkPaint& paint)
+    const SkPoint pos[], const SkRect& textRect, const SkPaint& paint)
 {
+    ASSERT(m_canvas);
     if (contextDisabled())
         return;
 
@@ -1161,8 +1288,40 @@ void GraphicsContext::drawPosText(const void* text, size_t byteLength,
     didDrawTextInRect(textRect);
 
     // FIXME: compute bounds for positioned text.
-    if (m_trackOpaqueRegion)
-        m_opaqueRegion.didDrawUnbounded(this, paint, OpaqueRegionSkia::FillOrStroke);
+    if (regionTrackingEnabled())
+        m_trackedRegion.didDrawUnbounded(this, paint, RegionTracker::FillOrStroke);
+}
+
+void GraphicsContext::drawPosTextH(const void* text, size_t byteLength,
+    const SkScalar xpos[], SkScalar constY, const SkRect& textRect, const SkPaint& paint)
+{
+    ASSERT(m_canvas);
+    if (contextDisabled())
+        return;
+
+    m_canvas->drawPosTextH(text, byteLength, xpos, constY, paint);
+    didDrawTextInRect(textRect);
+
+    // FIXME: compute bounds for positioned text.
+    if (regionTrackingEnabled())
+        m_trackedRegion.didDrawUnbounded(this, paint, RegionTracker::FillOrStroke);
+}
+
+void GraphicsContext::drawTextBlob(const SkTextBlob* blob, const SkPoint& origin, const SkPaint& paint)
+{
+    ASSERT(m_canvas);
+    if (contextDisabled())
+        return;
+
+    m_canvas->drawTextBlob(blob, origin.x(), origin.y(), paint);
+
+    SkRect bounds = blob->bounds();
+    bounds.offset(origin);
+    didDrawTextInRect(bounds);
+
+    // FIXME: use bounds here if it helps performance.
+    if (regionTrackingEnabled())
+        m_trackedRegion.didDrawUnbounded(this, paint, RegionTracker::FillOrStroke);
 }
 
 void GraphicsContext::fillPath(const Path& pathToFill)
@@ -1174,8 +1333,7 @@ void GraphicsContext::fillPath(const Path& pathToFill)
     SkPath& path = const_cast<SkPath&>(pathToFill.skPath());
     SkPath::FillType previousFillType = path.getFillType();
 
-    SkPath::FillType temporaryFillType =
-        immutableState()->fillRule() == RULE_EVENODD ? SkPath::kEvenOdd_FillType : SkPath::kWinding_FillType;
+    SkPath::FillType temporaryFillType = WebCoreWindRuleToSkFillType(immutableState()->fillRule());
     path.setFillType(temporaryFillType);
 
     drawPath(path, immutableState()->fillPaint());
@@ -1205,7 +1363,9 @@ void GraphicsContext::fillRect(const FloatRect& rect, const Color& color)
 }
 
 void GraphicsContext::fillBetweenRoundedRects(const IntRect& outer, const IntSize& outerTopLeft, const IntSize& outerTopRight, const IntSize& outerBottomLeft, const IntSize& outerBottomRight,
-    const IntRect& inner, const IntSize& innerTopLeft, const IntSize& innerTopRight, const IntSize& innerBottomLeft, const IntSize& innerBottomRight, const Color& color) {
+    const IntRect& inner, const IntSize& innerTopLeft, const IntSize& innerTopRight, const IntSize& innerBottomLeft, const IntSize& innerBottomRight, const Color& color)
+{
+    ASSERT(m_canvas);
     if (contextDisabled())
         return;
 
@@ -1224,8 +1384,8 @@ void GraphicsContext::fillBetweenRoundedRects(const IntRect& outer, const IntSiz
 
     m_canvas->drawDRRect(rrOuter, rrInner, paint);
 
-    if (m_trackOpaqueRegion)
-        m_opaqueRegion.didDrawBounded(this, rrOuter.getBounds(), paint);
+    if (regionTrackingEnabled())
+        m_trackedRegion.didDrawBounded(this, rrOuter.getBounds(), paint);
 }
 
 void GraphicsContext::fillBetweenRoundedRects(const RoundedRect& outer, const RoundedRect& inner, const Color& color)
@@ -1237,6 +1397,7 @@ void GraphicsContext::fillBetweenRoundedRects(const RoundedRect& outer, const Ro
 void GraphicsContext::fillRoundedRect(const IntRect& rect, const IntSize& topLeft, const IntSize& topRight,
     const IntSize& bottomLeft, const IntSize& bottomRight, const Color& color)
 {
+    ASSERT(m_canvas);
     if (contextDisabled())
         return;
 
@@ -1262,8 +1423,8 @@ void GraphicsContext::fillRoundedRect(const IntRect& rect, const IntSize& topLef
 
     m_canvas->drawRRect(rr, paint);
 
-    if (m_trackOpaqueRegion)
-        m_opaqueRegion.didDrawBounded(this, rr.getBounds(), paint);
+    if (regionTrackingEnabled())
+        m_trackedRegion.didDrawBounded(this, rr.getBounds(), paint);
 }
 
 void GraphicsContext::fillEllipse(const FloatRect& ellipse)
@@ -1366,7 +1527,7 @@ void GraphicsContext::clipPath(const Path& pathToClip, WindRule clipRule)
     SkPath& path = const_cast<SkPath&>(pathToClip.skPath());
     SkPath::FillType previousFillType = path.getFillType();
 
-    SkPath::FillType temporaryFillType = clipRule == RULE_EVENODD ? SkPath::kEvenOdd_FillType : SkPath::kWinding_FillType;
+    SkPath::FillType temporaryFillType = WebCoreWindRuleToSkFillType(clipRule);
     path.setFillType(temporaryFillType);
     clipPath(path, AntiAliased);
 
@@ -1403,7 +1564,7 @@ void GraphicsContext::canvasClip(const Path& pathToClip, WindRule clipRule)
     SkPath& path = const_cast<SkPath&>(pathToClip.skPath());
     SkPath::FillType previousFillType = path.getFillType();
 
-    SkPath::FillType temporaryFillType = clipRule == RULE_EVENODD ? SkPath::kEvenOdd_FillType : SkPath::kWinding_FillType;
+    SkPath::FillType temporaryFillType = WebCoreWindRuleToSkFillType(clipRule);
     path.setFillType(temporaryFillType);
     clipPath(path);
 
@@ -1412,6 +1573,7 @@ void GraphicsContext::canvasClip(const Path& pathToClip, WindRule clipRule)
 
 void GraphicsContext::clipRect(const SkRect& rect, AntiAliasingMode aa, SkRegion::Op op)
 {
+    ASSERT(m_canvas);
     if (contextDisabled())
         return;
 
@@ -1422,6 +1584,7 @@ void GraphicsContext::clipRect(const SkRect& rect, AntiAliasingMode aa, SkRegion
 
 void GraphicsContext::clipPath(const SkPath& path, AntiAliasingMode aa, SkRegion::Op op)
 {
+    ASSERT(m_canvas);
     if (contextDisabled())
         return;
 
@@ -1432,6 +1595,7 @@ void GraphicsContext::clipPath(const SkPath& path, AntiAliasingMode aa, SkRegion
 
 void GraphicsContext::clipRRect(const SkRRect& rect, AntiAliasingMode aa, SkRegion::Op op)
 {
+    ASSERT(m_canvas);
     if (contextDisabled())
         return;
 
@@ -1442,6 +1606,7 @@ void GraphicsContext::clipRRect(const SkRRect& rect, AntiAliasingMode aa, SkRegi
 
 void GraphicsContext::beginCull(const FloatRect& rect)
 {
+    ASSERT(m_canvas);
     if (contextDisabled())
         return;
 
@@ -1451,6 +1616,7 @@ void GraphicsContext::beginCull(const FloatRect& rect)
 
 void GraphicsContext::endCull()
 {
+    ASSERT(m_canvas);
     if (contextDisabled())
         return;
 
@@ -1461,6 +1627,7 @@ void GraphicsContext::endCull()
 
 void GraphicsContext::rotate(float angleInRadians)
 {
+    ASSERT(m_canvas);
     if (contextDisabled())
         return;
 
@@ -1471,6 +1638,7 @@ void GraphicsContext::rotate(float angleInRadians)
 
 void GraphicsContext::translate(float x, float y)
 {
+    ASSERT(m_canvas);
     if (contextDisabled())
         return;
 
@@ -1484,6 +1652,7 @@ void GraphicsContext::translate(float x, float y)
 
 void GraphicsContext::scale(float x, float y)
 {
+    ASSERT(m_canvas);
     if (contextDisabled())
         return;
 
@@ -1497,6 +1666,7 @@ void GraphicsContext::scale(float x, float y)
 
 void GraphicsContext::setURLForRect(const KURL& link, const IntRect& destRect)
 {
+    ASSERT(m_canvas);
     if (contextDisabled())
         return;
 
@@ -1506,6 +1676,7 @@ void GraphicsContext::setURLForRect(const KURL& link, const IntRect& destRect)
 
 void GraphicsContext::setURLFragmentForRect(const String& destName, const IntRect& rect)
 {
+    ASSERT(m_canvas);
     if (contextDisabled())
         return;
 
@@ -1515,6 +1686,7 @@ void GraphicsContext::setURLFragmentForRect(const String& destName, const IntRec
 
 void GraphicsContext::addURLTargetAtPoint(const String& name, const IntPoint& pos)
 {
+    ASSERT(m_canvas);
     if (contextDisabled())
         return;
 
@@ -1623,7 +1795,7 @@ void GraphicsContext::adjustLineToPixelBoundaries(FloatPoint& p1, FloatPoint& p2
     }
 }
 
-PassOwnPtr<ImageBuffer> GraphicsContext::createCompatibleBuffer(const IntSize& size, OpacityMode opacityMode) const
+PassOwnPtr<ImageBuffer> GraphicsContext::createRasterBuffer(const IntSize& size, OpacityMode opacityMode) const
 {
     // Make the buffer larger if the context's transform is scaling it so we need a higher
     // resolution than one pixel per unit. Also set up a corresponding scale factor on the
@@ -1632,13 +1804,9 @@ PassOwnPtr<ImageBuffer> GraphicsContext::createCompatibleBuffer(const IntSize& s
     AffineTransform transform = getCTM();
     IntSize scaledSize(static_cast<int>(ceil(size.width() * transform.xScale())), static_cast<int>(ceil(size.height() * transform.yScale())));
 
-    SkAlphaType alphaType = (opacityMode == Opaque) ? kOpaque_SkAlphaType : kPremul_SkAlphaType;
-    SkImageInfo info = SkImageInfo::MakeN32(size.width(), size.height(), alphaType);
-    RefPtr<SkSurface> skSurface = adoptRef(m_canvas->newSurface(info));
-    if (!skSurface)
+    OwnPtr<ImageBufferSurface> surface = adoptPtr(new UnacceleratedImageBufferSurface(scaledSize, opacityMode));
+    if (!surface->isValid())
         return nullptr;
-    OwnPtr<ImageBufferSurface> surface = adoptPtr(new CompatibleImageBufferSurface(skSurface.release(), scaledSize, opacityMode));
-    ASSERT(surface->isValid());
     OwnPtr<ImageBuffer> buffer = adoptPtr(new ImageBuffer(surface.release()));
 
     buffer->context()->scale(static_cast<float>(scaledSize.width()) / size.width(),
@@ -1667,28 +1835,6 @@ void GraphicsContext::setPathFromConvexPoints(SkPath* path, size_t numPoints, co
     if (numPoints == 4)
         convexity = SkPath::kUnknown_Convexity;
     path->setConvexity(convexity);
-}
-
-void GraphicsContext::drawOuterPath(const SkPath& path, SkPaint& paint, int width)
-{
-#if OS(MACOSX)
-    paint.setAlpha(64);
-    paint.setStrokeWidth(width);
-    paint.setPathEffect(SkCornerPathEffect::Create((width - 1) * 0.5f))->unref();
-#else
-    paint.setStrokeWidth(1);
-    paint.setPathEffect(SkCornerPathEffect::Create(1))->unref();
-#endif
-    drawPath(path, paint);
-}
-
-void GraphicsContext::drawInnerPath(const SkPath& path, SkPaint& paint, int width)
-{
-#if OS(MACOSX)
-    paint.setAlpha(128);
-    paint.setStrokeWidth(width * 0.5f);
-    drawPath(path, paint);
-#endif
 }
 
 void GraphicsContext::setRadii(SkVector* radii, IntSize topLeft, IntSize topRight, IntSize bottomRight, IntSize bottomLeft)
@@ -1783,7 +1929,7 @@ void GraphicsContext::draw1xMarker(SkBitmap* bitmap, int index)
     }
 }
 
-const SkPMColor GraphicsContext::lineColors(int index)
+SkPMColor GraphicsContext::lineColors(int index)
 {
     static const SkPMColor colors[] = {
         SkPreMultiplyARGB(0xFF, 0xFF, 0x00, 0x00), // Opaque red.
@@ -1793,7 +1939,7 @@ const SkPMColor GraphicsContext::lineColors(int index)
     return colors[index];
 }
 
-const SkPMColor GraphicsContext::antiColors1(int index)
+SkPMColor GraphicsContext::antiColors1(int index)
 {
     static const SkPMColor colors[] = {
         SkPreMultiplyARGB(0xB0, 0xFF, 0x00, 0x00), // Semitransparent red.
@@ -1803,7 +1949,7 @@ const SkPMColor GraphicsContext::antiColors1(int index)
     return colors[index];
 }
 
-const SkPMColor GraphicsContext::antiColors2(int index)
+SkPMColor GraphicsContext::antiColors2(int index)
 {
     static const SkPMColor colors[] = {
         SkPreMultiplyARGB(0x60, 0xFF, 0x00, 0x00), // More transparent red
@@ -1822,4 +1968,49 @@ void GraphicsContext::didDrawTextInRect(const SkRect& textRect)
     }
 }
 
+void GraphicsContext::preparePaintForDrawRectToRect(
+    SkPaint* paint,
+    const SkRect& srcRect,
+    const SkRect& destRect,
+    CompositeOperator compositeOp,
+    WebBlendMode blendMode,
+    bool isLazyDecoded,
+    bool isDataComplete) const
+{
+    paint->setXfermodeMode(WebCoreCompositeToSkiaComposite(compositeOp, blendMode));
+    paint->setColorFilter(this->colorFilter());
+    paint->setAlpha(this->getNormalizedAlpha());
+    paint->setLooper(this->drawLooper());
+    paint->setAntiAlias(shouldDrawAntiAliased(this, destRect));
+
+    InterpolationQuality resampling;
+    if (this->isAccelerated()) {
+        resampling = InterpolationLow;
+    } else if (this->printing()) {
+        resampling = InterpolationNone;
+    } else if (isLazyDecoded) {
+        resampling = InterpolationHigh;
+    } else {
+        // Take into account scale applied to the canvas when computing sampling mode (e.g. CSS scale or page scale).
+        SkRect destRectTarget = destRect;
+        SkMatrix totalMatrix = this->getTotalMatrix();
+        if (!(totalMatrix.getType() & (SkMatrix::kAffine_Mask | SkMatrix::kPerspective_Mask)))
+            totalMatrix.mapRect(&destRectTarget, destRect);
+
+        resampling = computeInterpolationQuality(totalMatrix,
+            SkScalarToFloat(srcRect.width()), SkScalarToFloat(srcRect.height()),
+            SkScalarToFloat(destRectTarget.width()), SkScalarToFloat(destRectTarget.height()),
+            isDataComplete);
+    }
+
+    if (resampling == InterpolationNone) {
+        // FIXME: This is to not break tests (it results in the filter bitmap flag
+        // being set to true). We need to decide if we respect InterpolationNone
+        // being returned from computeInterpolationQuality.
+        resampling = InterpolationLow;
+    }
+    resampling = limitInterpolationQuality(this, resampling);
+    paint->setFilterLevel(static_cast<SkPaint::FilterLevel>(resampling));
 }
+
+} // namespace blink

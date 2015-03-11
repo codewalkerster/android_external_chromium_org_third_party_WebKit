@@ -7,12 +7,13 @@
 
 #include "core/css/MediaValues.h"
 
-namespace WebCore {
+namespace blink {
 
 class Document;
 
 class MediaValuesDynamic FINAL : public MediaValues {
 public:
+    static PassRefPtr<MediaValues> create(Document&);
     static PassRefPtr<MediaValues> create(LocalFrame*);
     virtual PassRefPtr<MediaValues> copy() const OVERRIDE;
     virtual bool isSafeToSendToAnotherThread() const OVERRIDE;
@@ -26,12 +27,13 @@ public:
     virtual float devicePixelRatio() const OVERRIDE;
     virtual int colorBitsPerComponent() const OVERRIDE;
     virtual int monochromeBitsPerComponent() const OVERRIDE;
-    virtual PointerDeviceType pointer() const OVERRIDE;
+    virtual PointerType primaryPointerType() const OVERRIDE;
+    virtual int availablePointerTypes() const OVERRIDE;
+    virtual HoverType primaryHoverType() const OVERRIDE;
+    virtual int availableHoverTypes() const OVERRIDE;
     virtual bool threeDEnabled() const OVERRIDE;
-    virtual bool scanMediaType() const OVERRIDE;
-    virtual bool screenMediaType() const OVERRIDE;
-    virtual bool printMediaType() const OVERRIDE;
     virtual bool strictMode() const OVERRIDE;
+    virtual const String mediaType() const OVERRIDE;
     virtual Document* document() const OVERRIDE;
     virtual bool hasValues() const OVERRIDE;
 

@@ -21,21 +21,21 @@
 #ifndef ScriptLoader_h
 #define ScriptLoader_h
 
+#include "core/fetch/FetchRequest.h"
 #include "core/fetch/ResourceClient.h"
 #include "core/fetch/ResourcePtr.h"
+#include "core/fetch/ScriptResource.h"
 #include "wtf/text/TextPosition.h"
 #include "wtf/text/WTFString.h"
 
-namespace WebCore {
+namespace blink {
 
-class ScriptResource;
-class ContainerNode;
 class Element;
 class ScriptLoaderClient;
 class ScriptSourceCode;
 
 
-class ScriptLoader FINAL : private ResourceClient {
+class ScriptLoader FINAL : private ScriptResourceClient {
 public:
     static PassOwnPtr<ScriptLoader> create(Element*, bool createdByParser, bool isEvaluated);
     virtual ~ScriptLoader();
@@ -47,7 +47,7 @@ public:
 
     String scriptCharset() const { return m_characterEncoding; }
     String scriptContent() const;
-    void executeScript(const ScriptSourceCode&);
+    void executeScript(const ScriptSourceCode&, double* compilationFinishTime = 0);
     void execute(ScriptResource*);
 
     // XML parser calls these
@@ -78,7 +78,7 @@ private:
     bool ignoresLoadRequest() const;
     bool isScriptForEventSupported() const;
 
-    bool fetchScript(const String& sourceUrl);
+    bool fetchScript(const String& sourceUrl, FetchRequest::DeferOption);
     void stopLoadRequest();
 
     ScriptLoaderClient* client() const;
@@ -86,6 +86,7 @@ private:
     // ResourceClient
     virtual void notifyFinished(Resource*) OVERRIDE;
 
+    // FIXME: Oilpan: This should become a Member once ResourceClient is moved to the heap.
     Element* m_element;
     ResourcePtr<ScriptResource> m_resource;
     WTF::OrdinalNumber m_startLineNumber;

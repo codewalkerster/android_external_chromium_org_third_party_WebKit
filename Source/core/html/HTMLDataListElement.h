@@ -32,25 +32,27 @@
 #ifndef HTMLDataListElement_h
 #define HTMLDataListElement_h
 
-#include "core/html/HTMLCollection.h"
 #include "core/html/HTMLElement.h"
 
-namespace WebCore {
+namespace blink {
+
+class HTMLDataListOptionsCollection;
 
 class HTMLDataListElement FINAL : public HTMLElement {
+    DEFINE_WRAPPERTYPEINFO();
 public:
     static PassRefPtrWillBeRawPtr<HTMLDataListElement> create(Document&);
 
-    PassRefPtrWillBeRawPtr<HTMLCollection> options();
+    PassRefPtrWillBeRawPtr<HTMLDataListOptionsCollection> options();
 
     void optionElementChildrenChanged();
 
 private:
     HTMLDataListElement(Document&);
-    virtual void childrenChanged(bool, Node*, Node*, int) OVERRIDE;
+    virtual void childrenChanged(const ChildrenChange&) OVERRIDE;
     virtual void finishParsingChildren() OVERRIDE;
 };
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // HTMLDataListElement_h

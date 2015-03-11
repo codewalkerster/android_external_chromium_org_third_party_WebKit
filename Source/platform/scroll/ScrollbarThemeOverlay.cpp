@@ -36,9 +36,7 @@
 
 #include <algorithm>
 
-using namespace std;
-
-namespace WebCore {
+namespace blink {
 
 ScrollbarThemeOverlay::ScrollbarThemeOverlay(int thumbThickness, int scrollbarMargin, HitTestBehavior allowHitTest, Color color)
     : ScrollbarTheme()
@@ -88,7 +86,7 @@ int ScrollbarThemeOverlay::thumbLength(ScrollbarThemeClient* scrollbar)
 
     float proportion = static_cast<float>(scrollbar->visibleSize()) / scrollbar->totalSize();
     int length = round(proportion * trackLen);
-    length = min(max(length, minimumThumbLength(scrollbar)), trackLen);
+    length = std::min(std::max(length, minimumThumbLength(scrollbar)), trackLen);
     return length;
 }
 
@@ -124,8 +122,6 @@ int ScrollbarThemeOverlay::thumbThickness(ScrollbarThemeClient*)
 
 void ScrollbarThemeOverlay::paintThumb(GraphicsContext* context, ScrollbarThemeClient* scrollbar, const IntRect& rect)
 {
-    if (context->paintingDisabled())
-        return;
     IntRect thumbRect = rect;
     if (scrollbar->orientation() == HorizontalScrollbar) {
         thumbRect.setHeight(thumbRect.height() - m_scrollbarMargin);
@@ -163,4 +159,4 @@ ScrollbarPart ScrollbarThemeOverlay::hitTest(ScrollbarThemeClient* scrollbar, co
     return ScrollbarTheme::hitTest(scrollbar, position);
 }
 
-} // namespace WebCore
+} // namespace blink

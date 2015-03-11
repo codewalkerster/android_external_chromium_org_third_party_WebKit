@@ -26,11 +26,10 @@
 
 #include "core/dom/Node.h"
 
-namespace WebCore {
-
-class NamedNodeMap;
+namespace blink {
 
 class DocumentType FINAL : public Node {
+    DEFINE_WRAPPERTYPEINFO();
 public:
     static PassRefPtrWillBeRawPtr<DocumentType> create(Document* document, const String& name, const String& publicId, const String& systemId)
     {
@@ -59,6 +58,6 @@ private:
 
 DEFINE_NODE_TYPE_CASTS(DocumentType, isDocumentTypeNode());
 
-} // namespace WebCore
+} // namespace blink
 
-#endif
+#endif // DocumentType_h

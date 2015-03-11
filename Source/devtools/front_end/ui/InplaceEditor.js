@@ -17,7 +17,7 @@ WebInspector.InplaceEditor = function()
 WebInspector.InplaceEditor.startEditing = function(element, config)
 {
     if (config.multiline)
-        return WebInspector.moduleManager.instance(WebInspector.InplaceEditor).startEditing(element, config);
+        return self.runtime.instance(WebInspector.InplaceEditor).startEditing(element, config);
 
     if (!WebInspector.InplaceEditor._defaultInstance)
         WebInspector.InplaceEditor._defaultInstance = new WebInspector.InplaceEditor();
@@ -95,7 +95,7 @@ WebInspector.InplaceEditor.prototype = {
         var self = this;
 
         /**
-         * @param {?Event} e
+         * @param {!Event} e
          */
         function consumeCopy(e)
         {
@@ -107,9 +107,11 @@ WebInspector.InplaceEditor.prototype = {
         editingContext.oldText = isMultiline ? config.initialValue : this.editorContent(editingContext);
 
         /**
-         * @param {?Event=} e
+         * @param {!Event=} e
          */
         function blurEventListener(e) {
+            if (config.blurHandler && !config.blurHandler(element, e))
+                return;
             if (!isMultiline || !e || !e.relatedTarget || !e.relatedTarget.isSelfOrDescendant(element))
                 editingCommitted.call(element);
         }
@@ -203,13 +205,15 @@ WebInspector.InplaceEditor.prototype = {
  * @param {function(!Element,string,string,T,string)} commitHandler
  * @param {function(!Element,T)} cancelHandler
  * @param {T=} context
+ * @param {function(!Element,!Event):boolean=} blurHandler
  * @template T
  */
-WebInspector.InplaceEditor.Config = function(commitHandler, cancelHandler, context)
+WebInspector.InplaceEditor.Config = function(commitHandler, cancelHandler, context, blurHandler)
 {
     this.commitHandler = commitHandler;
     this.cancelHandler = cancelHandler
     this.context = context;
+    this.blurHandler = blurHandler;
 
     /**
      * Handles the "paste" event, return values are the same as those for customFinishHandler

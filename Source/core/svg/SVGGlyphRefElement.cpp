@@ -26,7 +26,7 @@
 #include "core/svg/SVGParserUtilities.h"
 #include "wtf/text/AtomicString.h"
 
-namespace WebCore {
+namespace blink {
 
 inline SVGGlyphRefElement::SVGGlyphRefElement(Document& document)
     : SVGElement(SVGNames::glyphRefTag, document)
@@ -36,7 +36,6 @@ inline SVGGlyphRefElement::SVGGlyphRefElement(Document& document)
     , m_dx(0)
     , m_dy(0)
 {
-    ScriptWrappable::init(this);
 }
 
 DEFINE_NODE_FACTORY(SVGGlyphRefElement)

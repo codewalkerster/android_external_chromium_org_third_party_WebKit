@@ -35,15 +35,13 @@
 #include "platform/scroll/ScrollableArea.h"
 #include "platform/scroll/ScrollbarTheme.h"
 
-using namespace std;
-
 #if ((OS(POSIX) && !OS(MACOSX)) || OS(WIN))
 // The position of the scrollbar thumb affects the appearance of the steppers, so
 // when the thumb moves, we have to invalidate them for painting.
 #define THUMB_POSITION_AFFECTS_BUTTONS
 #endif
 
-namespace WebCore {
+namespace blink {
 
 PassRefPtr<Scrollbar> Scrollbar::create(ScrollableArea* scrollableArea, ScrollbarOrientation orientation, ScrollbarControlSize size)
 {
@@ -100,12 +98,7 @@ void Scrollbar::removeFromParent()
 
 ScrollView* Scrollbar::parentScrollView() const
 {
-    return toScrollView(parent());
-}
-
-ScrollView* Scrollbar::rootScrollView() const
-{
-    return toScrollView(root());
+    return parent() && parent()->isScrollView() ? toScrollView(parent()) : 0;
 }
 
 ScrollbarOverlayStyle Scrollbar::scrollbarOverlayStyle() const
@@ -183,12 +176,7 @@ void Scrollbar::updateThumbProportion()
 
 void Scrollbar::paint(GraphicsContext* context, const IntRect& damageRect)
 {
-    if (context->updatingControlTints() && theme()->supportsControlTints()) {
-        invalidate();
-        return;
-    }
-
-    if (context->paintingDisabled() || !frameRect().intersects(damageRect))
+    if (!frameRect().intersects(damageRect))
         return;
 
     if (!theme()->paint(this, context, damageRect))
@@ -307,9 +295,9 @@ void Scrollbar::moveThumb(int pos, bool draggingDocument)
     int thumbLen = theme()->thumbLength(this);
     int trackLen = theme()->trackLength(this);
     if (delta > 0)
-        delta = min(trackLen - thumbLen - thumbPos, delta);
+        delta = std::min(trackLen - thumbLen - thumbPos, delta);
     else if (delta < 0)
-        delta = max(-thumbPos, delta);
+        delta = std::max(-thumbPos, delta);
 
     float minPos = m_scrollableArea->minimumScrollPosition(m_orientation);
     float maxPos = m_scrollableArea->maximumScrollPosition(m_orientation);
@@ -603,4 +591,4 @@ float Scrollbar::scrollableAreaCurrentPos() const
     return m_scrollableArea->scrollPosition().y() - m_scrollableArea->minimumScrollPosition().y();
 }
 
-} // namespace WebCore
+} // namespace blink

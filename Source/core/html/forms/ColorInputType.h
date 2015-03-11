@@ -32,9 +32,9 @@
 #define ColorInputType_h
 
 #include "core/html/forms/BaseClickableWithKeyInputType.h"
-#include "platform/ColorChooserClient.h"
+#include "core/html/forms/ColorChooserClient.h"
 
-namespace WebCore {
+namespace blink {
 
 class ColorChooser;
 
@@ -46,15 +46,16 @@ public:
     // ColorChooserClient implementation.
     virtual void didChooseColor(const Color&) OVERRIDE;
     virtual void didEndChooser() OVERRIDE;
+    virtual Element& ownerElement() const OVERRIDE;
     virtual IntRect elementRectRelativeToRootView() const OVERRIDE;
     virtual Color currentColor() OVERRIDE;
     virtual bool shouldShowSuggestions() const OVERRIDE;
     virtual Vector<ColorSuggestion> suggestions() const OVERRIDE;
+    ColorChooserClient* colorChooserClient() OVERRIDE;
 
 private:
     ColorInputType(HTMLInputElement& element) : BaseClickableWithKeyInputType(element) { }
     virtual void countUsage() OVERRIDE;
-    virtual bool isColorControl() const OVERRIDE;
     virtual const AtomicString& formControlType() const OVERRIDE;
     virtual bool supportsRequired() const OVERRIDE;
     virtual String fallbackValue() const OVERRIDE;
@@ -66,6 +67,7 @@ private:
     virtual bool shouldRespectListAttribute() OVERRIDE;
     virtual bool typeMismatchFor(const String&) const OVERRIDE;
     virtual void updateView() OVERRIDE;
+    virtual AXObject* popupRootAXObject() OVERRIDE;
 
     Color valueAsColor() const;
     void endColorChooser();
@@ -74,6 +76,6 @@ private:
     OwnPtr<ColorChooser> m_chooser;
 };
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // ColorInputType_h

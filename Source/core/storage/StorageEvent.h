@@ -30,7 +30,7 @@
 #include "platform/heap/Handle.h"
 #include "wtf/text/WTFString.h"
 
-namespace WebCore {
+namespace blink {
 
 class Storage;
 
@@ -45,6 +45,7 @@ struct StorageEventInit : public EventInit {
 };
 
 class StorageEvent FINAL : public Event {
+    DEFINE_WRAPPERTYPEINFO();
 public:
     static PassRefPtrWillBeRawPtr<StorageEvent> create();
     static PassRefPtrWillBeRawPtr<StorageEvent> create(const AtomicString& type, const String& key, const String& oldValue, const String& newValue, const String& url, Storage* storageArea);
@@ -56,7 +57,6 @@ public:
     const String& newValue() const { return m_newValue; }
     const String& url() const { return m_url; }
     Storage* storageArea() const { return m_storageArea.get(); }
-    Storage* storageArea(bool& isNull) const { isNull = !m_storageArea; return m_storageArea.get(); }
 
     void initStorageEvent(const AtomicString& type, bool canBubble, bool cancelable, const String& key, const String& oldValue, const String& newValue, const String& url, Storage* storageArea);
 
@@ -79,6 +79,6 @@ private:
     RefPtrWillBeMember<Storage> m_storageArea;
 };
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // StorageEvent_h

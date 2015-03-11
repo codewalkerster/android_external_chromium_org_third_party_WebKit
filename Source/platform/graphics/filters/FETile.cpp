@@ -22,7 +22,6 @@
 #include "config.h"
 #include "platform/graphics/filters/FETile.h"
 
-#include "SkFlattenableBuffers.h"
 #include "SkTileImageFilter.h"
 
 #include "platform/graphics/GraphicsContext.h"
@@ -33,7 +32,7 @@
 #include "platform/transforms/AffineTransform.h"
 #include "third_party/skia/include/core/SkDevice.h"
 
-namespace WebCore {
+namespace blink {
 
 FETile::FETile(Filter* filter)
     : FilterEffect(filter)
@@ -84,7 +83,7 @@ void FETile::applySoftware()
     if (ImageBuffer* tileImageBuffer = in->asImageBuffer())
         tileImageContext->drawImageBuffer(tileImageBuffer, IntRect(in->absolutePaintRect().location(), tileImageBuffer->size()));
 
-    RefPtr<Pattern> pattern = Pattern::create(tileImage->copyImage(CopyBackingStore), true, true);
+    RefPtr<Pattern> pattern = Pattern::createBitmapPattern(tileImage->copyImage(CopyBackingStore));
 
     AffineTransform patternTransform;
     patternTransform.translate(inMaxEffectLocation.x() - maxEffectLocation.x(), inMaxEffectLocation.y() - maxEffectLocation.y());
@@ -128,4 +127,4 @@ TextStream& FETile::externalRepresentation(TextStream& ts, int indent) const
     return ts;
 }
 
-} // namespace WebCore
+} // namespace blink

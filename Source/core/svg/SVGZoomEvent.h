@@ -26,9 +26,10 @@
 #include "core/svg/SVGPoint.h"
 #include "core/svg/SVGRect.h"
 
-namespace WebCore {
+namespace blink {
 
 class SVGZoomEvent FINAL : public UIEvent {
+    DEFINE_WRAPPERTYPEINFO();
 public:
     static PassRefPtrWillBeRawPtr<SVGZoomEvent> create()
     {
@@ -60,6 +61,6 @@ private:
     FloatPoint m_previousTranslate;
 };
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // SVGZoomEvent_h

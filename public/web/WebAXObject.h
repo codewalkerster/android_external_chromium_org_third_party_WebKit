@@ -40,10 +40,9 @@
 namespace WTF { template <typename T> class PassRefPtr; }
 #endif
 
-namespace WebCore { class AXObject; }
-
 namespace blink {
 
+class AXObject;
 class WebNode;
 class WebDocument;
 class WebString;
@@ -71,13 +70,6 @@ public:
     bool isNull() const { return m_private.isNull(); }
     // isDetached also checks for null, so it's safe to just call isDetached.
     BLINK_EXPORT bool isDetached() const;
-
-    // Static methods for enabling accessibility.
-    BLINK_EXPORT static void enableAccessibility();
-    BLINK_EXPORT static bool accessibilityEnabled();
-
-    // Temporary: this flag will only be toggleable until Chromium has it on by default.
-    BLINK_EXPORT static void enableInlineTextBoxAccessibility();
 
     BLINK_EXPORT int axID() const;
 
@@ -217,13 +209,13 @@ public:
     BLINK_EXPORT void scrollToGlobalPoint(const WebPoint&) const;
 
 #if BLINK_IMPLEMENTATION
-    WebAXObject(const WTF::PassRefPtr<WebCore::AXObject>&);
-    WebAXObject& operator=(const WTF::PassRefPtr<WebCore::AXObject>&);
-    operator WTF::PassRefPtr<WebCore::AXObject>() const;
+    WebAXObject(const WTF::PassRefPtr<AXObject>&);
+    WebAXObject& operator=(const WTF::PassRefPtr<AXObject>&);
+    operator WTF::PassRefPtr<AXObject>() const;
 #endif
 
 private:
-    WebPrivatePtr<WebCore::AXObject> m_private;
+    WebPrivatePtr<AXObject> m_private;
 };
 
 } // namespace blink

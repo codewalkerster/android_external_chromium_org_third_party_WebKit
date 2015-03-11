@@ -27,12 +27,13 @@
 #include "core/fetch/StyleSheetResource.h"
 #include "core/fetch/StyleSheetResourceClient.h"
 
-namespace WebCore {
+namespace blink {
 
 class StyleSheet;
 class CSSStyleSheet;
 
 class ProcessingInstruction FINAL : public CharacterData, private ResourceOwner<StyleSheetResource> {
+    DEFINE_WRAPPERTYPEINFO();
 public:
     static PassRefPtrWillBeRawPtr<ProcessingInstruction> create(Document&, const String& target, const String& data);
     virtual ~ProcessingInstruction();
@@ -92,6 +93,6 @@ inline bool isXSLStyleSheet(const Node& node)
     return node.nodeType() == Node::PROCESSING_INSTRUCTION_NODE && toProcessingInstruction(node).isXSL();
 }
 
-} // namespace WebCore
+} // namespace blink
 
-#endif
+#endif // ProcessingInstruction_h

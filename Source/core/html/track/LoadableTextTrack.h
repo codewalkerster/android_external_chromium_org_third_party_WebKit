@@ -31,7 +31,7 @@
 #include "platform/heap/Handle.h"
 #include "wtf/PassRefPtr.h"
 
-namespace WebCore {
+namespace blink {
 
 class HTMLTrackElement;
 class LoadableTextTrack;
@@ -40,7 +40,7 @@ class LoadableTextTrack FINAL : public TextTrack, private TextTrackLoaderClient 
 public:
     static PassRefPtrWillBeRawPtr<LoadableTextTrack> create(HTMLTrackElement* track)
     {
-        return adoptRefWillBeRefCountedGarbageCollected(new LoadableTextTrack(track));
+        return adoptRefWillBeNoop(new LoadableTextTrack(track));
     }
     virtual ~LoadableTextTrack();
 
@@ -66,18 +66,16 @@ private:
     virtual void cueLoadingCompleted(TextTrackLoader*, bool loadingFailed) OVERRIDE;
     virtual void newRegionsAvailable(TextTrackLoader*) OVERRIDE;
 
-    LoadableTextTrack(HTMLTrackElement*);
+    explicit LoadableTextTrack(HTMLTrackElement*);
 
     void loadTimerFired(Timer<LoadableTextTrack>*);
 
-    // FIXME: Oilpan: This should be a strong pointer once Member pointers
-    // into the Node hierarchy can be used.
-    RawPtrWillBeWeakMember<HTMLTrackElement> m_trackElement;
+    RawPtrWillBeMember<HTMLTrackElement> m_trackElement;
     Timer<LoadableTextTrack> m_loadTimer;
     OwnPtrWillBeMember<TextTrackLoader> m_loader;
     KURL m_url;
     bool m_isDefault;
 };
-} // namespace WebCore
+} // namespace blink
 
 #endif

@@ -33,7 +33,7 @@
 
 #include "core/html/forms/InputType.h"
 
-namespace WebCore {
+namespace blink {
 
 class HiddenInputType FINAL : public InputType {
 public:
@@ -49,13 +49,12 @@ private:
     virtual void accessKeyAction(bool sendMouseEvents) OVERRIDE;
     virtual bool rendererIsNeeded() OVERRIDE;
     virtual bool storesValueSeparateFromAttribute() OVERRIDE;
-    virtual bool isHiddenType() const OVERRIDE;
     virtual bool isInteractiveContent() const OVERRIDE { return false; }
     virtual bool shouldRespectHeightAndWidthAttributes() OVERRIDE;
     virtual void setValue(const String&, bool, TextFieldEventBehavior) OVERRIDE;
     virtual bool appendFormData(FormDataList&, bool) const OVERRIDE;
 };
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // HiddenInputType_h

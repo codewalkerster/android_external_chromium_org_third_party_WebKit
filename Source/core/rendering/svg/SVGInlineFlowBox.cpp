@@ -27,14 +27,11 @@
 #include "core/rendering/svg/SVGInlineTextBox.h"
 #include "core/rendering/svg/SVGRenderingContext.h"
 
-using namespace std;
-
-namespace WebCore {
+namespace blink {
 
 void SVGInlineFlowBox::paintSelectionBackground(PaintInfo& paintInfo)
 {
     ASSERT(paintInfo.phase == PaintPhaseForeground || paintInfo.phase == PaintPhaseSelection);
-    ASSERT(!paintInfo.context->paintingDisabled());
 
     PaintInfo childPaintInfo(paintInfo);
     for (InlineBox* child = firstChild(); child; child = child->nextOnLine()) {
@@ -48,9 +45,9 @@ void SVGInlineFlowBox::paintSelectionBackground(PaintInfo& paintInfo)
 void SVGInlineFlowBox::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffset, LayoutUnit, LayoutUnit)
 {
     ASSERT(paintInfo.phase == PaintPhaseForeground || paintInfo.phase == PaintPhaseSelection);
-    ASSERT(!paintInfo.context->paintingDisabled());
 
-    SVGRenderingContext renderingContext(&renderer(), paintInfo, SVGRenderingContext::SaveGraphicsContext);
+    GraphicsContextStateSaver stateSaver(*paintInfo.context);
+    SVGRenderingContext renderingContext(&renderer(), paintInfo);
     if (renderingContext.isRenderingPrepared()) {
         for (InlineBox* child = firstChild(); child; child = child->nextOnLine())
             child->paint(paintInfo, paintOffset, 0, 0);
@@ -68,4 +65,4 @@ FloatRect SVGInlineFlowBox::calculateBoundaries() const
     return childRect;
 }
 
-} // namespace WebCore
+} // namespace blink

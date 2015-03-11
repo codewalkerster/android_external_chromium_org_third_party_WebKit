@@ -23,7 +23,7 @@
 
 #include "core/rendering/RenderBlockFlow.h"
 
-namespace WebCore {
+namespace blink {
 
 class RenderDetailsMarker FINAL : public RenderBlockFlow {
 public:
@@ -39,8 +39,6 @@ private:
     virtual void paint(PaintInfo&, const LayoutPoint&) OVERRIDE;
 
     bool isOpen() const;
-    Path getCanonicalPath() const;
-    Path getPath(const LayoutPoint& origin) const;
 };
 
 DEFINE_RENDER_OBJECT_TYPE_CASTS(RenderDetailsMarker, isDetailsMarker());

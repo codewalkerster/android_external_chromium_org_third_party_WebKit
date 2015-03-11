@@ -38,7 +38,7 @@
 #include "wtf/HashMap.h"
 #include "wtf/text/WTFString.h"
 
-namespace WebCore {
+namespace blink {
 
 class Resource;
 class DOMWrapperWorld;
@@ -78,11 +78,12 @@ public:
         OtherResource
     };
 
-    static PassOwnPtr<InspectorPageAgent> create(Page*, InjectedScriptManager*, InspectorClient*, InspectorOverlay*);
+    static PassOwnPtrWillBeRawPtr<InspectorPageAgent> create(Page*, InjectedScriptManager*, InspectorClient*, InspectorOverlay*);
 
     // Settings overrides.
     void setTextAutosizingEnabled(bool);
     void setDeviceScaleAdjustment(float);
+    void setPreferCompositingToLCDTextEnabled(bool);
 
     static Vector<Document*> importsForFrame(LocalFrame*);
     static bool cachedResourceContent(Resource*, String* result, bool* base64Encoded);
@@ -100,16 +101,17 @@ public:
     virtual void addScriptToEvaluateOnLoad(ErrorString*, const String& source, String* result) OVERRIDE;
     virtual void removeScriptToEvaluateOnLoad(ErrorString*, const String& identifier) OVERRIDE;
     virtual void reload(ErrorString*, const bool* optionalIgnoreCache, const String* optionalScriptToEvaluateOnLoad, const String* optionalScriptPreprocessor) OVERRIDE;
-    virtual void navigate(ErrorString*, const String& url) OVERRIDE;
+    virtual void navigate(ErrorString*, const String& url, String* frameId) OVERRIDE;
     virtual void getCookies(ErrorString*, RefPtr<TypeBuilder::Array<TypeBuilder::Page::Cookie> >& cookies) OVERRIDE;
     virtual void deleteCookie(ErrorString*, const String& cookieName, const String& url) OVERRIDE;
     virtual void getResourceTree(ErrorString*, RefPtr<TypeBuilder::Page::FrameResourceTree>&) OVERRIDE;
-    virtual void getResourceContent(ErrorString*, const String& frameId, const String& url, String* content, bool* base64Encoded) OVERRIDE;
-    virtual void hasTouchInputs(ErrorString*, bool* result) OVERRIDE;
+    virtual void getResourceContent(ErrorString*, const String& frameId, const String& url, PassRefPtrWillBeRawPtr<GetResourceContentCallback>) OVERRIDE;
     virtual void searchInResource(ErrorString*, const String& frameId, const String& url, const String& query, const bool* optionalCaseSensitive, const bool* optionalIsRegex, RefPtr<TypeBuilder::Array<TypeBuilder::Page::SearchMatch> >&) OVERRIDE;
     virtual void setDocumentContent(ErrorString*, const String& frameId, const String& html) OVERRIDE;
-    virtual void setDeviceMetricsOverride(ErrorString*, int width, int height, double deviceScaleFactor, bool emulateViewport, bool fitWindow, const bool* optionalTextAutosizing, const double* optionalFontScaleFactor) OVERRIDE;
+    virtual void setDeviceMetricsOverride(ErrorString*, int width, int height, double deviceScaleFactor, bool mobile, bool fitWindow, const double* optionalScale, const double* optionalOffsetX, const double* optionalOffsetY) OVERRIDE;
     virtual void clearDeviceMetricsOverride(ErrorString*) OVERRIDE;
+    virtual void resetScrollAndPageScaleFactor(ErrorString*) OVERRIDE;
+    virtual void setPageScaleFactor(ErrorString*, double pageScaleFactor) OVERRIDE;
     virtual void setShowPaintRects(ErrorString*, bool show) OVERRIDE;
     virtual void setShowDebugBorders(ErrorString*, bool show) OVERRIDE;
     virtual void setShowFPSCounter(ErrorString*, bool show) OVERRIDE;
@@ -119,6 +121,8 @@ public:
     virtual void setScriptExecutionDisabled(ErrorString*, bool) OVERRIDE;
     virtual void setTouchEmulationEnabled(ErrorString*, bool) OVERRIDE;
     virtual void setEmulatedMedia(ErrorString*, const String&) OVERRIDE;
+    virtual void startScreencast(ErrorString*, const String* format, const int* quality, const int* maxWidth, const int* maxHeight) OVERRIDE;
+    virtual void stopScreencast(ErrorString*) OVERRIDE;
     virtual void setShowViewportSizeOnResize(ErrorString*, bool show, const bool* showGrid) OVERRIDE;
 
     // InspectorInstrumentation API
@@ -148,6 +152,7 @@ public:
     virtual void setFrontend(InspectorFrontend*) OVERRIDE;
     virtual void clearFrontend() OVERRIDE;
     virtual void restore() OVERRIDE;
+    virtual void discardAgent() OVERRIDE;
 
     // Cross-agents API
     Page* page() { return m_page; }
@@ -162,25 +167,36 @@ public:
     String scriptPreprocessorSource() { return m_scriptPreprocessorSource; }
     const AtomicString& resourceSourceMapURL(const String& url);
     bool deviceMetricsOverrideEnabled();
+    void deviceOrPageScaleFactorChanged();
+    bool screencastEnabled();
     static DocumentLoader* assertDocumentLoader(ErrorString*, LocalFrame*);
     InspectorResourceContentLoader* resourceContentLoader() { return m_inspectorResourceContentLoader.get(); }
+    void clearEditedResourcesContent();
+    void addEditedResourceContent(const String& url, const String& content);
+    bool getEditedResourceContent(const String& url, String* content);
+
+    virtual void trace(Visitor*) OVERRIDE;
 
 private:
-    static void resourceContent(ErrorString*, LocalFrame*, const KURL&, String* result, bool* base64Encoded);
+    class GetResourceContentLoadListener;
 
     InspectorPageAgent(Page*, InjectedScriptManager*, InspectorClient*, InspectorOverlay*);
-    bool deviceMetricsChanged(bool enabled, int width, int height, double deviceScaleFactor, bool emulateViewport, bool fitWindow, double fontScaleFactor, bool textAutosizing);
+    bool deviceMetricsChanged(bool enabled, int width, int height, double deviceScaleFactor, bool mobile, bool fitWindow, double scale, double offsetX, double offsetY);
     void updateViewMetricsFromState();
-    void updateViewMetrics(bool enabled, int width, int height, double deviceScaleFactor, bool emulateViewport, bool fitWindow, double fontScaleFactor, bool textAutosizingEnabled);
+    void updateViewMetrics(bool enabled, int width, int height, double deviceScaleFactor, bool mobile, bool fitWindow, double scale, double offsetX, double offsetY);
     void updateTouchEventEmulationInPage(bool);
     bool compositingEnabled(ErrorString*);
 
+    void getResourceContentAfterResourcesContentLoaded(const String& frameId, const String& url, PassRefPtrWillBeRawPtr<GetResourceContentCallback>);
+
     static bool dataContent(const char* data, unsigned size, const String& textEncodingName, bool withBase64Encode, String* result);
+
+    void viewportChanged();
 
     PassRefPtr<TypeBuilder::Page::Frame> buildObjectForFrame(LocalFrame*);
     PassRefPtr<TypeBuilder::Page::FrameResourceTree> buildObjectForFrameTree(LocalFrame*);
-    Page* m_page;
-    InjectedScriptManager* m_injectedScriptManager;
+    RawPtrWillBeMember<Page> m_page;
+    RawPtrWillBeMember<InjectedScriptManager> m_injectedScriptManager;
     InspectorClient* m_client;
     InspectorFrontend::Page* m_frontend;
     InspectorOverlay* m_overlay;
@@ -195,21 +211,24 @@ private:
     bool m_enabled;
     bool m_ignoreScriptsEnabledNotification;
     bool m_deviceMetricsOverridden;
-    bool m_emulateViewportEnabled;
+    bool m_emulateMobileEnabled;
 
     bool m_touchEmulationEnabled;
     bool m_originalTouchEnabled;
     bool m_originalDeviceSupportsMouse;
     bool m_originalDeviceSupportsTouch;
+    int m_originalMaxTouchPoints;
 
     bool m_embedderTextAutosizingEnabled;
     double m_embedderFontScaleFactor;
+    bool m_embedderPreferCompositingToLCDTextEnabled;
 
-    OwnPtr<InspectorResourceContentLoader> m_inspectorResourceContentLoader;
+    OwnPtrWillBeMember<InspectorResourceContentLoader> m_inspectorResourceContentLoader;
+    HashMap<String, String> m_editedResourceContent;
 };
 
 
-} // namespace WebCore
+} // namespace blink
 
 
 #endif // !defined(InspectorPagerAgent_h)

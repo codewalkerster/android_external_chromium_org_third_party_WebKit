@@ -7,7 +7,7 @@
 
 #include "core/css/MediaValues.h"
 
-namespace WebCore {
+namespace blink {
 
 class MediaValuesCached FINAL : public MediaValues {
 public:
@@ -20,13 +20,14 @@ public:
         float devicePixelRatio;
         int colorBitsPerComponent;
         int monochromeBitsPerComponent;
-        PointerDeviceType pointer;
+        PointerType primaryPointerType;
+        int availablePointerTypes;
+        HoverType primaryHoverType;
+        int availableHoverTypes;
         int defaultFontSize;
         bool threeDEnabled;
-        bool scanMediaType;
-        bool screenMediaType;
-        bool printMediaType;
         bool strictMode;
+        String mediaType;
 
         MediaValuesCachedData()
             : viewportWidth(0)
@@ -36,12 +37,12 @@ public:
             , devicePixelRatio(1.0)
             , colorBitsPerComponent(24)
             , monochromeBitsPerComponent(0)
-            , pointer(UnknownPointer)
+            , primaryPointerType(PointerTypeNone)
+            , availablePointerTypes(PointerTypeNone)
+            , primaryHoverType(HoverTypeNone)
+            , availableHoverTypes(HoverTypeNone)
             , defaultFontSize(16)
             , threeDEnabled(false)
-            , scanMediaType(false)
-            , screenMediaType(true)
-            , printMediaType(false)
             , strictMode(true)
         {
         }
@@ -63,14 +64,15 @@ public:
     virtual float devicePixelRatio() const OVERRIDE;
     virtual int colorBitsPerComponent() const OVERRIDE;
     virtual int monochromeBitsPerComponent() const OVERRIDE;
-    virtual PointerDeviceType pointer() const OVERRIDE;
+    virtual PointerType primaryPointerType() const OVERRIDE;
+    virtual int availablePointerTypes() const OVERRIDE;
+    virtual HoverType primaryHoverType() const OVERRIDE;
+    virtual int availableHoverTypes() const OVERRIDE;
     virtual bool threeDEnabled() const OVERRIDE;
-    virtual bool scanMediaType() const OVERRIDE;
-    virtual bool screenMediaType() const OVERRIDE;
-    virtual bool printMediaType() const OVERRIDE;
     virtual bool strictMode() const OVERRIDE;
     virtual Document* document() const OVERRIDE;
     virtual bool hasValues() const OVERRIDE;
+    virtual const String mediaType() const OVERRIDE;
 
 protected:
     MediaValuesCached();

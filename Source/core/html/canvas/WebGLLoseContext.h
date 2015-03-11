@@ -26,17 +26,18 @@
 #ifndef WebGLLoseContext_h
 #define WebGLLoseContext_h
 
-#include "bindings/v8/ScriptWrappable.h"
+#include "bindings/core/v8/ScriptWrappable.h"
 #include "core/html/canvas/WebGLExtension.h"
 #include "wtf/PassRefPtr.h"
 
-namespace WebCore {
+namespace blink {
 
 class WebGLRenderingContextBase;
 
 class WebGLLoseContext FINAL : public WebGLExtension, public ScriptWrappable {
+    DEFINE_WRAPPERTYPEINFO();
 public:
-    static PassRefPtr<WebGLLoseContext> create(WebGLRenderingContextBase*);
+    static PassRefPtrWillBeRawPtr<WebGLLoseContext> create(WebGLRenderingContextBase*);
     static bool supported(WebGLRenderingContextBase*);
     static const char* extensionName();
 
@@ -48,9 +49,9 @@ public:
     void restoreContext();
 
 private:
-    WebGLLoseContext(WebGLRenderingContextBase*);
+    explicit WebGLLoseContext(WebGLRenderingContextBase*);
 };
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // WebGLLoseContext_h

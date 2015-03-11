@@ -33,12 +33,11 @@
 #include "core/fetch/ResourcePtr.h"
 #include "platform/graphics/Image.h"
 
-namespace WebCore {
+namespace blink {
 
 class ImageResource;
 class CrossfadeSubimageObserverProxy;
 class RenderObject;
-class Document;
 
 class CSSCrossfadeValue : public CSSImageGeneratorValue {
     friend class CrossfadeSubimageObserverProxy;
@@ -108,6 +107,6 @@ private:
 
 DEFINE_CSS_VALUE_TYPE_CASTS(CSSCrossfadeValue, isCrossfadeValue());
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // CSSCrossfadeValue_h

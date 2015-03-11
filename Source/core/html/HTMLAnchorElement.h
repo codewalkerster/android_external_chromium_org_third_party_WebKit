@@ -30,7 +30,7 @@
 #include "core/html/HTMLElement.h"
 #include "platform/LinkHash.h"
 
-namespace WebCore {
+namespace blink {
 
 // Link relation bitmask values.
 // FIXME: Uncomment as the various link relations are implemented.
@@ -56,6 +56,7 @@ enum {
 };
 
 class HTMLAnchorElement : public HTMLElement, public DOMURLUtils {
+    DEFINE_WRAPPERTYPEINFO();
 public:
     static PassRefPtrWillBeRawPtr<HTMLAnchorElement> create(Document&);
 
@@ -72,7 +73,7 @@ public:
     virtual String input() const OVERRIDE FINAL;
     virtual void setInput(const String&) OVERRIDE FINAL;
 
-    bool isLiveLink() const;
+    virtual bool isLiveLink() const OVERRIDE FINAL;
 
     virtual bool willRespondToMouseClickEvents() OVERRIDE FINAL;
 
@@ -82,15 +83,18 @@ public:
     LinkHash visitedLinkHash() const;
     void invalidateCachedVisitedLinkHash() { m_cachedVisitedLinkHash = 0; }
 
-    virtual void trace(Visitor*) OVERRIDE;
+    void sendPings(const KURL& destinationURL) const;
 
 protected:
     HTMLAnchorElement(const QualifiedName&, Document&);
 
+    virtual void attributeWillChange(const QualifiedName&, const AtomicString& oldValue, const AtomicString& newValue) OVERRIDE;
     virtual void parseAttribute(const QualifiedName&, const AtomicString&) OVERRIDE;
     virtual bool supportsFocus() const OVERRIDE;
 
 private:
+    virtual bool shouldHaveFocusAppearance() const OVERRIDE FINAL;
+    virtual void dispatchFocusEvent(Element* oldFocusedElement, FocusType) OVERRIDE;
     virtual bool isMouseFocusable() const OVERRIDE;
     virtual bool isKeyboardFocusable() const OVERRIDE;
     virtual void defaultEventHandler(Event*) OVERRIDE FINAL;
@@ -102,23 +106,18 @@ private:
     virtual short tabIndex() const OVERRIDE FINAL;
     virtual bool draggable() const OVERRIDE FINAL;
     virtual bool isInteractiveContent() const OVERRIDE FINAL;
-
-    void sendPings(const KURL& destinationURL);
-    AtomicString target() const;
+    virtual InsertionNotificationRequest insertedInto(ContainerNode*) OVERRIDE;
     void handleClick(Event*);
 
-    class PrefetchEventHandler;
-    PrefetchEventHandler* prefetchEventHandler();
-
     uint32_t m_linkRelations;
-    OwnPtrWillBeMember<PrefetchEventHandler> m_prefetchEventHandler;
     mutable LinkHash m_cachedVisitedLinkHash;
+    bool m_wasFocusedByMouse;
 };
 
 inline LinkHash HTMLAnchorElement::visitedLinkHash() const
 {
     if (!m_cachedVisitedLinkHash)
-        m_cachedVisitedLinkHash = WebCore::visitedLinkHash(document().baseURL(), fastGetAttribute(HTMLNames::hrefAttr));
+        m_cachedVisitedLinkHash = blink::visitedLinkHash(document().baseURL(), fastGetAttribute(HTMLNames::hrefAttr));
     return m_cachedVisitedLinkHash;
 }
 
@@ -127,6 +126,6 @@ inline LinkHash HTMLAnchorElement::visitedLinkHash() const
 bool isEnterKeyKeydownEvent(Event*);
 bool isLinkClick(Event*);
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // HTMLAnchorElement_h

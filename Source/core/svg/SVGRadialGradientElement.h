@@ -25,11 +25,12 @@
 #include "core/svg/SVGAnimatedLength.h"
 #include "core/svg/SVGGradientElement.h"
 
-namespace WebCore {
+namespace blink {
 
 struct RadialGradientAttributes;
 
 class SVGRadialGradientElement FINAL : public SVGGradientElement {
+    DEFINE_WRAPPERTYPEINFO();
 public:
     DECLARE_NODE_FACTORY(SVGRadialGradientElement);
 
@@ -61,6 +62,6 @@ private:
     RefPtr<SVGAnimatedLength> m_fr;
 };
 
-} // namespace WebCore
+} // namespace blink
 
-#endif
+#endif // SVGRadialGradientElement_h

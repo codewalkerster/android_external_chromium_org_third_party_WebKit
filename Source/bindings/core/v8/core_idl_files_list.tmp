@@ -1,3 +1,9 @@
+../../../core/css/FontFaceDescriptors.idl
+../../../core/dom/DOMPointInit.idl
+../../../core/dom/MutationObserverInit.idl
+../../../core/frame/ScrollOptions.idl
+../../../core/html/canvas/HitRegionOptions.idl
+../../../core/page/EventSourceInit.idl
 ../../../core/animation/Animation.idl
 ../../../core/animation/AnimationEffect.idl
 ../../../core/animation/AnimationPlayer.idl
@@ -9,7 +15,6 @@
 ../../../core/clipboard/DataTransferItemList.idl
 ../../../core/css/CSS.idl
 ../../../core/css/CSSCharsetRule.idl
-../../../core/css/CSSFontFaceLoadEvent.idl
 ../../../core/css/CSSFontFaceRule.idl
 ../../../core/css/CSSImportRule.idl
 ../../../core/css/CSSKeyframeRule.idl
@@ -31,8 +36,10 @@
 ../../../core/css/FontFace.idl
 ../../../core/css/FontFaceSet.idl
 ../../../core/css/FontFaceSetForEachCallback.idl
+../../../core/css/FontFaceSetLoadEvent.idl
 ../../../core/css/MediaList.idl
 ../../../core/css/MediaQueryList.idl
+../../../core/css/MediaQueryListEvent.idl
 ../../../core/css/RGBColor.idl
 ../../../core/css/Rect.idl
 ../../../core/css/StyleMedia.idl
@@ -51,6 +58,12 @@
 ../../../core/dom/DOMError.idl
 ../../../core/dom/DOMException.idl
 ../../../core/dom/DOMImplementation.idl
+../../../core/dom/DOMMatrix.idl
+../../../core/dom/DOMMatrixReadOnly.idl
+../../../core/dom/DOMPoint.idl
+../../../core/dom/DOMPointReadOnly.idl
+../../../core/dom/DOMRect.idl
+../../../core/dom/DOMRectReadOnly.idl
 ../../../core/dom/DOMSettableTokenList.idl
 ../../../core/dom/DOMStringList.idl
 ../../../core/dom/DOMStringMap.idl
@@ -59,6 +72,7 @@
 ../../../core/dom/DocumentFragment.idl
 ../../../core/dom/DocumentType.idl
 ../../../core/dom/Element.idl
+../../../core/dom/Iterator.idl
 ../../../core/dom/MessageChannel.idl
 ../../../core/dom/MessagePort.idl
 ../../../core/dom/MutationObserver.idl
@@ -68,7 +82,6 @@
 ../../../core/dom/NodeFilter.idl
 ../../../core/dom/NodeIterator.idl
 ../../../core/dom/NodeList.idl
-../../../core/dom/Notation.idl
 ../../../core/dom/ProcessingInstruction.idl
 ../../../core/dom/Range.idl
 ../../../core/dom/RequestAnimationFrameCallback.idl
@@ -80,6 +93,7 @@
 ../../../core/dom/URL.idl
 ../../../core/dom/XMLDocument.idl
 ../../../core/dom/shadow/ShadowRoot.idl
+../../../core/editing/Selection.idl
 ../../../core/events/AnimationPlayerEvent.idl
 ../../../core/events/ApplicationCacheErrorEvent.idl
 ../../../core/events/AutocompleteErrorEvent.idl
@@ -99,6 +113,7 @@
 ../../../core/events/PageTransitionEvent.idl
 ../../../core/events/PopStateEvent.idl
 ../../../core/events/ProgressEvent.idl
+../../../core/events/RelatedEvent.idl
 ../../../core/events/ResourceProgressEvent.idl
 ../../../core/events/SecurityPolicyViolationEvent.idl
 ../../../core/events/TextEvent.idl
@@ -113,7 +128,6 @@
 ../../../core/fileapi/FileList.idl
 ../../../core/fileapi/FileReader.idl
 ../../../core/fileapi/FileReaderSync.idl
-../../../core/fileapi/Stream.idl
 ../../../core/frame/BarProp.idl
 ../../../core/frame/Console.idl
 ../../../core/frame/ConsoleBase.idl
@@ -122,7 +136,6 @@
 ../../../core/frame/Location.idl
 ../../../core/frame/Navigator.idl
 ../../../core/frame/Screen.idl
-../../../core/frame/WebKitPoint.idl
 ../../../core/frame/Window.idl
 ../../../core/html/FormData.idl
 ../../../core/html/HTMLAllCollection.idl
@@ -168,6 +181,7 @@
 ../../../core/html/HTMLMarqueeElement.idl
 ../../../core/html/HTMLMediaElement.idl
 ../../../core/html/HTMLMenuElement.idl
+../../../core/html/HTMLMenuItemElement.idl
 ../../../core/html/HTMLMetaElement.idl
 ../../../core/html/HTMLMeterElement.idl
 ../../../core/html/HTMLModElement.idl
@@ -252,6 +266,7 @@
 ../../../core/html/canvas/WebGLUniformLocation.idl
 ../../../core/html/canvas/WebGLVertexArrayObjectOES.idl
 ../../../core/html/ime/InputMethodContext.idl
+../../../core/html/shadow/PluginPlaceholderElement.idl
 ../../../core/html/track/AudioTrack.idl
 ../../../core/html/track/AudioTrackList.idl
 ../../../core/html/track/TextTrack.idl
@@ -271,13 +286,14 @@
 ../../../core/loader/appcache/ApplicationCache.idl
 ../../../core/page/EventSource.idl
 ../../../core/page/PagePopupController.idl
-../../../core/page/Selection.idl
 ../../../core/plugins/MimeType.idl
 ../../../core/plugins/MimeTypeArray.idl
 ../../../core/plugins/Plugin.idl
 ../../../core/plugins/PluginArray.idl
 ../../../core/storage/Storage.idl
 ../../../core/storage/StorageEvent.idl
+../../../core/streams/ReadableStream.idl
+../../../core/streams/Stream.idl
 ../../../core/svg/SVGAElement.idl
 ../../../core/svg/SVGAltGlyphDefElement.idl
 ../../../core/svg/SVGAltGlyphElement.idl

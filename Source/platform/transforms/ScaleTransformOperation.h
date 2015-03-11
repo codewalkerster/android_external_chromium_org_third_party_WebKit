@@ -27,7 +27,7 @@
 
 #include "platform/transforms/TransformOperation.h"
 
-namespace WebCore {
+namespace blink {
 
 class PLATFORM_EXPORT ScaleTransformOperation : public TransformOperation {
 public:
@@ -48,8 +48,6 @@ public:
     virtual bool canBlendWith(const TransformOperation& other) const;
 
 private:
-    virtual bool isIdentity() const OVERRIDE { return m_x == 1 &&  m_y == 1 &&  m_z == 1; }
-
     virtual OperationType type() const OVERRIDE { return m_type; }
 
     virtual bool operator==(const TransformOperation& o) const OVERRIDE
@@ -82,6 +80,6 @@ private:
     OperationType m_type;
 };
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // ScaleTransformOperation_h

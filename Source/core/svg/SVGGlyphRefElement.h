@@ -25,10 +25,11 @@
 #include "core/svg/SVGElement.h"
 #include "core/svg/SVGURIReference.h"
 
-namespace WebCore {
+namespace blink {
 
 class SVGGlyphRefElement FINAL : public SVGElement,
                                  public SVGURIReference {
+    DEFINE_WRAPPERTYPEINFO();
 public:
     DECLARE_NODE_FACTORY(SVGGlyphRefElement);
 
@@ -62,7 +63,7 @@ private:
     float m_dy;
 };
 
-}
+} // namespace blink
 
-#endif
-#endif
+#endif // ENABLE(SVG_FONTS)
+#endif // SVGGlyphRefElement_h

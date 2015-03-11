@@ -25,11 +25,12 @@
 #ifndef ChildNodeList_h
 #define ChildNodeList_h
 
+#include "core/dom/ContainerNode.h"
 #include "core/dom/NodeList.h"
 #include "core/html/CollectionIndexCache.h"
 #include "wtf/PassRefPtr.h"
 
-namespace WebCore {
+namespace blink {
 
 class ChildNodeList FINAL : public NodeList {
 public:
@@ -52,8 +53,8 @@ public:
 
     // CollectionIndexCache API.
     bool canTraverseBackward() const { return true; }
-    Node* traverseToFirstElement() const { return rootNode().firstChild(); }
-    Node* traverseToLastElement() const { return rootNode().lastChild(); }
+    Node* traverseToFirst() const { return rootNode().firstChild(); }
+    Node* traverseToLast() const { return rootNode().lastChild(); }
     Node* traverseForwardToOffset(unsigned offset, Node& currentNode, unsigned& currentOffset) const;
     Node* traverseBackwardToOffset(unsigned offset, Node& currentNode, unsigned& currentOffset) const;
 
@@ -71,6 +72,6 @@ private:
 
 DEFINE_TYPE_CASTS(ChildNodeList, NodeList, nodeList, nodeList->isChildNodeList(), nodeList.isChildNodeList());
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // ChildNodeList_h

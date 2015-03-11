@@ -33,7 +33,7 @@
 #include "wtf/HashSet.h"
 #include "wtf/Noncopyable.h"
 
-namespace WebCore {
+namespace blink {
 
 class GeolocationInspectorAgent;
 class GeolocationClient;
@@ -71,8 +71,6 @@ public:
 
     // Inherited from Supplement.
     virtual void trace(Visitor*) OVERRIDE;
-    virtual void willBeDestroyed() OVERRIDE;
-    virtual void persistentHostHasBeenDestroyed() OVERRIDE;
 
 private:
     GeolocationController(LocalFrame&, GeolocationClient*);
@@ -80,7 +78,7 @@ private:
     void startUpdatingIfNeeded();
     void stopUpdatingIfNeeded();
 
-    GeolocationClient* m_client;
+    RawPtrWillBeMember<GeolocationClient> m_client;
     bool m_hasClientForTest;
 
     PersistentWillBeMember<GeolocationPosition> m_lastPosition;
@@ -89,9 +87,9 @@ private:
     ObserversSet m_observers;
     ObserversSet m_highAccuracyObservers;
     bool m_isClientUpdating;
-    GeolocationInspectorAgent* m_inspectorAgent;
+    RawPtrWillBeMember<GeolocationInspectorAgent> m_inspectorAgent;
 };
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // GeolocationController_h

@@ -22,12 +22,13 @@
 
 #include "core/rendering/svg/RenderSVGResourcePattern.h"
 
+#include "core/dom/ElementTraversal.h"
 #include "core/rendering/svg/SVGRenderSupport.h"
 #include "core/rendering/svg/SVGRenderingContext.h"
 #include "core/svg/SVGFitToViewBox.h"
 #include "platform/graphics/GraphicsContext.h"
 
-namespace WebCore {
+namespace blink {
 
 const RenderSVGResourceType RenderSVGResourcePattern::s_resourceType = PatternResourceType;
 
@@ -41,34 +42,22 @@ void RenderSVGResourcePattern::removeAllClientsFromCache(bool markForInvalidatio
 {
     m_patternMap.clear();
     m_shouldCollectPatternAttributes = true;
-    markAllClientsForInvalidation(markForInvalidation ? RepaintInvalidation : ParentOnlyInvalidation);
+    markAllClientsForInvalidation(markForInvalidation ? PaintInvalidation : ParentOnlyInvalidation);
 }
 
 void RenderSVGResourcePattern::removeClientFromCache(RenderObject* client, bool markForInvalidation)
 {
     ASSERT(client);
     m_patternMap.remove(client);
-    markClientForInvalidation(client, markForInvalidation ? RepaintInvalidation : ParentOnlyInvalidation);
+    markClientForInvalidation(client, markForInvalidation ? PaintInvalidation : ParentOnlyInvalidation);
 }
 
-PatternData* RenderSVGResourcePattern::buildPattern(RenderObject* object, unsigned short resourceMode)
+PatternData* RenderSVGResourcePattern::buildPattern(RenderObject* object, const SVGPatternElement* patternElement)
 {
     ASSERT(object);
     PatternData* currentData = m_patternMap.get(object);
     if (currentData && currentData->pattern)
         return currentData;
-
-    SVGPatternElement* patternElement = toSVGPatternElement(element());
-    if (!patternElement)
-        return 0;
-
-    if (m_shouldCollectPatternAttributes) {
-        patternElement->synchronizeAnimatedSVGAttribute(anyQName());
-
-        m_attributes = PatternAttributes();
-        patternElement->collectPatternAttributes(m_attributes);
-        m_shouldCollectPatternAttributes = false;
-    }
 
     // If we couldn't determine the pattern content element root, stop here.
     if (!m_attributes.patternContentElement())
@@ -106,7 +95,7 @@ PatternData* RenderSVGResourcePattern::buildPattern(RenderObject* object, unsign
 
     // Build pattern.
     OwnPtr<PatternData> patternData = adoptPtr(new PatternData);
-    patternData->pattern = Pattern::create(copiedImage, true, true);
+    patternData->pattern = Pattern::createBitmapPattern(copiedImage);
 
     // Compute pattern space transformation.
     const IntSize tileImageSize = tileImage->size();
@@ -132,18 +121,29 @@ bool RenderSVGResourcePattern::applyResource(RenderObject* object, RenderStyle* 
 
     clearInvalidationMask();
 
+    SVGPatternElement* patternElement = toSVGPatternElement(element());
+    if (!patternElement)
+        return false;
+
+    if (m_shouldCollectPatternAttributes) {
+        patternElement->synchronizeAnimatedSVGAttribute(anyQName());
+
+        m_attributes = PatternAttributes();
+        patternElement->collectPatternAttributes(m_attributes);
+        m_shouldCollectPatternAttributes = false;
+    }
+
     // Spec: When the geometry of the applicable element has no width or height and objectBoundingBox is specified,
     // then the given effect (e.g. a gradient or a filter) will be ignored.
     FloatRect objectBoundingBox = object->objectBoundingBox();
     if (m_attributes.patternUnits() == SVGUnitTypes::SVG_UNIT_TYPE_OBJECTBOUNDINGBOX && objectBoundingBox.isEmpty())
         return false;
 
-    PatternData* patternData = buildPattern(object, resourceMode);
+    PatternData* patternData = buildPattern(object, patternElement);
     if (!patternData)
         return false;
 
-    const SVGRenderStyle* svgStyle = style->svgStyle();
-    ASSERT(svgStyle);
+    const SVGRenderStyle& svgStyle = style->svgStyle();
 
     AffineTransform computedPatternSpaceTransform = computeResourceSpaceTransform(object, patternData->transform, svgStyle, resourceMode);
     patternData->pattern->setPatternSpaceTransform(computedPatternSpaceTransform);
@@ -152,11 +152,11 @@ bool RenderSVGResourcePattern::applyResource(RenderObject* object, RenderStyle* 
     context->save();
 
     if (resourceMode & ApplyToFillMode) {
-        context->setAlphaAsFloat(svgStyle->fillOpacity());
+        context->setAlphaAsFloat(svgStyle.fillOpacity());
         context->setFillPattern(patternData->pattern);
-        context->setFillRule(svgStyle->fillRule());
+        context->setFillRule(svgStyle.fillRule());
     } else if (resourceMode & ApplyToStrokeMode) {
-        context->setAlphaAsFloat(svgStyle->strokeOpacity());
+        context->setAlphaAsFloat(svgStyle.strokeOpacity());
         context->setStrokePattern(patternData->pattern);
         SVGRenderSupport::applyStrokeStyleToContext(context, style, object);
     }
@@ -171,24 +171,9 @@ bool RenderSVGResourcePattern::applyResource(RenderObject* object, RenderStyle* 
     return true;
 }
 
-void RenderSVGResourcePattern::postApplyResource(RenderObject*, GraphicsContext*& context, unsigned short resourceMode, const Path* path, const RenderSVGShape* shape)
+void RenderSVGResourcePattern::postApplyResource(RenderObject*, GraphicsContext*& context)
 {
     ASSERT(context);
-    ASSERT(resourceMode != ApplyToDefaultMode);
-
-    if (resourceMode & ApplyToFillMode) {
-        if (path)
-            context->fillPath(*path);
-        else if (shape)
-            shape->fillShape(context);
-    }
-    if (resourceMode & ApplyToStrokeMode) {
-        if (path)
-            context->strokePath(*path);
-        else if (shape)
-            shape->strokeShape(context);
-    }
-
     context->restore();
 }
 
@@ -258,8 +243,8 @@ PassOwnPtr<ImageBuffer> RenderSVGResourcePattern::createTileImage(const PatternA
         contentTransformation = tileImageTransform;
 
     // Draw the content into the ImageBuffer.
-    for (Element* element = ElementTraversal::firstWithin(*attributes.patternContentElement()); element; element = ElementTraversal::nextSibling(*element)) {
-        if (!element->isSVGElement() || !element->renderer())
+    for (SVGElement* element = Traversal<SVGElement>::firstChild(*attributes.patternContentElement()); element; element = Traversal<SVGElement>::nextSibling(*element)) {
+        if (!element->renderer())
             continue;
         if (element->renderer()->needsLayout())
             return nullptr;

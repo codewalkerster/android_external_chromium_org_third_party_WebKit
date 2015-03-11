@@ -32,7 +32,7 @@
 #include "wtf/RefPtr.h"
 #include "wtf/Vector.h"
 
-namespace WebCore {
+namespace blink {
 
 class AudioBuffer;
 class AudioContext;
@@ -45,16 +45,18 @@ class AudioProcessingEvent;
 // AudioBuffers for each input and output.
 
 class ScriptProcessorNode FINAL : public AudioNode {
+    DEFINE_WRAPPERTYPEINFO();
 public:
     // bufferSize must be one of the following values: 256, 512, 1024, 2048, 4096, 8192, 16384.
     // This value controls how frequently the onaudioprocess event handler is called and how many sample-frames need to be processed each call.
     // Lower numbers for bufferSize will result in a lower (better) latency. Higher numbers will be necessary to avoid audio breakup and glitches.
     // The value chosen must carefully balance between latency and audio quality.
-    static PassRefPtrWillBeRawPtr<ScriptProcessorNode> create(AudioContext*, float sampleRate, size_t bufferSize, unsigned numberOfInputChannels, unsigned numberOfOutputChannels);
+    static ScriptProcessorNode* create(AudioContext*, float sampleRate, size_t bufferSize, unsigned numberOfInputChannels, unsigned numberOfOutputChannels);
 
     virtual ~ScriptProcessorNode();
 
     // AudioNode
+    virtual void dispose() OVERRIDE;
     virtual void process(size_t framesToProcess) OVERRIDE;
     virtual void initialize() OVERRIDE;
     virtual void uninitialize() OVERRIDE;
@@ -71,7 +73,6 @@ private:
 
     ScriptProcessorNode(AudioContext*, float sampleRate, size_t bufferSize, unsigned numberOfInputChannels, unsigned numberOfOutputChannels);
 
-    static void fireProcessEventDispatch(void* userData);
     void fireProcessEvent();
 
     // Double buffering
@@ -79,8 +80,8 @@ private:
     void swapBuffers() { m_doubleBufferIndex = 1 - m_doubleBufferIndex; }
     unsigned m_doubleBufferIndex;
     unsigned m_doubleBufferIndexForEvent;
-    WillBeHeapVector<RefPtrWillBeMember<AudioBuffer> > m_inputBuffers;
-    WillBeHeapVector<RefPtrWillBeMember<AudioBuffer> > m_outputBuffers;
+    HeapVector<Member<AudioBuffer> > m_inputBuffers;
+    HeapVector<Member<AudioBuffer> > m_outputBuffers;
 
     size_t m_bufferSize;
     unsigned m_bufferReadWriteIndex;
@@ -89,11 +90,10 @@ private:
     unsigned m_numberOfOutputChannels;
 
     RefPtr<AudioBus> m_internalInputBus;
-
     // Synchronize process() with fireProcessEvent().
     mutable Mutex m_processEventLock;
 };
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // ScriptProcessorNode_h

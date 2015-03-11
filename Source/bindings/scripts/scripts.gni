@@ -44,7 +44,7 @@ template("compute_interfaces_info_individual") {
     file_list = "$target_gen_dir/${target_name}_file_list.txt"
     write_file(file_list, rebase_path(invoker.sources_static, root_build_dir))
 
-    source_prereqs = [
+    inputs = [
       "$bindings_scripts_dir/utilities.py",
       file_list,
     ] + invoker.sources_static + invoker.sources_generated
@@ -54,7 +54,6 @@ template("compute_interfaces_info_individual") {
     ]
 
     args = [
-      "--component-dir", invoker.component_dir,
       "--idl-files-list", rebase_path(file_list, root_build_dir),
       "--interfaces-info-file",
       rebase_path(invoker.output_file, root_build_dir),
@@ -84,7 +83,7 @@ template("generate_event_interfaces") {
     write_file(idl_files_list,
                rebase_path(invoker.sources, root_build_dir))
 
-    source_prereqs = [
+    inputs = [
       "//third_party/WebKit/Source/bindings/scripts/utilities.py",
       idl_files_list,
     ] + invoker.sources
@@ -121,10 +120,10 @@ template("idl_compiler") {
     # really expressible in GN now).
     script = "//third_party/WebKit/Source/bindings/scripts/idl_compiler.py"
 
-    source_prereqs =
+    inputs =
       idl_lexer_parser_files +  # to be explicit (covered by parsetab)
       idl_compiler_files
-    source_prereqs += [
+    inputs += [
       "$bindings_scripts_output_dir/lextab.py",
       "$bindings_scripts_output_dir/parsetab.pickle",
       "$bindings_scripts_output_dir/cached_jinja_templates.stamp",
@@ -142,7 +141,7 @@ template("idl_compiler") {
     # FIXME: This is too conservative, and causes excess rebuilds:
     # compute this file-by-file.  http://crbug.com/341748
     # This should theoretically just be the IDL files passed in.
-    source_prereqs += all_dependency_idl_files
+    inputs += all_dependency_idl_files
 
     sources = invoker.sources
     outputs = [
@@ -174,6 +173,45 @@ template("idl_compiler") {
   }
 }
 
+# Runs the idl_compiler to generate IDL dictionary impl files.
+#
+# Parameters:
+#   sources = a list of IDL files to process
+#   outputs = a list of files to write to
+template("idl_dictionary") {
+  output_dir = "$root_gen_dir/blink/"
+
+  action(target_name) {
+    script = "//third_party/WebKit/Source/bindings/scripts/idl_compiler.py"
+    idl_files_list = "$target_gen_dir/${target_name}_file_list.tmp"
+    write_file(idl_files_list, rebase_path(invoker.sources, root_build_dir))
+
+    inputs = [ idl_files_list ] + invoker.sources
+    outputs = invoker.outputs
+
+    args = [
+      "--cache-dir",
+      rebase_path(bindings_scripts_output_dir, root_build_dir),
+      "--output-dir",
+      rebase_path(output_dir, root_build_dir),
+      "--interfaces-info",
+      rebase_path("$bindings_modules_output_dir/InterfacesInfoModules.pickle",
+                  root_build_dir),
+      "--write-file-only-if-changed=1",
+      "--generate-dictionary-impl",
+      rebase_path(idl_files_list, root_build_dir),
+    ]
+
+    deps = [
+      # FIXME: should be interfaces_info_core (w/o modules)
+      # http://crbug.com/358074
+      "//third_party/WebKit/Source/bindings/modules:interfaces_info",
+      "//third_party/WebKit/Source/bindings/scripts:cached_lex_yacc_tables",
+      "//third_party/WebKit/Source/bindings/scripts:cached_jinja_templates",
+    ]
+  }
+}
+
 # Calls the aggregate_generated_bindings script.
 #
 # Parameters:
@@ -189,7 +227,7 @@ template("aggregate_generated_bindings") {
     idl_files_list = "$target_gen_dir/${target_name}_file_list.tmp"
     write_file(idl_files_list, rebase_path(invoker.sources, root_build_dir))
 
-    source_prereqs = [ idl_files_list ] + invoker.sources
+    inputs = [ idl_files_list ] + invoker.sources
     outputs = invoker.outputs
 
     args = [

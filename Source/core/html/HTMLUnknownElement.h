@@ -32,9 +32,10 @@
 
 #include "core/html/HTMLElement.h"
 
-namespace WebCore {
+namespace blink {
 
 class HTMLUnknownElement FINAL : public HTMLElement {
+    DEFINE_WRAPPERTYPEINFO();
 public:
     static PassRefPtrWillBeRawPtr<HTMLUnknownElement> create(const QualifiedName& tagName, Document& document)
     {
@@ -45,16 +46,8 @@ public:
 
 private:
     HTMLUnknownElement(const QualifiedName& tagName, Document& document)
-        : HTMLElement(tagName, document)
-    {
-        ScriptWrappable::init(this);
-    }
+        : HTMLElement(tagName, document) { }
 };
-
-inline bool isHTMLUnknownElement(const Element& element)
-{
-    return element.isHTMLElement() && toHTMLElement(element).isHTMLUnknownElement();
-}
 
 inline bool isHTMLUnknownElement(const HTMLElement& element)
 {
@@ -63,6 +56,6 @@ inline bool isHTMLUnknownElement(const HTMLElement& element)
 
 DEFINE_HTMLELEMENT_TYPE_CASTS_WITH_FUNCTION(HTMLUnknownElement);
 
-} // namespace
+} // namespace blink
 
-#endif
+#endif // HTMLUnknownElement_h

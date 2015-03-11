@@ -28,13 +28,16 @@
 #include "wtf/PassRefPtr.h"
 #include "wtf/RefPtr.h"
 
-namespace WebCore {
+namespace blink {
 
 class Filter;
 class FilterEffect;
 class SVGFilterBuilder;
 
 class SVGFilterPrimitiveStandardAttributes : public SVGElement {
+    // No DEFINE_WRAPPERTYPEINFO() here because a) this class is never
+    // instantiated, and b) we don't generate corresponding V8T.h or V8T.cpp.
+    // The subclasses must write DEFINE_WRAPPERTYPEINFO().
 public:
     void setStandardAttributes(FilterEffect*) const;
 
@@ -55,7 +58,7 @@ protected:
     bool isSupportedAttribute(const QualifiedName&);
     virtual void parseAttribute(const QualifiedName&, const AtomicString&) OVERRIDE;
     virtual void svgAttributeChanged(const QualifiedName&) OVERRIDE;
-    virtual void childrenChanged(bool changedByParser = false, Node* beforeChange = 0, Node* afterChange = 0, int childCountDelta = 0) OVERRIDE;
+    virtual void childrenChanged(const ChildrenChange&) OVERRIDE;
 
     inline void invalidate()
     {
@@ -80,6 +83,6 @@ private:
 
 void invalidateFilterPrimitiveParent(SVGElement*);
 
-} // namespace WebCore
+} // namespace blink
 
-#endif
+#endif // SVGFilterPrimitiveStandardAttributes_h

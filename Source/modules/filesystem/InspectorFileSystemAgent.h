@@ -35,7 +35,7 @@
 #include "wtf/PassOwnPtr.h"
 #include "wtf/PassRefPtr.h"
 
-namespace WebCore {
+namespace blink {
 
 class ExecutionContext;
 class Page;
@@ -43,30 +43,31 @@ class SecurityOrigin;
 
 class InspectorFileSystemAgent FINAL : public InspectorBaseAgent<InspectorFileSystemAgent>, public InspectorBackendDispatcher::FileSystemCommandHandler {
 public:
-    static PassOwnPtr<InspectorFileSystemAgent> create(Page*);
+    static PassOwnPtrWillBeRawPtr<InspectorFileSystemAgent> create(Page*);
     virtual ~InspectorFileSystemAgent();
+    virtual void trace(Visitor*) OVERRIDE;
 
     virtual void enable(ErrorString*) OVERRIDE;
     virtual void disable(ErrorString*) OVERRIDE;
 
-    virtual void requestFileSystemRoot(ErrorString*, const String& origin, const String& typeString, PassRefPtr<RequestFileSystemRootCallback>) OVERRIDE;
-    virtual void requestDirectoryContent(ErrorString*, const String& url, PassRefPtr<RequestDirectoryContentCallback>) OVERRIDE;
-    virtual void requestMetadata(ErrorString*, const String& url, PassRefPtr<RequestMetadataCallback>) OVERRIDE;
-    virtual void requestFileContent(ErrorString*, const String& url, bool readAsText, const int* start, const int* end, const String* charset, PassRefPtr<RequestFileContentCallback>) OVERRIDE;
-    virtual void deleteEntry(ErrorString*, const String& url, PassRefPtr<DeleteEntryCallback>) OVERRIDE;
+    virtual void requestFileSystemRoot(ErrorString*, const String& origin, const String& typeString, PassRefPtrWillBeRawPtr<RequestFileSystemRootCallback>) OVERRIDE;
+    virtual void requestDirectoryContent(ErrorString*, const String& url, PassRefPtrWillBeRawPtr<RequestDirectoryContentCallback>) OVERRIDE;
+    virtual void requestMetadata(ErrorString*, const String& url, PassRefPtrWillBeRawPtr<RequestMetadataCallback>) OVERRIDE;
+    virtual void requestFileContent(ErrorString*, const String& url, bool readAsText, const int* start, const int* end, const String* charset, PassRefPtrWillBeRawPtr<RequestFileContentCallback>) OVERRIDE;
+    virtual void deleteEntry(ErrorString*, const String& url, PassRefPtrWillBeRawPtr<DeleteEntryCallback>) OVERRIDE;
 
     virtual void clearFrontend() OVERRIDE;
     virtual void restore() OVERRIDE;
 
 private:
-    InspectorFileSystemAgent(Page*);
+    explicit InspectorFileSystemAgent(Page*);
     bool assertEnabled(ErrorString*);
     ExecutionContext* assertExecutionContextForOrigin(ErrorString*, SecurityOrigin*);
 
-    Page* m_page;
+    RawPtrWillBeMember<Page> m_page;
     bool m_enabled;
 };
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // InspectorFileSystemAgent_h

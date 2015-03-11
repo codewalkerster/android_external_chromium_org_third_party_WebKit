@@ -27,13 +27,13 @@
 #ifndef DOMURL_h
 #define DOMURL_h
 
-#include "bindings/v8/ScriptWrappable.h"
+#include "bindings/core/v8/ScriptWrappable.h"
 #include "core/dom/DOMURLUtils.h"
 #include "platform/heap/Handle.h"
 #include "platform/weborigin/KURL.h"
 #include "wtf/Forward.h"
 
-namespace WebCore {
+namespace blink {
 
 class Blob;
 class ExceptionState;
@@ -41,6 +41,7 @@ class ExecutionContext;
 class URLRegistrable;
 
 class DOMURL FINAL : public RefCountedWillBeGarbageCollectedFinalized<DOMURL>, public ScriptWrappable, public DOMURLUtils {
+    DEFINE_WRAPPERTYPEINFO();
 public:
     static PassRefPtrWillBeRawPtr<DOMURL> create(const String& url, ExceptionState& exceptionState)
     {
@@ -77,6 +78,6 @@ private:
     String m_input;
 };
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // DOMURL_h

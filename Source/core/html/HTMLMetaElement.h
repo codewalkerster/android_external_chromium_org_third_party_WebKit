@@ -26,7 +26,7 @@
 #include "core/dom/ViewportDescription.h"
 #include "core/html/HTMLElement.h"
 
-namespace WebCore {
+namespace blink {
 
 enum ViewportErrorCode {
     UnrecognizedViewportArgumentKeyError,
@@ -37,6 +37,7 @@ enum ViewportErrorCode {
 };
 
 class HTMLMetaElement FINAL : public HTMLElement {
+    DEFINE_WRAPPERTYPEINFO();
 public:
     DECLARE_NODE_FACTORY(HTMLMetaElement);
 
@@ -68,6 +69,6 @@ private:
     void processViewportContentAttribute(const String& content, ViewportDescription::Type origin);
 };
 
-} // namespace WebCore
+} // namespace blink
 
-#endif
+#endif // HTMLMetaElement_h

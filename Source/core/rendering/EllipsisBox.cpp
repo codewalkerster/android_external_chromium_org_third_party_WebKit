@@ -23,21 +23,21 @@
 #include "core/rendering/HitTestResult.h"
 #include "core/rendering/InlineTextBox.h"
 #include "core/rendering/PaintInfo.h"
-#include "core/rendering/RenderBlockFlow.h"
+#include "core/rendering/RenderBlock.h"
 #include "core/rendering/RootInlineBox.h"
+#include "core/rendering/TextPainter.h"
+#include "core/rendering/TextRunConstructor.h"
 #include "core/rendering/style/ShadowList.h"
 #include "platform/fonts/Font.h"
-#include "platform/graphics/DrawLooperBuilder.h"
 #include "platform/graphics/GraphicsContextStateSaver.h"
 #include "platform/text/TextRun.h"
 
-namespace WebCore {
+namespace blink {
 
 void EllipsisBox::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffset, LayoutUnit lineTop, LayoutUnit lineBottom)
 {
     GraphicsContext* context = paintInfo.context;
     RenderStyle* style = renderer().style(isFirstLineStyle());
-
     const Font& font = style->font();
     FloatPoint boxOrigin = locationIncludingFlipping();
     boxOrigin.moveBy(FloatPoint(paintOffset));
@@ -47,49 +47,23 @@ void EllipsisBox::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffset, La
     GraphicsContextStateSaver stateSaver(*context);
     if (!isHorizontal())
         context->concatCTM(InlineTextBox::rotation(boxRect, InlineTextBox::Clockwise));
-    FloatPoint textOrigin = FloatPoint(boxOrigin.x(), boxOrigin.y() + font.fontMetrics().ascent());
+    FloatPoint textOrigin(boxOrigin.x(), boxOrigin.y() + font.fontMetrics().ascent());
 
-    Color styleTextColor = renderer().resolveColor(style, CSSPropertyWebkitTextFillColor);
-    if (styleTextColor != context->fillColor())
-        context->setFillColor(styleTextColor);
+    bool isPrinting = renderer().document().printing();
+    bool haveSelection = !isPrinting && paintInfo.phase != PaintPhaseTextClip && selectionState() != RenderObject::SelectionNone;
 
-    if (selectionState() != RenderObject::SelectionNone) {
+    if (haveSelection)
         paintSelection(context, boxOrigin, style, font);
+    else if (paintInfo.phase == PaintPhaseSelection)
+        return;
 
-        // Select the correct color for painting the text.
-        Color foreground = paintInfo.forceBlackText() ? Color::black : renderer().selectionForegroundColor();
-        if (foreground != styleTextColor)
-            context->setFillColor(foreground);
-    }
+    TextPainter::Style textStyle = TextPainter::textPaintingStyle(renderer(), style, paintInfo.forceBlackText(), isPrinting);
+    if (haveSelection)
+        textStyle = TextPainter::selectionPaintingStyle(renderer(), true, paintInfo.forceBlackText(), isPrinting, textStyle);
 
-    // Text shadows are disabled when printing. http://crbug.com/258321
-    const ShadowList* shadowList = context->printing() ? 0 : style->textShadow();
-    bool hasShadow = shadowList;
-    if (hasShadow) {
-        OwnPtr<DrawLooperBuilder> drawLooperBuilder = DrawLooperBuilder::create();
-        for (size_t i = shadowList->shadows().size(); i--; ) {
-            const ShadowData& shadow = shadowList->shadows()[i];
-            float shadowX = isHorizontal() ? shadow.x() : shadow.y();
-            float shadowY = isHorizontal() ? shadow.y() : -shadow.x();
-            FloatSize offset(shadowX, shadowY);
-            drawLooperBuilder->addShadow(offset, shadow.blur(), shadow.color(),
-                DrawLooperBuilder::ShadowRespectsTransforms, DrawLooperBuilder::ShadowIgnoresAlpha);
-        }
-        drawLooperBuilder->addUnmodifiedContent();
-        context->setDrawLooper(drawLooperBuilder.release());
-    }
-
-    TextRun textRun = RenderBlockFlow::constructTextRun(&renderer(), font, m_str, style, TextRun::AllowTrailingExpansion);
-    TextRunPaintInfo textRunPaintInfo(textRun);
-    textRunPaintInfo.bounds = boxRect;
-    context->drawText(font, textRunPaintInfo, textOrigin);
-
-    // Restore the regular fill color.
-    if (styleTextColor != context->fillColor())
-        context->setFillColor(styleTextColor);
-
-    if (hasShadow)
-        context->clearDrawLooper();
+    TextRun textRun = constructTextRun(&renderer(), font, m_str, style, TextRun::AllowTrailingExpansion);
+    TextPainter textPainter(context, font, textRun, textOrigin, boxRect, isHorizontal());
+    textPainter.paint(0, m_str.length(), m_str.length(), textStyle);
 
     paintMarkupBox(paintInfo, paintOffset, lineTop, lineBottom, style);
 }
@@ -129,7 +103,7 @@ IntRect EllipsisBox::selectionRect()
 {
     RenderStyle* style = renderer().style(isFirstLineStyle());
     const Font& font = style->font();
-    return enclosingIntRect(font.selectionRectForText(RenderBlockFlow::constructTextRun(&renderer(), font, m_str, style, TextRun::AllowTrailingExpansion), IntPoint(logicalLeft(), logicalTop() + root().selectionTopAdjustedForPrecedingBlock()), root().selectionHeightAdjustedForPrecedingBlock()));
+    return enclosingIntRect(font.selectionRectForText(constructTextRun(&renderer(), font, m_str, style, TextRun::AllowTrailingExpansion), IntPoint(logicalLeft(), logicalTop() + root().selectionTopAdjustedForPrecedingBlock()), root().selectionHeightAdjustedForPrecedingBlock()));
 }
 
 void EllipsisBox::paintSelection(GraphicsContext* context, const FloatPoint& boxOrigin, RenderStyle* style, const Font& font)
@@ -151,9 +125,8 @@ void EllipsisBox::paintSelection(GraphicsContext* context, const FloatPoint& box
     const int deltaY = roundToInt(renderer().style()->isFlippedLinesWritingMode() ? selectionBottom - logicalBottom() : logicalTop() - top);
     const FloatPoint localOrigin(boxOrigin.x(), boxOrigin.y() - deltaY);
     FloatRect clipRect(localOrigin, FloatSize(m_logicalWidth, h.toFloat()));
-    alignSelectionRectToDevicePixels(clipRect);
     context->clip(clipRect);
-    context->drawHighlightForText(font, RenderBlockFlow::constructTextRun(&renderer(), font, m_str, style, TextRun::AllowTrailingExpansion), localOrigin, h, c);
+    context->drawHighlightForText(font, constructTextRun(&renderer(), font, m_str, style, TextRun::AllowTrailingExpansion), localOrigin, h, c);
 }
 
 bool EllipsisBox::nodeAtPoint(const HitTestRequest& request, HitTestResult& result, const HitTestLocation& locationInContainer, const LayoutPoint& accumulatedOffset, LayoutUnit lineTop, LayoutUnit lineBottom)
@@ -183,4 +156,4 @@ bool EllipsisBox::nodeAtPoint(const HitTestRequest& request, HitTestResult& resu
     return false;
 }
 
-} // namespace WebCore
+} // namespace blink

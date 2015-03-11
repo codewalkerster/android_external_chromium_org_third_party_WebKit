@@ -30,14 +30,13 @@
 #include "core/svg/SVGFontFaceNameElement.h"
 #include "core/svg/SVGFontFaceUriElement.h"
 
-namespace WebCore {
+namespace blink {
 
 using namespace SVGNames;
 
 inline SVGFontFaceSrcElement::SVGFontFaceSrcElement(Document& document)
     : SVGElement(font_face_srcTag, document)
 {
-    ScriptWrappable::init(this);
 }
 
 DEFINE_NODE_FACTORY(SVGFontFaceSrcElement)
@@ -58,9 +57,9 @@ PassRefPtrWillBeRawPtr<CSSValueList> SVGFontFaceSrcElement::srcValue() const
     return list;
 }
 
-void SVGFontFaceSrcElement::childrenChanged(bool changedByParser, Node* beforeChange, Node* afterChange, int childCountDelta)
+void SVGFontFaceSrcElement::childrenChanged(const ChildrenChange& change)
 {
-    SVGElement::childrenChanged(changedByParser, beforeChange, afterChange, childCountDelta);
+    SVGElement::childrenChanged(change);
     if (isSVGFontFaceElement(parentNode()))
         toSVGFontFaceElement(*parentNode()).rebuildFontFace();
 }

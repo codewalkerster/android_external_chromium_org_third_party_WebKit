@@ -28,21 +28,23 @@
 #define ShadowRoot_h
 
 #include "core/dom/ContainerNode.h"
-#include "core/dom/Document.h"
 #include "core/dom/DocumentFragment.h"
 #include "core/dom/Element.h"
 #include "core/dom/TreeScope.h"
 #include "wtf/DoublyLinkedList.h"
 
-namespace WebCore {
+namespace blink {
 
+class Document;
 class ElementShadow;
 class ExceptionState;
 class HTMLShadowElement;
 class InsertionPoint;
 class ShadowRootRareData;
+class StyleSheetList;
 
 class ShadowRoot FINAL : public DocumentFragment, public TreeScope, public DoublyLinkedListNode<ShadowRoot> {
+    DEFINE_WRAPPERTYPEINFO();
     WILL_BE_USING_GARBAGE_COLLECTED_MIXIN(ShadowRoot);
     friend class WTF::DoublyLinkedListNode<ShadowRoot>;
 public:
@@ -133,7 +135,7 @@ private:
     virtual void dispose() OVERRIDE;
 #endif
 
-    virtual void childrenChanged(bool changedByParser, Node* beforeChange, Node* afterChange, int childCountDelta) OVERRIDE;
+    virtual void childrenChanged(const ChildrenChange&) OVERRIDE;
 
     ShadowRootRareData* ensureShadowRootRareData();
 
@@ -164,6 +166,6 @@ inline Element* ShadowRoot::activeElement() const
 DEFINE_NODE_TYPE_CASTS(ShadowRoot, isShadowRoot());
 DEFINE_TYPE_CASTS(ShadowRoot, TreeScope, treeScope, treeScope->rootNode().isShadowRoot(), treeScope.rootNode().isShadowRoot());
 
-} // namespace
+} // namespace blink
 
-#endif
+#endif // ShadowRoot_h

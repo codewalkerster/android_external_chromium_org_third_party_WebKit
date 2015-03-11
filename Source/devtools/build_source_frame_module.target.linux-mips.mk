@@ -6,7 +6,6 @@ LOCAL_MODULE_CLASS := GYP
 LOCAL_MODULE := third_party_WebKit_Source_devtools_build_source_frame_module_gyp
 LOCAL_MODULE_STEM := build_source_frame_module
 LOCAL_MODULE_SUFFIX := .stamp
-LOCAL_MODULE_TAGS := optional
 LOCAL_MODULE_TARGET_ARCH := $(TARGET_$(GYP_VAR_PREFIX)ARCH)
 gyp_intermediate_dir := $(call local-intermediates-dir,,$(GYP_VAR_PREFIX))
 gyp_shared_intermediate_dir := $(call intermediates-dir-for,GYP,shared,,,$(GYP_VAR_PREFIX))
@@ -15,32 +14,27 @@ gyp_shared_intermediate_dir := $(call intermediates-dir-for,GYP,shared,,,$(GYP_V
 GYP_TARGET_DEPENDENCIES :=
 
 ### Rules for action "build_source_frame_module":
-$(gyp_shared_intermediate_dir)/resources/inspector/source_frame/SourceFrame.js: gyp_local_path := $(LOCAL_PATH)
-$(gyp_shared_intermediate_dir)/resources/inspector/source_frame/SourceFrame.js: gyp_var_prefix := $(GYP_VAR_PREFIX)
-$(gyp_shared_intermediate_dir)/resources/inspector/source_frame/SourceFrame.js: gyp_intermediate_dir := $(abspath $(gyp_intermediate_dir))
-$(gyp_shared_intermediate_dir)/resources/inspector/source_frame/SourceFrame.js: gyp_shared_intermediate_dir := $(abspath $(gyp_shared_intermediate_dir))
-$(gyp_shared_intermediate_dir)/resources/inspector/source_frame/SourceFrame.js: export PATH := $(subst $(ANDROID_BUILD_PATHS),,$(PATH))
-$(gyp_shared_intermediate_dir)/resources/inspector/source_frame/SourceFrame.js: $(LOCAL_PATH)/third_party/WebKit/Source/devtools/scripts/inline_js_imports.py $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/source_frame/CodeMirrorTextEditor.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/source_frame/CodeMirrorUtils.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/source_frame/FontView.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/source_frame/GoToLineDialog.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/source_frame/ImageView.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/source_frame/ResourceView.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/source_frame/SourceFrame.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/cm/clike.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/cm/closebrackets.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/cm/codemirror.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/cm/coffeescript.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/cm/comment.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/cm/css.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/cm/headlesscodemirror.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/cm/htmlembedded.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/cm/htmlmixed.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/cm/javascript.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/cm/markselection.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/cm/matchbrackets.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/cm/overlay.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/cm/php.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/cm/python.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/cm/shell.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/cm/xml.js $(GYP_TARGET_DEPENDENCIES)
+$(gyp_shared_intermediate_dir)/resources/inspector/source_frame_module.js: gyp_local_path := $(LOCAL_PATH)
+$(gyp_shared_intermediate_dir)/resources/inspector/source_frame_module.js: gyp_var_prefix := $(GYP_VAR_PREFIX)
+$(gyp_shared_intermediate_dir)/resources/inspector/source_frame_module.js: gyp_intermediate_dir := $(abspath $(gyp_intermediate_dir))
+$(gyp_shared_intermediate_dir)/resources/inspector/source_frame_module.js: gyp_shared_intermediate_dir := $(abspath $(gyp_shared_intermediate_dir))
+$(gyp_shared_intermediate_dir)/resources/inspector/source_frame_module.js: export PATH := $(subst $(ANDROID_BUILD_PATHS),,$(PATH))
+$(gyp_shared_intermediate_dir)/resources/inspector/source_frame_module.js: $(LOCAL_PATH)/third_party/WebKit/Source/devtools/scripts/concatenate_module_scripts.py $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/source_frame/module.json $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/source_frame/CodeMirrorTextEditor.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/source_frame/CodeMirrorUtils.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/source_frame/FontView.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/source_frame/GoToLineDialog.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/source_frame/ImageView.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/source_frame/ResourceView.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/source_frame/SourceFrame.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/cm/clike.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/cm/closebrackets.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/cm/codemirror.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/cm/coffeescript.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/cm/comment.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/cm/css.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/cm/headlesscodemirror.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/cm/htmlembedded.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/cm/htmlmixed.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/cm/javascript.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/cm/markselection.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/cm/matchbrackets.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/cm/overlay.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/cm/php.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/cm/python.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/cm/shell.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/cm/xml.js $(GYP_TARGET_DEPENDENCIES)
 	@echo "Gyp action: third_party_WebKit_Source_devtools_devtools_gyp_build_source_frame_module_target_build_source_frame_module ($@)"
-	$(hide)cd $(gyp_local_path)/third_party/WebKit/Source/devtools; mkdir -p $(gyp_shared_intermediate_dir)/resources/inspector/source_frame; python scripts/inline_js_imports.py front_end/source_frame/SourceFrame.js "$(gyp_shared_intermediate_dir)/resources/inspector/source_frame/SourceFrame.js"
+	$(hide)cd $(gyp_local_path)/third_party/WebKit/Source/devtools; mkdir -p $(gyp_shared_intermediate_dir)/resources/inspector; python scripts/concatenate_module_scripts.py front_end/source_frame/module.json "$(gyp_shared_intermediate_dir)/resources/inspector/source_frame_module.js"
 
 
 
 ### Generated for copy rule.
-$(gyp_shared_intermediate_dir)/resources/inspector/cm/cmdevtools.css: $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/cm/cmdevtools.css $(GYP_TARGET_DEPENDENCIES) | $(ACP)
-	@echo Copying: $@
-	$(hide) mkdir -p $(dir $@)
-	$(hide) $(ACP) -rpf $< $@
-
 $(gyp_shared_intermediate_dir)/resources/inspector/cm/codemirror.css: $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/cm/codemirror.css $(GYP_TARGET_DEPENDENCIES) | $(ACP)
 	@echo Copying: $@
 	$(hide) mkdir -p $(dir $@)
 	$(hide) $(ACP) -rpf $< $@
 
-third_party_WebKit_Source_devtools_devtools_gyp_build_source_frame_module_target_copies = $(gyp_shared_intermediate_dir)/resources/inspector/cm/cmdevtools.css $(gyp_shared_intermediate_dir)/resources/inspector/cm/codemirror.css
+third_party_WebKit_Source_devtools_devtools_gyp_build_source_frame_module_target_copies = $(gyp_shared_intermediate_dir)/resources/inspector/cm/codemirror.css
 
 GYP_GENERATED_OUTPUTS := \
-	$(gyp_shared_intermediate_dir)/resources/inspector/source_frame/SourceFrame.js \
+	$(gyp_shared_intermediate_dir)/resources/inspector/source_frame_module.js \
 	$(third_party_WebKit_Source_devtools_devtools_gyp_build_source_frame_module_target_copies)
 
 # Make sure our deps and generated files are built first.

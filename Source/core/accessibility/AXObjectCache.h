@@ -34,7 +34,7 @@
 #include "wtf/HashSet.h"
 #include "wtf/RefPtr.h"
 
-namespace WebCore {
+namespace blink {
 
 class AbstractInlineTextBox;
 class Document;
@@ -43,6 +43,7 @@ class Node;
 class Page;
 class RenderObject;
 class ScrollView;
+class Settings;
 class VisiblePosition;
 class Widget;
 
@@ -145,10 +146,8 @@ public:
 
     void inlineTextBoxesUpdated(RenderObject* renderer);
 
-    static void enableAccessibility() { gAccessibilityEnabled = true; }
-    static bool accessibilityEnabled() { return gAccessibilityEnabled; }
-    static void setInlineTextBoxAccessibility(bool flag) { gInlineTextBoxAccessibility = flag; }
-    static bool inlineTextBoxAccessibility() { return gInlineTextBoxAccessibility; }
+    bool accessibilityEnabled();
+    bool inlineTextBoxAccessibilityEnabled();
 
     void removeAXID(AXObject*);
     bool isIDinUse(AXID id) const { return m_idsInUse.contains(id); }
@@ -197,6 +196,8 @@ public:
 
     bool nodeHasRole(Node*, const AtomicString& role);
 
+    void setCanvasObjectBounds(Element*, const LayoutRect&);
+
     AXComputedObjectAttributeCache* computedObjectAttributeCache() { return m_computedObjectAttributeCache.get(); }
 
 protected:
@@ -218,8 +219,6 @@ private:
     HashMap<AbstractInlineTextBox*, AXID> m_inlineTextBoxObjectMapping;
     HashSet<Node*> m_textMarkerNodes;
     OwnPtr<AXComputedObjectAttributeCache> m_computedObjectAttributeCache;
-    static bool gAccessibilityEnabled;
-    static bool gInlineTextBoxAccessibility;
 
     HashSet<AXID> m_idsInUse;
 
@@ -230,6 +229,8 @@ private:
     static AXObject* focusedImageMapUIElement(HTMLAreaElement*);
 
     AXID getAXID(AXObject*);
+
+    Settings* settings();
 };
 
 bool nodeHasRole(Node*, const String& role);

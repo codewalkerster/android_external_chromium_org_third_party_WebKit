@@ -28,15 +28,20 @@
 #include "core/rendering/RenderImageResource.h"
 #include "core/rendering/RenderReplaced.h"
 
-namespace WebCore {
+namespace blink {
 
 class HTMLAreaElement;
 class HTMLMapElement;
 
 class RenderImage : public RenderReplaced {
 public:
+    // These are the paddings to use when displaying either alt text or an image.
+    static const unsigned short paddingWidth = 4;
+    static const unsigned short paddingHeight = 4;
+
     RenderImage(Element*);
     virtual ~RenderImage();
+    virtual void destroy() OVERRIDE;
 
     static RenderImage* createAnonymous(Document*);
 
@@ -64,6 +69,12 @@ public:
     inline void setImageDevicePixelRatio(float factor) { m_imageDevicePixelRatio = factor; }
     float imageDevicePixelRatio() const { return m_imageDevicePixelRatio; }
 
+    virtual void intrinsicSizeChanged() OVERRIDE
+    {
+        if (m_imageResource)
+            imageChanged(m_imageResource->imagePtr());
+    }
+
 protected:
     virtual bool needsPreferredWidthsRecalculation() const OVERRIDE FINAL;
     virtual RenderBox* embeddedContentBox() const OVERRIDE FINAL;
@@ -71,16 +82,9 @@ protected:
 
     virtual void imageChanged(WrappedImagePtr, const IntRect* = 0) OVERRIDE;
 
-    void paintIntoRect(GraphicsContext*, const LayoutRect&);
     virtual void paint(PaintInfo&, const LayoutPoint&) OVERRIDE FINAL;
     virtual void layout() OVERRIDE;
     virtual bool updateImageLoadingPriorities() OVERRIDE FINAL;
-
-    virtual void intrinsicSizeChanged() OVERRIDE
-    {
-        if (m_imageResource)
-            imageChanged(m_imageResource->imagePtr());
-    }
 
 private:
     virtual const char* renderName() const OVERRIDE { return "RenderImage"; }
@@ -101,12 +105,10 @@ private:
     virtual bool boxShadowShouldBeAppliedToBackground(BackgroundBleedAvoidance, InlineFlowBox*) const OVERRIDE FINAL;
 
     IntSize imageSizeForError(ImageResource*) const;
-    void repaintOrMarkForLayout(bool imageSizeChanged, const IntRect* = 0);
+    void paintInvalidationOrMarkForLayout(bool imageSizeChanged, const IntRect* = 0);
     void updateIntrinsicSizeIfNeeded(const LayoutSize&);
     // Update the size of the image to be rendered. Object-fit may cause this to be different from the CSS box's content rect.
     void updateInnerContentRect();
-
-    void paintAreaElementFocusRing(PaintInfo&);
 
     // Text to display as long as the image isn't available.
     String m_altText;
@@ -120,6 +122,6 @@ private:
 
 DEFINE_RENDER_OBJECT_TYPE_CASTS(RenderImage, isRenderImage());
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // RenderImage_h

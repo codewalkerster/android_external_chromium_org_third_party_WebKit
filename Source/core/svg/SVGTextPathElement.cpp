@@ -19,14 +19,14 @@
  */
 
 #include "config.h"
-
 #include "core/svg/SVGTextPathElement.h"
 
 #include "core/XLinkNames.h"
 #include "core/rendering/svg/RenderSVGResource.h"
 #include "core/rendering/svg/RenderSVGTextPath.h"
+#include "core/svg/SVGDocumentExtensions.h"
 
-namespace WebCore {
+namespace blink {
 
 template<> const SVGEnumerationStringEntries& getStaticStringEntries<SVGTextPathMethodType>()
 {
@@ -55,8 +55,6 @@ inline SVGTextPathElement::SVGTextPathElement(Document& document)
     , m_method(SVGAnimatedEnumeration<SVGTextPathMethodType>::create(this, SVGNames::methodAttr, SVGTextPathMethodAlign))
     , m_spacing(SVGAnimatedEnumeration<SVGTextPathSpacingType>::create(this, SVGNames::spacingAttr, SVGTextPathSpacingExact))
 {
-    ScriptWrappable::init(this);
-
     addToPropertyMap(m_startOffset);
     addToPropertyMap(m_method);
     addToPropertyMap(m_spacing);
@@ -73,7 +71,7 @@ SVGTextPathElement::~SVGTextPathElement()
 
 void SVGTextPathElement::clearResourceReferences()
 {
-    document().accessSVGExtensions().removeAllTargetReferencesForElement(this);
+    removeAllOutgoingReferences();
 }
 
 bool SVGTextPathElement::isSupportedAttribute(const QualifiedName& attrName)
@@ -161,7 +159,7 @@ void SVGTextPathElement::buildPendingResource()
     } else if (isSVGPathElement(*target)) {
         // Register us with the target in the dependencies map. Any change of hrefElement
         // that leads to relayout/repainting now informs us, so we can react to it.
-        document().accessSVGExtensions().addElementReferencingTarget(this, toSVGElement((target)));
+        addReferenceTo(toSVGElement((target)));
     }
 }
 
@@ -185,4 +183,4 @@ bool SVGTextPathElement::selfHasRelativeLengths() const
         || SVGTextContentElement::selfHasRelativeLengths();
 }
 
-}
+} // namespace blink

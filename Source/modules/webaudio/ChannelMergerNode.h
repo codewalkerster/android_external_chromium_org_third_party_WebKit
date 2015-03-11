@@ -32,13 +32,14 @@
 #include "modules/webaudio/AudioNode.h"
 #include "wtf/PassRefPtr.h"
 
-namespace WebCore {
+namespace blink {
 
 class AudioContext;
 
 class ChannelMergerNode FINAL : public AudioNode {
+    DEFINE_WRAPPERTYPEINFO();
 public:
-    static PassRefPtrWillBeRawPtr<ChannelMergerNode> create(AudioContext*, float sampleRate, unsigned numberOfInputs);
+    static ChannelMergerNode* create(AudioContext*, float sampleRate, unsigned numberOfInputs);
 
     // AudioNode
     virtual void process(size_t framesToProcess) OVERRIDE;
@@ -55,6 +56,6 @@ private:
     ChannelMergerNode(AudioContext*, float sampleRate, unsigned numberOfInputs);
 };
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // ChannelMergerNode_h

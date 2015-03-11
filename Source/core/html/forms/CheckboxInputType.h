@@ -33,7 +33,7 @@
 
 #include "core/html/forms/BaseCheckableInputType.h"
 
-namespace WebCore {
+namespace blink {
 
 class CheckboxInputType FINAL : public BaseCheckableInputType {
 public:
@@ -47,10 +47,9 @@ private:
     virtual void handleKeyupEvent(KeyboardEvent*) OVERRIDE;
     virtual PassOwnPtrWillBeRawPtr<ClickHandlingState> willDispatchClick() OVERRIDE;
     virtual void didDispatchClick(Event*, const ClickHandlingState&) OVERRIDE;
-    virtual bool isCheckbox() const OVERRIDE;
-    virtual bool supportsIndeterminateAppearance() const OVERRIDE;
+    virtual bool shouldAppearIndeterminate() const OVERRIDE;
 };
 
-} // namespace WebCore
+} // namespace blink
 
 #endif // CheckboxInputType_h

@@ -36,9 +36,7 @@
 #include "platform/text/TextRun.h"
 #include "wtf/MathExtras.h"
 
-using namespace std;
-
-namespace WebCore {
+namespace blink {
 
 static bool preferHarfBuzz(const Font* font)
 {
@@ -84,7 +82,7 @@ float Font::getGlyphsAndAdvancesForComplexText(const TextRunPaintInfo& runInfo, 
     float afterWidth = controller.runWidthSoFar();
 
     if (runInfo.run.rtl()) {
-        initialAdvance = controller.totalWidth() + controller.finalRoundingWidth() - afterWidth;
+        initialAdvance = controller.totalWidth() - afterWidth;
         glyphBuffer.reverse();
     } else
         initialAdvance = beforeWidth;
@@ -92,15 +90,14 @@ float Font::getGlyphsAndAdvancesForComplexText(const TextRunPaintInfo& runInfo, 
     return initialAdvance;
 }
 
-void Font::drawComplexText(GraphicsContext* context, const TextRunPaintInfo& runInfo, const FloatPoint& point) const
+float Font::drawComplexText(GraphicsContext* context, const TextRunPaintInfo& runInfo, const FloatPoint& point) const
 {
     if (preferHarfBuzz(this)) {
         GlyphBuffer glyphBuffer;
         HarfBuzzShaper shaper(this, runInfo.run);
         shaper.setDrawRange(runInfo.from, runInfo.to);
         if (shaper.shape(&glyphBuffer)) {
-            drawGlyphBuffer(context, runInfo, glyphBuffer, point);
-            return;
+            return drawGlyphBuffer(context, runInfo, glyphBuffer, point);
         }
     }
     // This glyph buffer holds our glyphs + advances + font data for each glyph.
@@ -110,11 +107,11 @@ void Font::drawComplexText(GraphicsContext* context, const TextRunPaintInfo& run
 
     // We couldn't generate any glyphs for the run.  Give up.
     if (glyphBuffer.isEmpty())
-        return;
+        return 0;
 
     // Draw the glyph buffer now at the starting point returned in startX.
     FloatPoint startPoint(startX, point.y());
-    drawGlyphBuffer(context, runInfo, glyphBuffer, startPoint);
+    return drawGlyphBuffer(context, runInfo, glyphBuffer, startPoint);
 }
 
 void Font::drawEmphasisMarksForComplexText(GraphicsContext* context, const TextRunPaintInfo& runInfo, const AtomicString& mark, const FloatPoint& point) const
@@ -138,8 +135,8 @@ float Font::floatWidthForComplexText(const TextRun& run, HashSet<const SimpleFon
     ComplexTextController controller(this, run, true, fallbackFonts);
     glyphBounds->setTop(floorf(-controller.minGlyphBoundingBoxY()));
     glyphBounds->setBottom(ceilf(controller.maxGlyphBoundingBoxY()));
-    glyphBounds->setLeft(max<int>(0, floorf(-controller.minGlyphBoundingBoxX())));
-    glyphBounds->setRight(max<int>(0, ceilf(controller.maxGlyphBoundingBoxX() - controller.totalWidth())));
+    glyphBounds->setLeft(std::max<int>(0, floorf(-controller.minGlyphBoundingBoxX())));
+    glyphBounds->setRight(std::max<int>(0, ceilf(controller.maxGlyphBoundingBoxX() - controller.totalWidth())));
 
     return controller.totalWidth();
 }
@@ -161,7 +158,7 @@ const SimpleFontData* Font::fontDataForCombiningCharacterSequence(const UChar* c
     size_t baseCharacterLength = 0;
     U16_NEXT(characters, baseCharacterLength, length, baseCharacter);
 
-    GlyphData baseCharacterGlyphData = glyphDataForCharacter(baseCharacter, false, variant);
+    GlyphData baseCharacterGlyphData = glyphDataForCharacter(baseCharacter, false, false, variant);
 
     if (!baseCharacterGlyphData.glyph)
         return 0;
@@ -209,4 +206,4 @@ const SimpleFontData* Font::fontDataForCombiningCharacterSequence(const UChar* c
     return SimpleFontData::systemFallback();
 }
 
-} // namespace WebCore
+} // namespace blink

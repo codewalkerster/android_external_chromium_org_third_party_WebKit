@@ -28,7 +28,7 @@
 #include "core/svg/SVGFilterPrimitiveStandardAttributes.h"
 #include "platform/graphics/filters/FETurbulence.h"
 
-namespace WebCore {
+namespace blink {
 
 enum SVGStitchOptions {
     SVG_STITCHTYPE_UNKNOWN  = 0,
@@ -40,6 +40,7 @@ template<> const SVGEnumerationStringEntries& getStaticStringEntries<SVGStitchOp
 template<> const SVGEnumerationStringEntries& getStaticStringEntries<TurbulenceType>();
 
 class SVGFETurbulenceElement FINAL : public SVGFilterPrimitiveStandardAttributes {
+    DEFINE_WRAPPERTYPEINFO();
 public:
     DECLARE_NODE_FACTORY(SVGFETurbulenceElement);
 
@@ -66,6 +67,6 @@ private:
     RefPtr<SVGAnimatedInteger> m_numOctaves;
 };
 
-} // namespace WebCore
+} // namespace blink
 
-#endif
+#endif // SVGFETurbulenceElement_h
