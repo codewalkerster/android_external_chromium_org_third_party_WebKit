@@ -538,7 +538,11 @@ void HTMLMediaElement::parseAttribute(const QualifiedName& name, const AtomicStr
         // Trigger a reload, as long as the 'src' attribute is present.
         if (!value.isNull()) {
         #ifdef ENABLE_CUSTOMIZATION
-            m_pending_seek = currentTime();
+            if (ended()) {
+                m_pending_seek = 0;
+            } else {
+                m_pending_seek = currentTime();
+            }
         #endif
             clearMediaPlayer(LoadMediaResource);
             scheduleDelayedAction(LoadMediaResource);
@@ -1961,13 +1965,13 @@ void HTMLMediaElement::prepareToPlay()
 
 void HTMLMediaElement::seek(double time)
 {
+    WTF_LOG(Media, "HTMLMediaElement::seek(%p, %f)", this, time);
+
 #ifdef ENABLE_CUSTOMIZATION
     if (ended()) {
         m_seekAfterEnded = true;
     }
 #endif
-
-    WTF_LOG(Media, "HTMLMediaElement::seek(%p, %f)", this, time);
 
     // 2 - If the media element's readyState is HAVE_NOTHING, abort these steps.
     if (m_readyState == HAVE_NOTHING)
@@ -3412,16 +3416,19 @@ void HTMLMediaElement::updatePlayState()
         m_playing = true;
 
     } else { // Should not be playing right now
+        if (isPlaying)
+            webMediaPlayer()->pause();
+
     #ifdef ENABLE_CUSTOMIZATION
         if (m_seekAfterEnded) {
-            //m_player->play();
-            //m_player->pause();
+            if (m_paused) {
+                webMediaPlayer()->play();
+                webMediaPlayer()->pause();
+            }
             m_seekAfterEnded = false;
         }
     #endif
 
-        if (isPlaying)
-            webMediaPlayer()->pause();
         refreshCachedTime();
 
         m_playbackProgressTimer.stop();
